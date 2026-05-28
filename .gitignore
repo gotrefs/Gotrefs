@@ -1,0 +1,23 @@
+# Dependencies & build output
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+!**/.env.example
+web/.env.local
+officialconnect_config.json
+
+# Local / IDE
+.DS_Store
+Thumbs.db
+.vercel
+*.log
+
+# Optional: keep example config in repo
+!officialconnect_config.example.json

@@ -1,0 +1,240 @@
+{
+  "$comment": "Marketing copy + form definitions from the original GoTRefs landing page. Domain: gotrefs.org",
+  "meta": {
+    "siteName": "GoTRefs",
+    "domain": "gotrefs.org",
+    "defaultTitle": "GoTRefs — Find Certified Referees Instantly"
+  },
+  "nav": {
+    "refereeCta": "I'm a Referee",
+    "organizerCta": "Post an Event"
+  },
+  "hero": {
+    "badge": "4,800+ Verified Refs Nationwide",
+    "headline": {
+      "line1": "The Referee",
+      "line2Accent": "Marketplace",
+      "line3": "for Every Sport"
+    },
+    "subtext": "Certified. Background-checked. Ready to work. Connect with verified officials or find games in your area — in minutes, not weeks.",
+    "ctaReferee": {
+      "icon": "🏀",
+      "title": "I'm a Referee",
+      "subtitle": "Find games & get paid"
+    },
+    "ctaOrganizer": {
+      "icon": "📋",
+      "title": "I'm an Organizer",
+      "subtitle": "Find refs for your event"
+    },
+    "stats": [
+      { "value": "4,800+", "label": "Active Refs" },
+      { "value": "32", "label": "Sports" },
+      { "value": "50", "label": "States" },
+      { "value": "98%", "label": "Satisfaction" }
+    ]
+  },
+  "howItWorks": {
+    "sectionTag": "Simple Process",
+    "sectionTitle": "How It Works",
+    "sectionSubtext": "Whether you're blowing a whistle or running a tournament, we make it effortless.",
+    "forReferees": {
+      "icon": "🏀",
+      "title": "For Referees",
+      "steps": [
+        {
+          "num": 1,
+          "title": "Sign Up & Verify",
+          "description": "Submit your certifications and pass a quick background check. Takes under 10 minutes."
+        },
+        {
+          "num": 2,
+          "title": "Set Your Schedule",
+          "description": "Choose your sports, availability, and rate per game. You control your calendar."
+        },
+        {
+          "num": 3,
+          "title": "Get Paid",
+          "description": "Accept bookings, show up, officiate. Payment hits your account within 24 hours."
+        }
+      ],
+      "button": "Join as a Referee →"
+    },
+    "forOrganizers": {
+      "icon": "📋",
+      "title": "For Organizers",
+      "steps": [
+        {
+          "num": 1,
+          "title": "Post Your Event",
+          "description": "Tell us the sport, date, location, and how many officials you need."
+        },
+        {
+          "num": 2,
+          "title": "Get Matched",
+          "description": "We surface verified, available refs in your area that match your requirements."
+        },
+        {
+          "num": 3,
+          "title": "Confirmed & Done",
+          "description": "Book, pay securely, and receive confirmation. Your game is covered."
+        }
+      ],
+      "button": "Find Refs Now →"
+    }
+  },
+  "trustStrip": {
+    "items": [
+      { "label": "Background Checked" },
+      { "label": "Certified Officials" },
+      { "label": "Secure Payments" },
+      { "label": "24/7 Support" },
+      { "label": "50-State Coverage" }
+    ]
+  },
+  "ctaBanner": {
+    "title": "Ready to Get in the Game?",
+    "subtext": "Join thousands of refs and organizers already using GoTRefs.",
+    "primaryButton": "I'm a Referee — Sign Me Up",
+    "secondaryButton": "Find a Ref for My Event"
+  },
+  "footer": {
+    "tagline": "The fastest way to connect certified referees with sports organizers nationwide.",
+    "columns": [
+      {
+        "heading": "Referees",
+        "links": [
+          { "label": "Join as a Ref", "href": "#" },
+          { "label": "Get Certified", "href": "#" },
+          { "label": "How Payouts Work", "href": "#" }
+        ]
+      },
+      {
+        "heading": "Organizers",
+        "links": [
+          { "label": "Post an Event", "href": "#" },
+          { "label": "Browse Refs", "href": "#" },
+          { "label": "Bulk Booking", "href": "#" }
+        ]
+      },
+      {
+        "heading": "Company",
+        "links": [
+          { "label": "About", "href": "#" },
+          { "label": "Contact", "href": "#" },
+          { "label": "Privacy Policy", "href": "#" }
+        ]
+      }
+    ],
+    "copyright": "© 2026 GoTRefs, Inc. All rights reserved.",
+    "legalLine": "Terms · Privacy · Cookies"
+  },
+  "modals": {
+    "referee": {
+      "tag": "Referee Sign-Up",
+      "title": "Join as a Referee",
+      "intro": "Create your referee profile. We store your details securely, review your certification upload, then follow up by email to finish verification and background check consent.",
+      "successBanner": "✓ You're on the list! We'll review your profile and be in touch within 24 hours.",
+      "successTitle": "You're on the list!",
+      "successMessage": "Thanks for signing up! We'll review your profile and reach out within 24 hours to complete verification.",
+      "submitLabel": "Create My Referee Profile →",
+      "submitLoading": "Submitting..."
+    },
+    "organizer": {
+      "tag": "Event Request",
+      "title": "Find Refs for Your Event",
+      "successBanner": "✓ Request received! We're matching you with available refs now. Check your email within 2 hours.",
+      "successTitle": "Request Received!",
+      "successMessage": "We're matching you with available refs now. Expect a response within 2 hours. Check your email for next steps.",
+      "submitLabel": "Find Refs for My Event →",
+      "submitLoading": "Submitting...",
+      "footerNote": "We'll match you with available, verified refs within 2 hours. No commitment until you confirm."
+    }
+  },
+  "forms": {
+    "sports": [
+      "Basketball",
+      "Soccer",
+      "Football",
+      "Baseball / Softball",
+      "Volleyball",
+      "Hockey",
+      "Tennis",
+      "Wrestling",
+      "Other"
+    ],
+    "refereeCertificationLevels": [
+      "Entry / Trainee",
+      "Youth / Recreational",
+      "High School (NFHS)",
+      "Collegiate",
+      "National / Professional"
+    ],
+    "organizerCertificationRequired": [
+      { "value": "any", "label": "Any Certification" },
+      { "value": "Youth / Recreational", "label": "Youth / Recreational" },
+      { "value": "High School (NFHS)", "label": "High School (NFHS)" },
+      { "value": "Collegiate Level", "label": "Collegiate Level" },
+      { "value": "National / Professional", "label": "National / Professional" }
+    ],
+    "officialsNeeded": [
+      { "value": "1", "label": "1 Referee" },
+      { "value": "2", "label": "2 Referees" },
+      { "value": "3", "label": "3 Referees" },
+      { "value": "4-6", "label": "4–6 Referees" },
+      { "value": "7-10", "label": "7–10 Referees" },
+      { "value": "10+", "label": "10+ (Tournament)" }
+    ],
+    "availabilityDays": [
+      { "key": "mon", "label": "Monday", "short": "Mon" },
+      { "key": "tue", "label": "Tuesday", "short": "Tue" },
+      { "key": "wed", "label": "Wednesday", "short": "Wed" },
+      { "key": "thu", "label": "Thursday", "short": "Thu" },
+      { "key": "fri", "label": "Friday", "short": "Fri" },
+      { "key": "sat", "label": "Saturday", "short": "Sat" },
+      { "key": "sun", "label": "Sunday", "short": "Sun" }
+    ],
+    "verificationUpload": {
+      "label": "Verification Document *",
+      "hint": "Upload a photo of your referee certification card, NFHS card, or government-issued ID. Accepted: JPG, PNG, PDF (max 10 MB).",
+      "dropzoneLabel": "Click to upload or drag & drop",
+      "dropzoneSub": "JPG, PNG or PDF · Max 10 MB",
+      "maxBytes": 10485760
+    },
+    "refereeFields": {
+      "fullName": { "label": "Full Name *", "placeholder": "Marcus Johnson", "dbColumn": "full_name" },
+      "email": { "label": "Email Address *", "placeholder": "marcus@example.com", "dbColumn": "email" },
+      "phone": { "label": "Phone Number", "placeholder": "(555) 000-0000", "dbColumn": "phone" },
+      "zip": { "label": "Zip Code *", "placeholder": "90210", "dbColumn": "zip_code" },
+      "sport": { "label": "Primary Sport *", "dbColumn": "sport" },
+      "certification": { "label": "Certification Level *", "dbColumn": "certification_level" },
+      "availability": { "label": "General Availability *", "dbColumn": "availability", "format": "comma_separated_weekdays" },
+      "ratePerGame": { "label": "Rate per Game (optional)", "placeholder": "75", "dbColumn": "rate_per_game" },
+      "verificationFile": { "dbColumn": "verification_document_storage_path", "storageBucket": "verification_documents" }
+    },
+    "organizerFields": {
+      "name": { "label": "Your Name *", "placeholder": "Sarah Williams", "dbColumn": "organizer_name" },
+      "email": { "label": "Email Address *", "placeholder": "sarah@leagues.com", "dbColumn": "organizer_email" },
+      "phone": { "label": "Phone Number", "placeholder": "(555) 000-0000", "dbColumn": "organizer_phone" },
+      "organization": { "label": "Organization / League *", "placeholder": "Westside Youth Basketball", "dbColumn": "organization" },
+      "sport": { "label": "Sport *", "dbColumn": "sport" },
+      "officialsNeeded": { "label": "Officials Needed *", "dbColumn": "officials_needed" },
+      "eventDate": { "label": "Event Date *", "dbColumn": "event_date" },
+      "zip": { "label": "Event Zip Code *", "placeholder": "90210", "dbColumn": "zip_code" },
+      "certificationRequired": { "label": "Certification Required", "dbColumn": "certification_required", "default": "any" },
+      "notes": { "label": "Additional Notes", "placeholder": "Recurring league? Special requirements? Let us know...", "dbColumn": "notes" }
+    },
+    "disclaimerReferee": "By submitting, you agree to our Terms and Privacy Policy. Background check consent required after sign-up."
+  },
+  "supabase": {
+    "tables": {
+      "profiles": "Referee rows; role must be ref. Maps from referee onboarding form + verification_documents path.",
+      "events": "Organizer event requests from organizer form."
+    },
+    "migrationFile": "supabase/migrations/20260513120000_gotrefs_profiles_events_storage.sql",
+    "configFiles": {
+      "example": "officialconnect_config.example.json",
+      "local": "officialconnect_config.json"
+    }
+  }
+}

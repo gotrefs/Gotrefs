@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoTRefs — Find Certified Referees Instantly</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <!-- Supabase integration is handled in script.js + officialconnect_config.json -->
+</head>
+<body class="bg-white text-gray-900 font-body">
+
+  <!-- ═══════════════════════════════════════
+       NAVBAR
+  ═══════════════════════════════════════ -->
+  <nav class="fixed top-0 w-full z-50 bg-navy border-b border-white/10 py-3 px-4 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="logo-icon">GR</div>
+      <span class="font-display text-white text-xl font-800 tracking-tight">Got<span class="text-orange">Refs</span></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('referee')" class="btn-nav-ghost hidden sm:inline-flex">I'm a Referee</button>
+      <button onclick="openModal('organizer')" class="btn-nav-primary">Post an Event</button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       HERO
+  ═══════════════════════════════════════ -->
+  <section id="hero" class="hero-section min-h-screen flex flex-col justify-center items-center text-center px-4 pt-20">
+    <div class="hero-noise"></div>
+    <div class="relative z-10 max-w-3xl mx-auto">
+      <div class="hero-badge mb-6 inline-flex items-center gap-2">
+        <span class="pulse-dot"></span>
+        <span>4,800+ Verified Refs Nationwide</span>
+      </div>
+      <h1 class="font-display text-white leading-none mb-6 hero-headline">
+        The Referee<br/>
+        <span class="text-orange">Marketplace</span><br/>
+        for Every Sport
+      </h1>
+      <p class="text-white/60 text-lg font-light mb-10 max-w-xl mx-auto leading-relaxed">
+        Certified. Background-checked. Ready to work. Connect with verified officials or find games in your area — in minutes, not weeks.
+      </p>
+
+      <!-- DUAL CTA -->
+      <div class="dual-cta-grid">
+        <button onclick="openModal('referee')" class="cta-card cta-ref group">
+          <div class="cta-icon">🏀</div>
+          <div>
+            <div class="cta-title">I'm a Referee</div>
+            <div class="cta-sub">Find games & get paid</div>
+          </div>
+          <svg class="cta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        <button onclick="openModal('organizer')" class="cta-card cta-org group">
+          <div class="cta-icon">📋</div>
+          <div>
+            <div class="cta-title">I'm an Organizer</div>
+            <div class="cta-sub">Find refs for your event</div>
+          </div>
+          <svg class="cta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- STATS ROW -->
+      <div class="stats-row mt-14">
+        <div class="stat-item"><span class="stat-num">4,800+</span><span class="stat-label">Active Refs</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><span class="stat-num">32</span><span class="stat-label">Sports</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><span class="stat-num">50</span><span class="stat-label">States</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><span class="stat-num">98%</span><span class="stat-label">Satisfaction</span></div>
+      </div>
+    </div>
+
+    <!-- Scroll Indicator -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 scroll-indicator">
+      <div class="scroll-arrow"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       TRUST / HOW IT WORKS
+  ═══════════════════════════════════════ -->
+  <section id="how" class="py-20 px-4 bg-white">
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center mb-14">
+        <p class="section-tag">Simple Process</p>
+        <h2 class="font-display section-headline">How It Works</h2>
+        <p class="text-gray-500 mt-3 max-w-md mx-auto">Whether you're blowing a whistle or running a tournament, we make it effortless.</p>
+      </div>
+
+      <!-- TWO COLUMNS: Refs vs Organizers -->
+      <div class="how-grid">
+        <!-- REFS COLUMN -->
+        <div class="how-column how-ref">
+          <div class="how-col-header">
+            <span class="how-icon">🏀</span>
+            <h3 class="font-display text-2xl font-800 text-white">For Referees</h3>
+          </div>
+          <div class="how-steps">
+            <div class="how-step">
+              <div class="step-num">1</div>
+              <div>
+                <div class="step-title">Sign Up & Verify</div>
+                <div class="step-desc">Submit your certifications and pass a quick background check. Takes under 10 minutes.</div>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="step-num">2</div>
+              <div>
+                <div class="step-title">Set Your Schedule</div>
+                <div class="step-desc">Choose your sports, availability, and rate per game. You control your calendar.</div>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="step-num">3</div>
+              <div>
+                <div class="step-title">Get Paid</div>
+                <div class="step-desc">Accept bookings, show up, officiate. Payment hits your account within 24 hours.</div>
+              </div>
+            </div>
+          </div>
+          <button onclick="openModal('referee')" class="how-btn-ref mt-6">Join as a Referee →</button>
+        </div>
+
+        <!-- ORGANIZERS COLUMN -->
+        <div class="how-column how-org">
+          <div class="how-col-header">
+            <span class="how-icon">📋</span>
+            <h3 class="font-display text-2xl font-800 text-navy">For Organizers</h3>
+          </div>
+          <div class="how-steps how-steps-org">
+            <div class="how-step how-step-org">
+              <div class="step-num step-num-org">1</div>
+              <div>
+                <div class="step-title step-title-org">Post Your Event</div>
+                <div class="step-desc step-desc-org">Tell us the sport, date, location, and how many officials you need.</div>
+              </div>
+            </div>
+            <div class="how-step how-step-org">
+              <div class="step-num step-num-org">2</div>
+              <div>
+                <div class="step-title step-title-org">Get Matched</div>
+                <div class="step-desc step-desc-org">We surface verified, available refs in your area that match your requirements.</div>
+              </div>
+            </div>
+            <div class="how-step how-step-org">
+              <div class="step-num step-num-org">3</div>
+              <div>
+                <div class="step-title step-title-org">Confirmed & Done</div>
+                <div class="step-desc step-desc-org">Book, pay securely, and receive confirmation. Your game is covered.</div>
+              </div>
+            </div>
+          </div>
+          <button onclick="openModal('organizer')" class="how-btn-org mt-6">Find Refs Now →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       TRUST BADGES
+  ═══════════════════════════════════════ -->
+  <section class="trust-strip py-10 px-4">
+    <div class="max-w-4xl mx-auto trust-items">
+      <div class="trust-item">
+        <svg class="trust-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Background Checked</span>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Certified Officials</span>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span>Secure Payments</span>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>24/7 Support</span>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>50-State Coverage</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       CTA BANNER
+  ═══════════════════════════════════════ -->
+  <section class="cta-banner py-20 px-4 text-center">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="font-display text-white cta-banner-headline mb-4">Ready to Get in the Game?</h2>
+      <p class="text-white/60 mb-8 text-lg font-light">Join thousands of refs and organizers already using GoTRefs.</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <button onclick="openModal('referee')" class="btn-cta-white">I'm a Referee — Sign Me Up</button>
+        <button onclick="openModal('organizer')" class="btn-cta-outline">Find a Ref for My Event</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════ -->
+  <footer class="bg-navy border-t border-white/10 py-10 px-4">
+    <div class="max-w-5xl mx-auto footer-inner">
+      <div class="footer-brand">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="logo-icon">GR</div>
+          <span class="font-display text-white text-lg font-800">Got<span class="text-orange">Refs</span></span>
+        </div>
+        <p class="text-white/40 text-sm max-w-xs leading-relaxed">The fastest way to connect certified referees with sports organizers nationwide.</p>
+      </div>
+      <div class="footer-links">
+        <div>
+          <div class="footer-col-head">Referees</div>
+          <a href="#" class="footer-link">Join as a Ref</a>
+          <a href="#" class="footer-link">Get Certified</a>
+          <a href="#" class="footer-link">How Payouts Work</a>
+        </div>
+        <div>
+          <div class="footer-col-head">Organizers</div>
+          <a href="#" class="footer-link">Post an Event</a>
+          <a href="#" class="footer-link">Browse Refs</a>
+          <a href="#" class="footer-link">Bulk Booking</a>
+        </div>
+        <div>
+          <div class="footer-col-head">Company</div>
+          <a href="#" class="footer-link">About</a>
+          <a href="#" class="footer-link">Contact</a>
+          <a href="#" class="footer-link">Privacy Policy</a>
+        </div>
+      </div>
+    </div>
+    <div class="max-w-5xl mx-auto mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <p class="text-white/30 text-xs">© 2025 GoTRefs, Inc. All rights reserved.</p>
+      <p class="text-white/30 text-xs">Terms · Privacy · Cookies</p>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════
+       MODAL OVERLAY
+  ═══════════════════════════════════════ -->
+  <div id="modalOverlay" class="modal-overlay hidden" onclick="closeModalOutside(event)">
+    <div class="modal-box" id="modalBox">
+
+      <!-- MODAL HEADER -->
+      <div class="modal-header" id="modalHeader">
+        <div>
+          <p class="modal-tag" id="modalTag">Referee Sign-Up</p>
+          <h2 class="font-display modal-title" id="modalTitle">Join as a Referee</h2>
+        </div>
+        <button onclick="closeModal()" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <!-- REFEREE ONBOARDING -->
+      <div id="refSuccess" class="fs-banner fs-banner-success hidden">
+        ✓ You're on the list! We'll review your profile and be in touch within 24 hours.
+      </div>
+      <div id="refError" class="fs-banner fs-banner-error hidden" role="alert"></div>
+
+      <form id="refForm" onsubmit="handleSubmit(event, 'referee')" class="modal-form" novalidate>
+        <input type="hidden" name="form_type" value="referee_signup" />
+
+        <p class="text-sm text-gray-500 mb-5 leading-relaxed -mt-1">
+          Create your referee profile. We store your details securely, review your certification upload, then follow up by email to finish verification and background check consent.
+        </p>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="ref_name">Full Name *</label>
+            <input type="text" id="ref_name" name="name" required placeholder="Marcus Johnson" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ref_email">Email Address *</label>
+            <input type="email" id="ref_email" name="email" required placeholder="marcus@example.com" class="form-input" autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="ref_phone">Phone Number</label>
+            <input type="tel" id="ref_phone" name="phone" placeholder="(555) 000-0000" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ref_zip">Zip Code *</label>
+            <input type="text" id="ref_zip" name="zip_code" required placeholder="90210" maxlength="5" class="form-input" />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="ref_sport">Primary Sport *</label>
+            <select id="ref_sport" name="sport" required class="form-select">
+              <option value="" disabled selected>Select a sport</option>
+              <option>Basketball</option>
+              <option>Soccer</option>
+              <option>Football</option>
+              <option>Baseball / Softball</option>
+              <option>Volleyball</option>
+              <option>Hockey</option>
+              <option>Tennis</option>
+              <option>Wrestling</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ref_cert">Certification Level *</label>
+            <select id="ref_cert" name="certification_level" required class="form-select">
+              <option value="" disabled selected>Select level</option>
+              <option>Entry / Trainee</option>
+              <option>Youth / Recreational</option>
+              <option>High School (NFHS)</option>
+              <option>Collegiate</option>
+              <option>National / Professional</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">General Availability *</label>
+          <div class="avail-grid">
+            <label class="avail-check"><input type="checkbox" name="avail_mon" value="Monday" /><span>Mon</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_tue" value="Tuesday" /><span>Tue</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_wed" value="Wednesday" /><span>Wed</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_thu" value="Thursday" /><span>Thu</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_fri" value="Friday" /><span>Fri</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_sat" value="Saturday" /><span>Sat</span></label>
+            <label class="avail-check"><input type="checkbox" name="avail_sun" value="Sunday" /><span>Sun</span></label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ref_rate">Rate per Game (optional)</label>
+          <div class="input-prefix-wrap">
+            <span class="input-prefix">$</span>
+            <input type="number" id="ref_rate" name="rate_per_game" placeholder="75" min="0" class="form-input input-with-prefix" />
+          </div>
+        </div>
+
+        <!-- VERIFICATION UPLOAD -->
+        <div class="form-group">
+          <label class="form-label" for="ref_doc">Verification Document *</label>
+          <p class="upload-hint">Upload a photo of your referee certification card, NFHS card, or government-issued ID. Accepted: JPG, PNG, PDF (max 10 MB).</p>
+          <label for="ref_doc" class="upload-dropzone" id="refDropzone">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <span class="upload-label" id="refUploadLabel">Click to upload or drag &amp; drop</span>
+            <span class="upload-sub">JPG, PNG or PDF · Max 10 MB</span>
+          </label>
+          <input type="file" id="ref_doc" name="verification_document"
+                 accept=".jpg,.jpeg,.png,.pdf"
+                 required
+                 class="upload-input"
+                 onchange="handleFileSelect(event, 'refUploadLabel', 'refDropzone')" />
+        </div>
+
+        <button type="submit" class="form-submit-btn form-submit-ref">
+          <span id="refBtnText">Create My Referee Profile →</span>
+          <span id="refBtnLoading" class="hidden">Submitting...</span>
+        </button>
+        <p class="form-disclaimer">By submitting, you agree to our <a href="#" class="underline">Terms</a> and <a href="#" class="underline">Privacy Policy</a>. Background check consent required after sign-up.</p>
+      </form>
+
+      <!-- ORGANIZER / EVENT REQUEST -->
+      <div id="orgSuccess" class="fs-banner fs-banner-success hidden">
+        ✓ Request received! We're matching you with available refs now. Check your email within 2 hours.
+      </div>
+      <div id="orgError" class="fs-banner fs-banner-error hidden" role="alert"></div>
+
+      <form id="orgForm" onsubmit="handleSubmit(event, 'organizer')" class="modal-form hidden" novalidate>
+        <input type="hidden" name="form_type" value="organizer_request" />
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="org_name">Your Name *</label>
+            <input type="text" id="org_name" name="name" required placeholder="Sarah Williams" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="org_email">Email Address *</label>
+            <input type="email" id="org_email" name="email" required placeholder="sarah@leagues.com" class="form-input" autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="org_org">Organization / League *</label>
+            <input type="text" id="org_org" name="organization" required placeholder="Westside Youth Basketball" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="org_phone">Phone Number</label>
+            <input type="tel" id="org_phone" name="phone" placeholder="(555) 000-0000" class="form-input" />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="org_sport">Sport *</label>
+            <select id="org_sport" name="sport" required class="form-select">
+              <option value="" disabled selected>Select a sport</option>
+              <option>Basketball</option>
+              <option>Soccer</option>
+              <option>Football</option>
+              <option>Baseball / Softball</option>
+              <option>Volleyball</option>
+              <option>Hockey</option>
+              <option>Tennis</option>
+              <option>Wrestling</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="org_officials">Officials Needed *</label>
+            <select id="org_officials" name="officials_needed" required class="form-select">
+              <option value="" disabled selected>How many?</option>
+              <option value="1">1 Referee</option>
+              <option value="2">2 Referees</option>
+              <option value="3">3 Referees</option>
+              <option value="4-6">4–6 Referees</option>
+              <option value="7-10">7–10 Referees</option>
+              <option value="10+">10+ (Tournament)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="org_date">Event Date *</label>
+            <input type="date" id="org_date" name="event_date" required class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="org_zip">Event Zip Code *</label>
+            <input type="text" id="org_zip" name="zip_code" required placeholder="90210" maxlength="5" class="form-input" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="org_cert">Certification Required</label>
+          <select id="org_cert" name="certification_required" class="form-select">
+            <option value="any" selected>Any Certification</option>
+            <option>Youth / Recreational</option>
+            <option>High School (NFHS)</option>
+            <option>Collegiate Level</option>
+            <option>National / Professional</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="org_notes">Additional Notes</label>
+          <textarea id="org_notes" name="notes" rows="3" placeholder="Recurring league? Special requirements? Let us know..." class="form-textarea"></textarea>
+        </div>
+
+        <button type="submit" class="form-submit-btn form-submit-org">
+          <span id="orgBtnText">Find Refs for My Event →</span>
+          <span id="orgBtnLoading" class="hidden">Submitting...</span>
+        </button>
+        <p class="form-disclaimer">We'll match you with available, verified refs within 2 hours. No commitment until you confirm.</p>
+      </form>
+
+      <!-- SUCCESS STATE -->
+      <div id="successState" class="hidden text-center py-8 px-4">
+        <div class="success-icon">✓</div>
+        <h3 class="font-display text-2xl font-800 text-navy mt-4 mb-2" id="successTitle">You're on the list!</h3>
+        <p class="text-gray-500 text-sm leading-relaxed" id="successMsg">We'll be in touch within 2 hours to get you set up.</p>
+        <button onclick="closeModal()" class="btn-success-close mt-6">Close</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

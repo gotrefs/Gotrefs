@@ -1,0 +1,31 @@
+{
+  "$comment": "Extracted from styles.css :root — use when rebuilding UI (Tailwind theme, CSS variables, etc.)",
+  "colors": {
+    "orange": "#F04E23",
+    "orangeDark": "#C03B18",
+    "orangeLight": "#FDEEE9",
+    "navy": "#0D1B2A",
+    "navyMid": "#1A2E44",
+    "slate": "#3A5068",
+    "muted": "#7B8FA0",
+    "border": "#E2E8EF",
+    "bg": "#F8FAFB",
+    "white": "#FFFFFF",
+    "green": "#1A9E6E",
+    "greenLight": "#E3F6EF"
+  },
+  "fonts": {
+    "display": "'Barlow Condensed', sans-serif",
+    "body": "'DM Sans', sans-serif",
+    "googleFontsUrl": "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500&display=swap"
+  },
+  "radius": {
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px"
+  },
+  "logo": {
+    "iconLetters": "GR",
+    "wordmarkHtmlStyle": "Got<span class=\"text-orange\">Refs</span>"
+  }
+}

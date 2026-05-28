@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --orange: #f04e23;
+  --orange-dark: #c03b18;
+  --navy: #0d1b2a;
+  --navy-mid: #1a2e44;
+  --slate: #3a5068;
+  --muted: #7b8fa0;
+  --border: #e2e8ef;
+  --bg: #f8fafb;
+  --white: #ffffff;
+}
+
+@theme inline {
+  --font-display: var(--font-barlow);
+  --font-body: var(--font-dm);
+}
+
+body {
+  background: var(--bg);
+  color: var(--navy);
+  font-family: var(--font-dm), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-barlow), system-ui, sans-serif;
+}
