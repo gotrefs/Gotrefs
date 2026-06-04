@@ -1,15 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --orange: #f04e23;
-  --orange-dark: #c03b18;
-  --navy: #0d1b2a;
-  --navy-mid: #1a2e44;
+  /* Patriotic red, white & blue */
+  --red: #b22234;
+  --red-dark: #8b1a28;
+  --red-light: #fde8eb;
+  --blue: #002868;
+  --blue-mid: #1e3a6e;
   --slate: #3a5068;
-  --muted: #7b8fa0;
-  --border: #e2e8ef;
-  --bg: #f8fafb;
+  --muted: #6b7c8f;
+  --border: #d9e2ef;
+  --bg: #f4f7fb;
   --white: #ffffff;
+
+  /* Legacy aliases used across the app */
+  --orange: var(--red);
+  --orange-dark: var(--red-dark);
+  --navy: var(--blue);
+  --navy-mid: var(--blue-mid);
 }
 
 @theme inline {
@@ -19,7 +27,7 @@
 
 body {
   background: var(--bg);
-  color: var(--navy);
+  color: var(--blue);
   font-family: var(--font-dm), system-ui, sans-serif;
 }
 

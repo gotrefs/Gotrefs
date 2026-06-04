@@ -320,6 +320,8 @@ on conflict (id) do nothing;
 drop policy if exists "Allow verification uploads" on storage.objects;
 drop policy if exists "verification_upload_own_folder" on storage.objects;
 drop policy if exists "verification_read_own_folder" on storage.objects;
+drop policy if exists "verification_update_own_folder" on storage.objects;
+drop policy if exists "verification_delete_own_folder" on storage.objects;
 
 create policy "verification_upload_own_folder"
   on storage.objects for insert to authenticated

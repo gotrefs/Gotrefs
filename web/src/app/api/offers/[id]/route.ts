@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { refOfferEligible } from "@/lib/ref-eligibility";
 
 type Action = "accept" | "decline" | "cancel";
 
@@ -61,6 +62,53 @@ export async function PATCH(
 
   if (action === "accept" && !isRef) {
     return NextResponse.json({ error: "Only the referee can accept" }, { status: 403 });
+  }
+
+  if (action === "accept" && isRef) {
+    const [{ data: screening }, { data: profile }, { data: submission }] = await Promise.all([
+      supabase.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
+      supabase
+        .from("ref_profiles")
+        .select(
+          "verification_method, external_verification_proof_path, government_id_path, verification_doc_path, certification_document_path, bio, primary_sport, certification_level"
+        )
+        .eq("member_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("ref_verification_submissions")
+        .select("status")
+        .eq("ref_member_id", user.id)
+        .maybeSingle(),
+    ]);
+
+    if (
+      !refOfferEligible({
+        screeningStatus: screening?.status,
+        verificationMethod: profile?.verification_method,
+        externalProofPath: profile?.external_verification_proof_path,
+        verificationSubmissionStatus: submission?.status,
+        profile,
+      })
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Complete verification first: upload ID and certification, fill out your profile, and submit your verification package.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (screening?.status !== "clear") {
+      await supabase
+        .from("screening_checks")
+        .update({
+          status: "clear",
+          summary: "Eligible via completed verification package",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("ref_member_id", user.id);
+    }
   }
 
   if (action === "decline" && !isRef) {

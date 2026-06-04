@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { RefEventCalendar } from "@/components/RefEventCalendar";
+import { refOfferEligible } from "@/lib/ref-eligibility";
 
 type Screening = {
   status: string;
@@ -42,6 +44,13 @@ export default function RefereeDashboardClient() {
   const [endAt, setEndAt] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [screeningLoading, setScreeningLoading] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState<"checkr" | "external">("checkr");
+  const [externalCompany, setExternalCompany] = useState("");
+  const [externalProofPath, setExternalProofPath] = useState<string | null>(null);
+  const [govIdPath, setGovIdPath] = useState<string | null>(null);
+  const [certDocPath, setCertDocPath] = useState<string | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<string>("draft");
+  const [submittingVerification, setSubmittingVerification] = useState(false);
 
   const load = useCallback(async () => {
     const {
@@ -74,7 +83,9 @@ export default function RefereeDashboardClient() {
 
     const { data: rp } = await supabase
       .from("ref_profiles")
-      .select("rate_per_game, primary_sport, certification_level, bio")
+      .select(
+        "rate_per_game, primary_sport, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+      )
       .eq("member_id", user.id)
       .maybeSingle();
     if (rp) {
@@ -82,7 +93,22 @@ export default function RefereeDashboardClient() {
       setSport(rp.primary_sport || "Basketball");
       setCert(rp.certification_level || "Youth / Recreational");
       setBio(rp.bio || "");
+      setVerificationMethod(
+        rp.verification_method === "external" ? "external" : "checkr"
+      );
+      setExternalCompany(rp.external_verifier_name || "");
+      setExternalProofPath(rp.external_verification_proof_path || null);
+      setGovIdPath(rp.government_id_path || rp.verification_doc_path || null);
+      setCertDocPath(rp.certification_document_path || null);
     }
+
+    const { data: vs } = await supabase
+      .from("ref_verification_submissions")
+      .select("status")
+      .eq("ref_member_id", user.id)
+      .maybeSingle();
+    setVerificationStatus(vs?.status || "draft");
+
     setLoading(false);
   }, [supabase]);
 
@@ -186,7 +212,10 @@ export default function RefereeDashboardClient() {
     await load();
   }
 
-  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadVerificationFile(
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: "government_id_path" | "certification_document_path"
+  ) {
     const file = e.target.files?.[0];
     if (!file) return;
     setMsg(null);
@@ -194,7 +223,8 @@ export default function RefereeDashboardClient() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const path = `${user.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const prefix = field === "government_id_path" ? "gov_id" : "cert";
+    const path = `${user.id}/${prefix}_${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error: upErr } = await supabase.storage
       .from("verification_documents")
       .upload(path, file, { upsert: true });
@@ -202,9 +232,97 @@ export default function RefereeDashboardClient() {
       setMsg(upErr.message);
       return;
     }
-    await supabase.from("ref_profiles").update({ verification_doc_path: path }).eq("member_id", user.id);
-    setMsg("Verification document uploaded.");
+    const update: Record<string, string> = { [field]: path, updated_at: new Date().toISOString() };
+    if (field === "government_id_path") {
+      update.verification_doc_path = path;
+    }
+    await supabase.from("ref_profiles").update(update).eq("member_id", user.id);
+    if (field === "government_id_path") setGovIdPath(path);
+    else setCertDocPath(path);
+    setMsg(field === "government_id_path" ? "Government ID uploaded." : "Certification document uploaded.");
   }
+
+  async function submitVerificationPackage() {
+    setMsg(null);
+    setSubmittingVerification(true);
+    try {
+      const res = await fetch("/api/verification/submit", { method: "POST" });
+      const j = (await res.json()) as { error?: string; status?: string };
+      if (!res.ok) {
+        setMsg(j.error || "Could not submit verification.");
+        return;
+      }
+      setVerificationStatus(j.status || "submitted");
+      setMsg("Verification package submitted for review.");
+      await load();
+    } catch {
+      setMsg("Network error — could not submit verification.");
+    } finally {
+      setSubmittingVerification(false);
+    }
+  }
+
+  async function saveExternalVerification(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!externalCompany.trim()) {
+      setMsg("Enter the company or organization that verified you first.");
+      return;
+    }
+    setMsg(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const path = `${user.id}/external_${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { error: upErr } = await supabase.storage
+      .from("verification_documents")
+      .upload(path, file, { upsert: true });
+    if (upErr) {
+      setMsg(upErr.message);
+      return;
+    }
+    const { error: profErr } = await supabase
+      .from("ref_profiles")
+      .update({
+        verification_method: "external",
+        external_verifier_name: externalCompany.trim(),
+        external_verification_proof_path: path,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("member_id", user.id);
+    if (profErr) {
+      setMsg(profErr.message);
+      return;
+    }
+    await supabase
+      .from("screening_checks")
+      .update({
+        status: "clear",
+        summary: `External verification on file (${externalCompany.trim()})`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("ref_member_id", user.id);
+    setExternalProofPath(path);
+    setVerificationMethod("external");
+    setMsg("External verification saved. You can request events and accept offers.");
+    await load();
+  }
+
+  const isVerified = refOfferEligible({
+    screeningStatus: screening?.status,
+    verificationMethod,
+    externalProofPath,
+    verificationSubmissionStatus: verificationStatus,
+    profile: {
+      government_id_path: govIdPath,
+      verification_doc_path: govIdPath,
+      certification_document_path: certDocPath,
+      bio,
+      primary_sport: sport,
+      certification_level: cert,
+    },
+  });
 
   if (loading) {
     return <p className="text-[var(--muted)]">Loading…</p>;
@@ -212,14 +330,47 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-[var(--navy)]">Referee dashboard</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Set availability and pay, complete screening, then accept offers from organizers.
+      <div className="rounded-xl border border-[var(--red)]/20 bg-gradient-to-r from-[var(--red)]/5 to-white p-6">
+        <h1 className="font-display text-3xl font-bold text-[var(--red)]">Referee dashboard</h1>
+        <p className="mt-1 text-sm text-[var(--slate)]">
+          Set your profile, verify your credentials, browse events, and accept paid assignments.
         </p>
       </div>
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
+
+      <RefEventCalendar />
+
+      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Already verified elsewhere?</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          If another company already background-checked or certified you, enter their name and upload a
+          receipt or screenshot. That lets you request events and accept offers without running Checkr again.
+        </p>
+        <label className="mt-4 flex flex-col gap-1 text-sm">
+          Verifying company / organization
+          <input
+            className="rounded border border-[var(--border)] px-2 py-1"
+            value={externalCompany}
+            onChange={(e) => setExternalCompany(e.target.value)}
+            placeholder="e.g. NFHS, local assignor, prior platform"
+          />
+        </label>
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          Receipt or screenshot (JPG, PNG, PDF)
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf"
+            className="text-sm"
+            onChange={(e) => void saveExternalVerification(e)}
+          />
+        </label>
+        {externalProofPath && (
+          <p className="mt-2 text-sm text-green-700">
+            External proof on file{verificationMethod === "external" ? " — verified via third party" : ""}.
+          </p>
+        )}
+      </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Background screening</h2>
@@ -245,11 +396,47 @@ export default function RefereeDashboardClient() {
       </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">ID / certification upload</h2>
+        <h2 className="font-display text-xl font-bold text-[var(--navy)]">ID & certification package</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Private storage — only you and admins you authorize should access these files.
+          Upload your documents, complete your profile below, then submit for review. Files are stored in private
+          storage with row-level security.
         </p>
-        <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-3 text-sm" onChange={(e) => void uploadDoc(e)} />
+        <p className="mt-2 text-sm">
+          Submission status:{" "}
+          <span className="font-semibold capitalize text-[var(--blue)]">{verificationStatus.replace(/_/g, " ")}</span>
+        </p>
+        <label className="mt-4 flex flex-col gap-1 text-sm">
+          Government ID (JPG, PNG, PDF)
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf"
+            className="text-sm"
+            onChange={(e) => void uploadVerificationFile(e, "government_id_path")}
+          />
+          {govIdPath && <span className="text-green-700">Government ID on file.</span>}
+        </label>
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          Certification / license document
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf"
+            className="text-sm"
+            onChange={(e) => void uploadVerificationFile(e, "certification_document_path")}
+          />
+          {certDocPath && <span className="text-green-700">Certification document on file.</span>}
+        </label>
+        <button
+          type="button"
+          disabled={submittingVerification || verificationStatus === "submitted" || verificationStatus === "under_review"}
+          onClick={() => void submitVerificationPackage()}
+          className="mt-4 rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {submittingVerification
+            ? "Submitting…"
+            : verificationStatus === "submitted" || verificationStatus === "under_review"
+              ? "Submitted — awaiting review"
+              : "Submit verification package"}
+        </button>
       </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -362,7 +549,7 @@ export default function RefereeDashboardClient() {
                     <strong>{o.status}</strong>
                   </p>
                 </div>
-                {o.status === "pending" && screening?.status === "clear" && (
+                {o.status === "pending" && isVerified && (
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -380,8 +567,11 @@ export default function RefereeDashboardClient() {
                     </button>
                   </div>
                 )}
-                {o.status === "pending" && screening?.status !== "clear" && (
-                  <p className="text-xs text-amber-700">Complete screening before accepting.</p>
+                {o.status === "pending" && !isVerified && (
+                  <p className="text-xs text-amber-700">
+                    Upload ID + certification, complete your profile, then submit verification — or complete
+                    screening — before accepting.
+                  </p>
                 )}
               </div>
             </li>

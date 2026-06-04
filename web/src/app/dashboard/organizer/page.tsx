@@ -9,8 +9,9 @@ export default async function OrganizerDashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: member } = await supabase.from("members").select("role").eq("id", user.id).single();
-  if (member?.role !== "organizer") {
+  const { data: member } = await supabase.from("members").select("role").eq("id", user.id).maybeSingle();
+  // Only redirect when role is explicitly ref — missing row must not bounce to referee.
+  if (member?.role === "ref") {
     redirect("/dashboard/referee");
   }
 

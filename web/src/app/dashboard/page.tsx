@@ -14,9 +14,13 @@ export default async function DashboardIndexPage() {
     .from("members")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (member?.role === "organizer") {
+  const role =
+    member?.role ??
+    (user.user_metadata?.role === "organizer" ? "organizer" : "ref");
+
+  if (role === "organizer") {
     redirect("/dashboard/organizer");
   }
   redirect("/dashboard/referee");
