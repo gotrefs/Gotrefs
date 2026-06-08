@@ -26,8 +26,13 @@ type RefRow = {
 
 type SignupRequestRow = {
   id: string;
+  event_id: string;
+  ref_member_id: string;
   members: { display_name: string } | { display_name: string }[] | null;
-  scheduled_events: { title: string } | { title: string }[] | null;
+  scheduled_events:
+    | { title: string; pay_offer: number | null }
+    | { title: string; pay_offer: number | null }[]
+    | null;
 };
 
 function sanitizeFilename(name: string) {
@@ -72,6 +77,10 @@ export default function OrganizerDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [eventMsg, setEventMsg] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const [bio, setBio] = useState("");
   const [sport, setSport] = useState("Basketball");
@@ -124,7 +133,7 @@ export default function OrganizerDashboardClient() {
     const { data: sr } = await supabase
       .from("event_signup_requests")
       .select(
-        "id, status, members ( display_name ), scheduled_events!inner ( title, organizer_member_id )"
+        "id, event_id, ref_member_id, members ( display_name ), scheduled_events!inner ( title, pay_offer, organizer_member_id )"
       )
       .eq("scheduled_events.organizer_member_id", user.id)
       .eq("status", "pending");
@@ -143,28 +152,46 @@ export default function OrganizerDashboardClient() {
     void load();
   }, [load]);
 
+  function clearEventFeedback() {
+    setEventMsg(null);
+    setMsg((prev) => {
+      if (!prev) return null;
+      const eventRelated = ["Start time", "ZIP", "published", "Could not publish", "Invalid start", "Please fill in"];
+      return eventRelated.some((s) => prev.includes(s)) ? null : prev;
+    });
+  }
+
   async function ensureOrganizerProfile(userId: string) {
     await supabase.from("organizer_profiles").upsert({ member_id: userId }, { onConflict: "member_id" });
   }
 
   async function saveProfile() {
     setMsg(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    await ensureOrganizerProfile(user.id);
-    const rateNum = ratePerOfficial === "" ? null : Number(ratePerOfficial);
-    const { error } = await supabase
-      .from("organizer_profiles")
-      .update({
-        bio,
-        primary_sport: sport,
-        rate_per_official: Number.isFinite(rateNum as number) ? rateNum : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("member_id", user.id);
-    setMsg(error ? error.message : "Organization profile saved.");
+    setProfileMsg(null);
+    setSavingProfile(true);
+    try {
+      const rateNum = ratePerOfficial === "" ? null : Number(ratePerOfficial);
+      const res = await fetch("/api/organizer/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bio,
+          primary_sport: sport,
+          rate_per_official: Number.isFinite(rateNum as number) ? rateNum : null,
+        }),
+      });
+      const json = (await res.json()) as { error?: string; ok?: boolean };
+      const text = res.ok ? "Organization profile saved." : json.error || "Could not save profile.";
+      setProfileMsg(text);
+      setMsg(text);
+      if (res.ok) await load();
+    } catch {
+      const text = "Could not reach the server. Refresh and try again.";
+      setProfileMsg(text);
+      setMsg(text);
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   async function uploadId(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,17 +237,31 @@ export default function OrganizerDashboardClient() {
       const text = await file.text();
       const parsed = parseEventsCsv(text);
       if (parsed.length > 0) {
-        const rows = parsed.map((row) => ({
-          organizer_member_id: user.id,
-          ...row,
-          notes: null,
-          status: "published" as const,
-        }));
-        const { error: insErr } = await supabase.from("scheduled_events").insert(rows);
-        if (insErr) {
-          setMsg(`List saved. CSV import failed: ${insErr.message}`);
+        await fetch("/api/auth/sync-member", { method: "POST" });
+        let imported = 0;
+        let lastErr: string | null = null;
+        for (const row of parsed) {
+          const res = await fetch("/api/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: row.title,
+              sport: row.sport,
+              starts_at: row.starts_at,
+              ends_at: row.ends_at,
+              zip_code: row.zip_code,
+              officials_needed: row.officials_needed,
+              pay_offer: row.pay_offer,
+            }),
+          });
+          const j = (await res.json()) as { error?: string };
+          if (res.ok) imported += 1;
+          else lastErr = j.error || "Import failed";
+        }
+        if (imported === 0) {
+          setMsg(`List saved. CSV import failed: ${lastErr ?? "Unknown error"}`);
         } else {
-          setMsg(`Uploaded list and imported ${parsed.length} event(s) from CSV.`);
+          setMsg(`Uploaded list and imported ${imported} event(s) from CSV.`);
         }
         await load();
         return;
@@ -232,34 +273,83 @@ export default function OrganizerDashboardClient() {
 
   async function createEvent() {
     setMsg(null);
-    if (!starts || !ends || !zip) {
-      setMsg("Start, end, and ZIP are required.");
+    setEventMsg(null);
+    const startVal = starts.trim();
+    const endVal = ends.trim();
+    const zipVal = zip.trim();
+    const missing: string[] = [];
+    if (!startVal) missing.push("Start time");
+    if (!zipVal) missing.push("ZIP code");
+    if (missing.length > 0) {
+      const text = `Please fill in: ${missing.join(" and ")}.`;
+      setEventMsg(text);
+      setMsg(text);
       return;
     }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const payNum = pay === "" ? null : Number(pay);
-    const { error } = await supabase.from("scheduled_events").insert({
-      organizer_member_id: user.id,
-      title: title || "Event",
-      sport: eventSport,
-      starts_at: new Date(starts).toISOString(),
-      ends_at: new Date(ends).toISOString(),
-      zip_code: zip,
-      officials_needed: needed,
-      pay_offer: Number.isFinite(payNum as number) ? payNum : null,
-      notes: notes || null,
-      status: "published",
+    setPublishing(true);
+    try {
+      await fetch("/api/auth/sync-member", { method: "POST" });
+      const payNum = pay === "" ? null : Number(pay);
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title || "Event",
+          sport: eventSport,
+          starts_at: startVal,
+          ends_at: endVal || startVal,
+          zip_code: zipVal,
+          officials_needed: needed,
+          pay_offer: Number.isFinite(payNum as number) ? payNum : null,
+          notes: notes || null,
+        }),
+      });
+      const json = (await res.json()) as { error?: string; ok?: boolean };
+      if (!res.ok) {
+        const text = json.error || "Could not publish event.";
+        setEventMsg(text);
+        setMsg(text);
+        return;
+      }
+      setTitle("");
+      setNotes("");
+      setStarts("");
+      setEnds("");
+      setZip("");
+      const text = "Event published.";
+      setEventMsg(text);
+      setMsg(text);
+      await load();
+    } catch {
+      const text = "Could not reach the server. Refresh and try again.";
+      setEventMsg(text);
+      setMsg(text);
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function sendOfferFromRequest(sr: SignupRequestRow) {
+    const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
+    const res = await fetch("/api/offers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventId: sr.event_id,
+        refMemberId: sr.ref_member_id,
+        offeredPay: ev?.pay_offer ?? null,
+      }),
     });
-    if (error) {
-      setMsg(error.message);
+    const j = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      setMsg(j.error || "Could not send offer.");
       return;
     }
-    setTitle("");
-    setNotes("");
-    setMsg("Event added to your schedule.");
+    await supabase
+      .from("event_signup_requests")
+      .update({ status: "accepted" })
+      .eq("id", sr.id);
+    setMsg("Offer sent to referee.");
     await load();
   }
 
@@ -341,52 +431,108 @@ export default function OrganizerDashboardClient() {
         </label>
         <button
           type="button"
+          disabled={savingProfile}
           onClick={() => void saveProfile()}
-          className="mt-4 rounded-lg bg-[var(--blue)] px-4 py-2 text-sm font-medium text-white"
+          className="mt-4 rounded-lg bg-[var(--blue)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Save profile
+          {savingProfile ? "Saving…" : "Save profile"}
         </button>
+        {profileMsg && (
+          <p
+            role="status"
+            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+              profileMsg.includes("saved")
+                ? "border border-green-200 bg-green-50 text-green-800"
+                : "border border-red-200 bg-red-50 text-red-800"
+            }`}
+          >
+            {profileMsg}
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--red)]">Add upcoming event</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <form
+          className="mt-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void createEvent();
+          }}
+        >
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             Title
-            <input className="rounded border px-2 py-1" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input className="rounded border px-2 py-1" value={title} onChange={(e) => { setTitle(e.target.value); clearEventFeedback(); }} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Sport
-            <input className="rounded border px-2 py-1" value={eventSport} onChange={(e) => setEventSport(e.target.value)} />
+            <input className="rounded border px-2 py-1" value={eventSport} onChange={(e) => { setEventSport(e.target.value); clearEventFeedback(); }} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Start
-            <input type="datetime-local" className="rounded border px-2 py-1" value={starts} onChange={(e) => setStarts(e.target.value)} />
+            Start <span className="text-[var(--red)]">*</span>
+            <input
+              type="datetime-local"
+              required
+              className="rounded border px-2 py-1"
+              value={starts}
+              onChange={(e) => { setStarts(e.target.value); clearEventFeedback(); }}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             End
-            <input type="datetime-local" className="rounded border px-2 py-1" value={ends} onChange={(e) => setEnds(e.target.value)} />
+            <input
+              type="datetime-local"
+              className="rounded border px-2 py-1"
+              value={ends}
+              onChange={(e) => { setEnds(e.target.value); clearEventFeedback(); }}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            ZIP
-            <input className="rounded border px-2 py-1" value={zip} onChange={(e) => setZip(e.target.value)} />
+            ZIP <span className="text-[var(--red)]">*</span>
+            <input
+              required
+              inputMode="numeric"
+              autoComplete="postal-code"
+              placeholder="e.g. 90210"
+              className="rounded border px-2 py-1"
+              value={zip}
+              onChange={(e) => { setZip(e.target.value); clearEventFeedback(); }}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Officials needed
-            <input type="number" min={1} className="rounded border px-2 py-1" value={needed} onChange={(e) => setNeeded(Number(e.target.value))} />
+            <input type="number" min={1} className="rounded border px-2 py-1" value={needed} onChange={(e) => { setNeeded(Number(e.target.value)); clearEventFeedback(); }} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Pay offer ($)
-            <input className="rounded border px-2 py-1" value={pay} onChange={(e) => setPay(e.target.value)} />
+            <input className="rounded border px-2 py-1" value={pay} onChange={(e) => { setPay(e.target.value); clearEventFeedback(); }} />
           </label>
         </div>
         <label className="mt-3 flex flex-col gap-1 text-sm">
           Notes
-          <textarea className="rounded border px-2 py-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <textarea className="rounded border px-2 py-1" value={notes} onChange={(e) => { setNotes(e.target.value); clearEventFeedback(); }} />
         </label>
-        <button type="button" onClick={() => void createEvent()} className="mt-4 rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-white">
-          Publish event
+        <button
+          type="submit"
+          disabled={publishing}
+          className="mt-4 rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {publishing ? "Publishing…" : "Publish event"}
         </button>
+        </form>
+        {eventMsg && (
+          <p
+            role="status"
+            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+              eventMsg.includes("published")
+                ? "border border-green-200 bg-green-50 text-green-800"
+                : "border border-red-200 bg-red-50 text-red-800"
+            }`}
+          >
+            {eventMsg}
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -434,8 +580,17 @@ export default function OrganizerDashboardClient() {
               const ref = Array.isArray(sr.members) ? sr.members[0] : sr.members;
               const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
               return (
-                <li key={sr.id} className="rounded border px-3 py-2">
-                  <strong>{ref?.display_name}</strong> → {ev?.title}
+                <li key={sr.id} className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2">
+                  <span>
+                    <strong>{ref?.display_name}</strong> → {ev?.title}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded bg-[var(--blue)] px-3 py-1 text-xs font-medium text-white"
+                    onClick={() => void sendOfferFromRequest(sr)}
+                  >
+                    Send offer
+                  </button>
                 </li>
               );
             })}

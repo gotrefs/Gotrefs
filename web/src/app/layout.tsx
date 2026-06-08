@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed, DM_Sans } from "next/font/google";
+import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import siteData from "@/data/site-data.json";
 
-const barlow = Barlow_Condensed({
+const openSans = Open_Sans({
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
-  variable: "--font-barlow",
-});
-
-const dm = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-dm",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-open-sans",
 });
 
 const meta = siteData.meta as { defaultTitle: string };
@@ -28,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${barlow.variable} ${dm.variable} h-full`}>
+    <html lang="en" className={`${openSans.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );

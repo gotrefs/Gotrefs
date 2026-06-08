@@ -104,31 +104,163 @@
       {
         "heading": "Referees",
         "links": [
-          { "label": "Join as a Ref", "href": "#" },
-          { "label": "Get Certified", "href": "#" },
-          { "label": "How Payouts Work", "href": "#" }
+          { "label": "Join as a Ref", "href": "/auth/signup?role=ref" },
+          { "label": "Log in", "href": "/auth/login" },
+          { "label": "Referee dashboard", "href": "/dashboard/referee" }
         ]
       },
       {
         "heading": "Organizers",
         "links": [
-          { "label": "Post an Event", "href": "#" },
-          { "label": "Browse Refs", "href": "#" },
-          { "label": "Bulk Booking", "href": "#" }
+          { "label": "Post an Event", "href": "/auth/signup?role=organizer" },
+          { "label": "Log in", "href": "/auth/login" },
+          { "label": "Organizer dashboard", "href": "/dashboard/organizer" }
         ]
       },
       {
         "heading": "Company",
         "links": [
-          { "label": "About", "href": "#" },
-          { "label": "Contact", "href": "#" },
-          { "label": "Privacy Policy", "href": "#" }
+          { "label": "How it works", "href": "#features" },
+          { "label": "FAQ", "href": "#faq" },
+          { "label": "Contact", "href": "mailto:hello@gotrefs.org" }
         ]
       }
     ],
     "copyright": "© 2026 GoTRefs, Inc. All rights reserved.",
     "legalLine": "Terms · Privacy · Cookies"
   },
+  "featureTabs": {
+    "sectionTitle": "One Marketplace.",
+    "sectionTitleAccent": "Every Game.",
+    "tabs": [
+      {
+        "id": "refs",
+        "title": "For Referees",
+        "description": "GoTRefs gives verified officials one place to build a profile, browse published events, request assignments, and accept offers — without chasing organizers by text or email.",
+        "bullets": [
+          "Set your sports, availability, and rate per game",
+          "Browse events from organizers nationwide",
+          "Upload certifications and complete background screening",
+          "Accept offers and get confirmed for games in minutes"
+        ],
+        "ctaLabel": "Join as a Referee",
+        "ctaHref": "/auth/signup?role=ref"
+      },
+      {
+        "id": "organizers",
+        "title": "For Organizers",
+        "description": "Post events, review ref requests, and send offers from a single dashboard — so your tournaments and leagues stay staffed without spreadsheets or group chats.",
+        "bullets": [
+          "Post events individually or upload a CSV schedule",
+          "See ref requests for your events only",
+          "Send offers with one click from the request list",
+          "Track confirmed bookings in one place"
+        ],
+        "ctaLabel": "Post Your Events",
+        "ctaHref": "/auth/signup?role=organizer"
+      },
+      {
+        "id": "verification",
+        "title": "Verification & Trust",
+        "description": "Every referee on GoTRefs completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
+        "bullets": [
+          "Government ID and certification document upload",
+          "Background screening via Checkr integration",
+          "External verification path for existing credentials",
+          "Organizers only see eligible, verified refs"
+        ],
+        "ctaLabel": "See verification flow",
+        "ctaHref": "/auth/signup?role=ref"
+      },
+      {
+        "id": "offers",
+        "title": "Offers & Bookings",
+        "description": "When an organizer sends an offer, the ref accepts or declines in their dashboard. Accepted offers become confirmed bookings automatically.",
+        "bullets": [
+          "Organizers send offers from ref requests or hire flow",
+          "Refs accept or decline from their dashboard",
+          "Confirmed bookings created on acceptance",
+          "Each organizer only sees their own events and refs"
+        ],
+        "ctaLabel": "Get started free",
+        "ctaHref": "/auth/signup"
+      }
+    ]
+  },
+  "apart": {
+    "title": "What Sets GoTRefs Apart",
+    "items": [
+      {
+        "icon": "✓",
+        "title": "Verified Referee Marketplace",
+        "description": "Connect with background-checked, certified officials — not unvetted volunteers from a Facebook post."
+      },
+      {
+        "icon": "⚡",
+        "title": "Connected Offer Workflows",
+        "description": "Post an event, receive ref requests, send offers, and confirm bookings without duplicate entry or disconnected tools."
+      },
+      {
+        "icon": "📅",
+        "title": "Real-Time Event Calendar",
+        "description": "Refs browse all published events; organizers manage their own schedule and staffing from one dashboard."
+      }
+    ]
+  },
+  "statsBanner": {
+    "title": "The Numbers That Matter",
+    "subtext": "The value of GoTRefs is simple: less manual work, clearer visibility, and more time back for the people running games, leagues, and tournaments.",
+    "stats": [
+      {
+        "icon": "shield",
+        "value": "4,800+",
+        "title": "Verified Refs",
+        "description": "Background-checked, certified officials ready to work — so organizers hire with confidence, not guesswork."
+      },
+      {
+        "icon": "globe",
+        "value": "50",
+        "title": "States Covered",
+        "description": "Nationwide reach connecting organizers and refs across youth leagues, schools, and tournament circuits."
+      },
+      {
+        "icon": "people",
+        "value": "32",
+        "title": "Sports Supported",
+        "description": "From basketball and soccer to football and volleyball — one marketplace for every sport you run."
+      },
+      {
+        "icon": "stopwatch",
+        "value": "Minutes",
+        "title": "Not Weeks",
+        "description": "Post an event, receive ref requests, and send offers in minutes — not weeks of phone tag and group texts."
+      }
+    ]
+  },
+  "seeHowItWorks": {
+    "title": "See How GoTRefs Works",
+    "body": "Take a walkthrough of the GoTRefs platform and see how organizers post events, review ref requests, and confirm assignments — while refs browse games, complete verification, and accept offers from one connected dashboard.",
+    "ctaLabel": "Book a Demo",
+    "ctaHref": "mailto:hello@gotrefs.org?subject=GoTRefs%20Demo%20Request"
+  },
+  "faqs": [
+    {
+      "q": "What is GoTRefs?",
+      "a": "GoTRefs is a referee marketplace that connects certified officials with event organizers. Refs find games, set availability, and get paid. Organizers post events and hire verified refs in minutes."
+    },
+    {
+      "q": "Who uses GoTRefs?",
+      "a": "Youth leagues, school athletic departments, tournament directors, and independent referees use GoTRefs to staff games and find officiating work."
+    },
+    {
+      "q": "How does verification work?",
+      "a": "Refs upload ID and certification documents, complete background screening, and submit a verification package. Organizers can only send offers to eligible refs."
+    },
+    {
+      "q": "Is GoTRefs free to join?",
+      "a": "Yes — create a free account as a referee or organizer. Sign up, complete your profile, and start using the marketplace."
+    }
+  ],
   "modals": {
     "referee": {
       "tag": "Referee Sign-Up",

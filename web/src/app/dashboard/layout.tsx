@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
+import { resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "./SignOutButton";
 
@@ -15,8 +16,7 @@ export default async function DashboardLayout({
 
   let role: "ref" | "organizer" | null = null;
   if (user) {
-    const { data: member } = await supabase.from("members").select("role").eq("id", user.id).single();
-    role = member?.role === "organizer" ? "organizer" : member?.role === "ref" ? "ref" : null;
+    role = await resolveMemberRole(supabase, user);
   }
 
   return (

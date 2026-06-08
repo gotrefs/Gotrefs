@@ -1,171 +1,123 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
-import { HeroVideoBackground } from "@/components/HeroVideoBackground";
+import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
+import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { SecondViewport } from "@/components/marketing/SecondViewport";
 
 type SD = typeof siteData;
 
 export default function HomePage() {
   const d = siteData as SD;
   const hero = d.hero;
-  const how = d.howItWorks;
-  const trust = d.trustStrip;
+  const stats = d.statsBanner;
+  const seeHow = d.seeHowItWorks;
+  const apart = d.apart;
+  const faqs = d.faqs;
   const cta = d.ctaBanner;
 
   return (
     <>
-      <section className="relative flex min-h-[calc(100vh-56px)] flex-col justify-center overflow-hidden bg-white px-4 pb-16 pt-12 text-center">
-        <HeroVideoBackground />
-        <div
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-white/55 via-white/45 to-white/70"
-          aria-hidden
-        />
-        <div className="relative z-10 mx-auto max-w-3xl">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--blue)]/25 bg-[var(--blue)]/5 px-4 py-1.5 text-sm text-[var(--blue)]">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--red)]" />
-            {hero.badge}
+      <MarketingHeader />
+
+      {/* Screen 1 — headline left, full video right */}
+      <section className="hero-arbiter-bg hero-fullscreen flex items-center text-white">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-4 lg:grid-cols-2 lg:gap-12">
+          <div id="for-referees">
+            <h1 className="text-3xl font-bold leading-[1.1] tracking-tight md:text-4xl lg:text-[3.25rem]">
+              <span className="block text-white">The Referee Marketplace</span>
+              <span className="mt-1 block text-[var(--red)]">For Every Sport</span>
+            </h1>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/85 md:text-base lg:text-lg">
+              {hero.subtext}
+            </p>
+            <div className="mt-6" id="for-organizers">
+              <Link
+                href="mailto:hello@gotrefs.org?subject=GoTRefs%20Demo%20Request"
+                className="btn-demo-hero"
+              >
+                Book a Demo
+              </Link>
+            </div>
           </div>
-          <h1 className="font-display text-5xl font-extrabold leading-none text-[var(--blue)] sm:text-6xl">
-            {hero.headline.line1}
-            <br />
-            <span className="text-[var(--red)]">{hero.headline.line2Accent}</span>
-            <br />
-            <span className="text-[var(--blue)]">{hero.headline.line3}</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg font-light text-[var(--slate)]">{hero.subtext}</p>
-          <div className="mx-auto mt-10 grid max-w-lg gap-4 sm:grid-cols-2">
-            <Link
-              href="/auth/signup?role=ref"
-              className="flex items-center justify-between gap-3 rounded-xl border border-[var(--blue)]/20 bg-white px-5 py-4 text-left shadow-sm transition hover:border-[var(--blue)]/40"
-            >
-              <span className="text-2xl">{hero.ctaReferee.icon}</span>
-              <span className="flex-1">
-                <span className="block font-semibold text-[var(--blue)]">{hero.ctaReferee.title}</span>
-                <span className="text-sm text-[var(--muted)]">{hero.ctaReferee.subtitle}</span>
-              </span>
-              <span className="text-[var(--red)]" aria-hidden>
-                →
-              </span>
-            </Link>
-            <Link
-              href="/auth/signup?role=organizer"
-              className="flex items-center justify-between gap-3 rounded-xl border border-[var(--red)]/30 bg-[var(--red-light)] px-5 py-4 text-left transition hover:border-[var(--red)]/50"
-            >
-              <span className="text-2xl">{hero.ctaOrganizer.icon}</span>
-              <span className="flex-1">
-                <span className="block font-semibold text-[var(--red)]">{hero.ctaOrganizer.title}</span>
-                <span className="text-sm text-[var(--slate)]">{hero.ctaOrganizer.subtitle}</span>
-              </span>
-              <span className="text-[var(--blue)]" aria-hidden>
-                →
-              </span>
-            </Link>
+          <div className="flex h-[min(50vh,400px)] items-center justify-center lg:h-[min(72vh,calc(100svh-10rem))]">
+            <HeroVideoShowcase fitContainer className="h-full w-full" />
           </div>
-          <div className="mt-14 flex flex-wrap justify-center gap-6">
-            {hero.stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="font-display text-3xl font-bold text-[var(--red)]">{s.value}</div>
-                <div className="text-xs uppercase tracking-wider text-[var(--blue)]">{s.label}</div>
+        </div>
+      </section>
+
+      {/* Screen 2 — Numbers That Matter + See How (one viewport) */}
+      <SecondViewport
+        statsTitle={stats.title}
+        statsSubtext={stats.subtext}
+        stats={stats.stats}
+        seeHowTitle={seeHow.title}
+        seeHowBody={seeHow.body}
+        seeHowCtaLabel={seeHow.ctaLabel}
+        seeHowCtaHref={seeHow.ctaHref}
+      />
+
+      {/* Screen 3 — What sets us apart */}
+      <section className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4">
+        <div className="mx-auto w-full max-w-6xl">
+          <h2 className="mb-8 text-center text-2xl font-bold uppercase tracking-wide text-[#1b2132] md:text-3xl">
+            {apart.title}
+          </h2>
+          <div className="grid gap-8 md:grid-cols-3">
+            {apart.items.map((item) => (
+              <div key={item.title}>
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--red-light)] text-lg text-[var(--red)]">
+                  {item.icon}
+                </div>
+                <h3 className="mb-1 text-base font-bold uppercase text-[#1b2132]">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-[var(--muted)]">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-white px-4 py-20">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-[var(--red)]">
-            {how.sectionTag}
-          </p>
-          <h2 className="mt-2 text-center font-display text-4xl font-bold text-[var(--blue)]">{how.sectionTitle}</h2>
-          <p className="mx-auto mt-3 max-w-md text-center text-[var(--muted)]">{how.sectionSubtext}</p>
-
-          <div className="mt-14 grid gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-[var(--blue)]/15 bg-[var(--blue)] p-8 text-white">
-              <div className="mb-6 flex items-center gap-2">
-                <span className="text-2xl">{how.forReferees.icon}</span>
-                <h3 className="font-display text-2xl font-bold">{how.forReferees.title}</h3>
-              </div>
-              <ol className="space-y-5">
-                {how.forReferees.steps.map((step) => (
-                  <li key={step.num} className="flex gap-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--red)] font-bold">
-                      {step.num}
-                    </span>
-                    <div>
-                      <p className="font-semibold">{step.title}</p>
-                      <p className="text-sm text-white/70">{step.description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <Link
-                href="/auth/signup?role=ref"
-                className="mt-8 inline-block rounded-lg bg-[var(--red)] px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Join as a Referee
-              </Link>
-            </div>
-            <div className="rounded-2xl border border-[var(--red)]/20 bg-white p-8 shadow-sm">
-              <div className="mb-6 flex items-center gap-2">
-                <span className="text-2xl">{how.forOrganizers.icon}</span>
-                <h3 className="font-display text-2xl font-bold text-[var(--blue)]">{how.forOrganizers.title}</h3>
-              </div>
-              <ol className="space-y-5">
-                {how.forOrganizers.steps.map((step) => (
-                  <li key={step.num} className="flex gap-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--blue)] font-bold text-white">
-                      {step.num}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-[var(--blue)]">{step.title}</p>
-                      <p className="text-sm text-[var(--muted)]">{step.description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <Link
-                href="/auth/signup?role=organizer"
-                className="mt-8 inline-block rounded-lg border-2 border-[var(--red)] px-5 py-2.5 text-sm font-semibold text-[var(--red)]"
-              >
-                Post Your Events
-              </Link>
-            </div>
+      {/* Screen 4 — Trust + FAQ */}
+      <section className="viewport-screen flex flex-col justify-center bg-white px-4" id="faq">
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-semibold text-[#1b2132] md:text-sm">
+            {d.trustStrip.items.map((t) => (
+              <span key={t.label}>
+                <span className="text-[var(--red)]">✓</span> {t.label}
+              </span>
+            ))}
+          </div>
+          <h2 className="mb-6 text-center text-2xl font-bold text-[#1b2132] md:text-3xl">FAQs</h2>
+          <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-white">
+            {faqs.map((faq) => (
+              <details key={faq.q} className="group px-4 py-3 md:px-5 md:py-4">
+                <summary className="cursor-pointer list-none text-sm font-semibold text-[#1b2132] marker:content-none group-open:text-[var(--red)] md:text-base">
+                  {faq.q}
+                </summary>
+                <p className="mt-2 text-xs leading-relaxed text-[var(--muted)] md:text-sm">{faq.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="border-y border-[var(--border)] bg-white py-10">
-        <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-8 px-4 text-sm text-[var(--blue)]">
-          {trust.items.map((t) => (
-            <span key={t.label} className="font-medium">
-              <span className="text-[var(--red)]">✓</span> {t.label}
-            </span>
-          ))}
+      {/* Screen 5 — CTA */}
+      <section className="hero-arbiter-bg viewport-screen flex flex-col items-center justify-center px-4 text-center text-white">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="text-2xl font-bold md:text-3xl">{cta.title}</h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-[var(--grey-light)] md:text-base">{cta.subtext}</p>
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link href="/auth/signup?role=ref" className="btn-primary">
+              {cta.primaryButton}
+            </Link>
+            <Link href="/auth/signup?role=organizer" className="btn-outline-light">
+              {cta.secondaryButton}
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="bg-[var(--blue)] px-4 py-20 text-center text-white">
-        <h2 className="font-display text-3xl font-bold">{cta.title}</h2>
-        <p className="mx-auto mt-3 max-w-lg text-white/75">{cta.subtext}</p>
-        <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-          <Link href="/auth/signup?role=ref" className="rounded-lg bg-[var(--red)] px-6 py-3 font-semibold text-white">
-            {cta.primaryButton}
-          </Link>
-          <Link
-            href="/auth/signup?role=organizer"
-            className="rounded-lg border border-white/40 bg-white px-6 py-3 font-semibold text-[var(--blue)]"
-          >
-            {cta.secondaryButton}
-          </Link>
-        </div>
-      </section>
-
-      <footer className="border-t border-[var(--border)] bg-white px-4 py-10 text-sm text-[var(--muted)]">
-        <div className="mx-auto flex max-w-5xl flex-col justify-between gap-4 sm:flex-row">
-          <p>{d.footer.copyright}</p>
-          <p>{d.footer.legalLine}</p>
-        </div>
-      </footer>
+      <MarketingFooter />
     </>
   );
 }

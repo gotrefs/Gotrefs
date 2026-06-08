@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { resolveMemberRole, dashboardPathForRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardIndexPage() {
@@ -10,18 +11,6 @@ export default async function DashboardIndexPage() {
     redirect("/auth/login");
   }
 
-  const { data: member } = await supabase
-    .from("members")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role =
-    member?.role ??
-    (user.user_metadata?.role === "organizer" ? "organizer" : "ref");
-
-  if (role === "organizer") {
-    redirect("/dashboard/organizer");
-  }
-  redirect("/dashboard/referee");
+  const role = await resolveMemberRole(supabase, user);
+  redirect(dashboardPathForRole(role));
 }

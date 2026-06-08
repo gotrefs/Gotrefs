@@ -1,19 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  /* Patriotic red, white & blue */
-  --red: #b22234;
-  --red-dark: #8b1a28;
-  --red-light: #fde8eb;
-  --blue: #002868;
-  --blue-mid: #1e3a6e;
-  --slate: #3a5068;
-  --muted: #6b7c8f;
-  --border: #d9e2ef;
-  --bg: #f4f7fb;
+  /* Arbiter brand palette (from arbiter.io global styles) */
+  --red: #d81d24;
+  --red-dark: #ba1b21;
+  --red-light: #fdeced;
+  --blue: #26213e;
+  --blue-hero: #221e3f;
+  --blue-mid: #3d3851;
+  --blue-text: #202442;
+  --slate: #2f3031;
+  --muted: #565656;
+  --border: #dce2e4;
+  --grey-light: #edf2f4;
+  --grey: #dce2e4;
+  --bg: #ffffff;
   --white: #ffffff;
+  --green: #6ec49b;
 
-  /* Legacy aliases used across the app */
+  /* Legacy aliases used across dashboards */
   --orange: var(--red);
   --orange-dark: var(--red-dark);
   --navy: var(--blue);
@@ -21,16 +26,118 @@
 }
 
 @theme inline {
-  --font-display: var(--font-barlow);
-  --font-body: var(--font-dm);
+  --font-display: var(--font-open-sans);
+  --font-body: var(--font-open-sans);
 }
 
 body {
   background: var(--bg);
-  color: var(--blue);
-  font-family: var(--font-dm), system-ui, sans-serif;
+  color: var(--blue-text);
+  font-family: var(--font-open-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 .font-display {
-  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-family: var(--font-open-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* Solid section backgrounds — no patterns */
+.hero-arbiter-bg {
+  background-color: var(--blue-hero);
+}
+
+.bg-section-blue {
+  background-color: var(--blue);
+}
+
+.btn-demo-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background-color: var(--white);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--blue-hero);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.btn-demo-header:hover {
+  opacity: 0.92;
+}
+
+.btn-demo-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background-color: var(--red);
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--white);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-demo-hero:hover {
+  background-color: var(--red-dark);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--red);
+  padding: 0.75rem 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--white);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--red-dark);
+}
+
+.btn-outline-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: transparent;
+  padding: 0.75rem 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--white);
+  text-decoration: none;
+}
+
+.btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* One full screen below the sticky header */
+.hero-fullscreen,
+.viewport-screen {
+  min-height: calc(100svh - 4.25rem);
+  height: calc(100svh - 4.25rem);
+}
+
+.section-padding {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+@media (min-width: 1024px) {
+  .section-padding {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+  }
 }

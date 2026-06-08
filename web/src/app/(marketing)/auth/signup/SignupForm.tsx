@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
 import { validatePasswordStrength } from "@/lib/auth/password";
 
@@ -47,31 +46,36 @@ export function SignupForm() {
 
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-            organization_name: role === "organizer" ? organizationName.trim() : null,
-            role,
-          },
-        },
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          role,
+          organizationName: role === "organizer" ? organizationName.trim() : undefined,
+        }),
       });
-      if (signUpError) {
-        setError(signUpError.message);
+      const json = (await res.json()) as {
+        error?: string;
+        needsEmailConfirmation?: boolean;
+        redirect?: string;
+        role?: "ref" | "organizer";
+      };
+      if (!res.ok) {
+        setError(json.error || "Could not create account.");
         return;
       }
-      if (data.session) {
-        await fetch("/api/auth/sync-member", { method: "POST" });
-        window.location.href = "/dashboard";
+      if (json.needsEmailConfirmation) {
+        setInfo("Check your email to confirm your account, then log in.");
         return;
       }
-      setInfo("Check your email to confirm your account, then log in.");
+      const dest =
+        json.redirect ||
+        (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
+      window.location.href = dest;
     } catch {
       setError(
         "Could not reach Supabase (Failed to fetch). On Vercel: confirm NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set for Production, then Redeploy."
@@ -82,8 +86,9 @@ export function SignupForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
-      <h1 className="font-display text-3xl font-bold text-[var(--blue)]">Create account</h1>
+    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
+      <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-sm">
+      <h1 className="text-3xl font-bold text-[var(--blue-text)]">Create account</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
         Already have an account?{" "}
         <Link href="/auth/login" className="text-[var(--red)] underline">
@@ -98,7 +103,7 @@ export function SignupForm() {
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-[var(--blue)]">First name</span>
+            <span className="font-medium text-[var(--blue-text)]">First name</span>
             <input
               type="text"
               required
@@ -109,7 +114,7 @@ export function SignupForm() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-[var(--blue)]">Last name</span>
+            <span className="font-medium text-[var(--blue-text)]">Last name</span>
             <input
               type="text"
               required
@@ -121,7 +126,7 @@ export function SignupForm() {
           </label>
         </div>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue)]">I am a…</span>
+          <span className="font-medium text-[var(--blue-text)]">I am a…</span>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as "ref" | "organizer")}
@@ -133,7 +138,7 @@ export function SignupForm() {
         </label>
         {role === "organizer" && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-[var(--blue)]">Organization name</span>
+            <span className="font-medium text-[var(--blue-text)]">Organization name</span>
             <input
               type="text"
               required
@@ -145,7 +150,7 @@ export function SignupForm() {
           </label>
         )}
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue)]">Email</span>
+          <span className="font-medium text-[var(--blue-text)]">Email</span>
           <input
             type="email"
             required
@@ -156,7 +161,7 @@ export function SignupForm() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue)]">Password</span>
+          <span className="font-medium text-[var(--blue-text)]">Password</span>
           <input
             type="password"
             required
@@ -173,11 +178,12 @@ export function SignupForm() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-[var(--red)] py-2.5 font-medium text-white hover:opacity-95 disabled:opacity-50"
+          className="btn-primary w-full py-2.5 disabled:opacity-50"
         >
           {loading ? "Creating…" : "Sign up"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

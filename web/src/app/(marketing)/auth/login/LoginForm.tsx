@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
 
 export function LoginForm() {
@@ -29,24 +28,28 @@ export function LoginForm() {
     }
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        const msg = signInError.message.toLowerCase();
-        if (msg.includes("email not confirmed")) {
-          setError("Confirm your email first (check inbox/spam), then log in again.");
-        } else if (msg.includes("invalid login credentials")) {
-          setError("Invalid email or password.");
-        } else {
-          setError(signInError.message);
-        }
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        role?: "ref" | "organizer";
+        redirect?: string;
+      };
+      if (!res.ok) {
+        setError(json.error || "Invalid email or password.");
         return;
       }
 
-      await fetch("/api/auth/sync-member", { method: "POST" });
-
-      const next = searchParams.get("next") || "/dashboard";
-      window.location.href = next;
+      const next = searchParams.get("next");
+      const dest =
+        next && next !== "/dashboard"
+          ? next
+          : json.redirect ||
+            (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
+      window.location.href = dest;
     } catch {
       setError(
         "Could not reach Supabase. Check web/.env.local and restart npm run dev."
@@ -57,8 +60,9 @@ export function LoginForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
-      <h1 className="font-display text-3xl font-bold text-[var(--blue)]">Log in</h1>
+    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
+      <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-sm">
+      <h1 className="text-3xl font-bold text-[var(--blue-text)]">Log in</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
         No account?{" "}
         <Link href="/auth/signup" className="text-[var(--red)] underline">
@@ -67,7 +71,7 @@ export function LoginForm() {
       </p>
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue)]">Email</span>
+          <span className="font-medium text-[var(--blue-text)]">Email</span>
           <input
             type="email"
             required
@@ -78,7 +82,7 @@ export function LoginForm() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue)]">Password</span>
+          <span className="font-medium text-[var(--blue-text)]">Password</span>
           <input
             type="password"
             required
@@ -92,11 +96,12 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-[var(--red)] py-2.5 font-medium text-white hover:opacity-95 disabled:opacity-50"
+          className="btn-primary w-full py-2.5 disabled:opacity-50"
         >
           {loading ? "Signing in…" : "Log in"}
         </button>
       </form>
+      </div>
     </div>
   );
 }
