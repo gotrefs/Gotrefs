@@ -24,7 +24,7 @@ export function MarketingHeader() {
           <Link href="/auth/login" className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline">
             Log in
           </Link>
-          <Link href="mailto:hello@gotrefs.org?subject=GoTRefs%20Demo%20Request" className="btn-demo-header">
+          <Link href="mailto:hello@gotrefs.org?subject=GotREFS%20Demo%20Request" className="btn-demo-header">
             Book a Demo
           </Link>
         </div>

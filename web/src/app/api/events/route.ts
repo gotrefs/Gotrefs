@@ -8,6 +8,8 @@ type EventBody = {
   sport?: string;
   starts_at?: string;
   ends_at?: string;
+  city?: string | null;
+  state?: string | null;
   zip_code?: string;
   officials_needed?: number;
   pay_offer?: number | null;
@@ -63,6 +65,8 @@ export async function POST(request: Request) {
     sport: (body.sport ?? "").trim() || "Basketball",
     starts_at: times.starts_at,
     ends_at: times.ends_at,
+    city: body.city?.trim() || null,
+    state: body.state?.trim() || null,
     zip_code: zip,
     officials_needed: needed,
     pay_offer: payOffer,

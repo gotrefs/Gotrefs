@@ -5,7 +5,7 @@ const BCRYPT_ROUNDS = 12;
 
 /**
  * Hash a plaintext password with bcrypt + salt.
- * GoTRefs uses Supabase Auth for login (passwords stored in auth.users, hashed by Supabase).
+ * GotREFS uses Supabase Auth for login (passwords stored in auth.users, hashed by Supabase).
  * Use these helpers only for self-hosted auth or admin tooling — never log the plaintext.
  */
 export async function hashPassword(plaintext: string): Promise<string> {

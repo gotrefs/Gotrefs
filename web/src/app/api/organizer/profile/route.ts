@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 type ProfileBody = {
   bio?: string;
   primary_sport?: string;
+  additional_sports?: string[];
   rate_per_official?: number | null;
 };
 
@@ -30,10 +31,15 @@ export async function POST(request: Request) {
     rateRaw == null || rateRaw === ("" as unknown as number) ? null : Number(rateRaw);
   const ratePerOfficial = rateNum != null && Number.isFinite(rateNum) ? rateNum : null;
 
+  const additionalSports = Array.isArray(body.additional_sports)
+    ? body.additional_sports.map((s) => String(s).trim()).filter(Boolean)
+    : [];
+
   const row = {
     member_id: user.id,
     bio: (body.bio ?? "").trim(),
     primary_sport: (body.primary_sport ?? "").trim() || "Basketball",
+    additional_sports: additionalSports,
     rate_per_official: ratePerOfficial,
     updated_at: new Date().toISOString(),
   };

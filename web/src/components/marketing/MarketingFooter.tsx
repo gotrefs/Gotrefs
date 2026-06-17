@@ -14,7 +14,7 @@ export function MarketingFooter() {
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-1">
-            <p className="text-lg font-bold">GoTRefs</p>
+            <p className="text-lg font-bold">GotREFS</p>
             <p className="mt-2 text-sm text-white/70">{footer.tagline}</p>
           </div>
           {footer.columns.map((col) => (

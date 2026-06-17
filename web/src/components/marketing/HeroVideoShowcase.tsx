@@ -12,7 +12,7 @@ type HeroVideoShowcaseProps = {
   className?: string;
 };
 
-/** GoTRefs hero video — entire frame visible (object-contain). */
+/** GotREFS hero video — entire frame visible (object-contain). */
 export function HeroVideoShowcase({
   showCaption = false,
   caption = "THE REFEREE MARKETPLACE FOR EVERY SPORT",
@@ -51,7 +51,7 @@ export function HeroVideoShowcase({
       {showCaption && (
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/75 px-4 py-2.5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-white sm:text-xs">{caption}</p>
-          <span className="shrink-0 text-xs font-bold text-[var(--red)]">GoTRefs</span>
+          <span className="shrink-0 text-xs font-bold text-[var(--red)]">GotREFS</span>
         </div>
       )}
     </div>

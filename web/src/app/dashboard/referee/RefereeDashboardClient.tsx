@@ -2,8 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
+import { SportsFields } from "@/components/SportsFields";
+import { VerificationUploadField } from "@/components/VerificationUploadField";
+import { formatEventLocation } from "@/data/sports";
+import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible } from "@/lib/ref-eligibility";
+
+type InquiryRow = {
+  id: string;
+  subject: string;
+  message: string;
+  created_at: string;
+  organizer_member_id: string;
+  members: { display_name: string } | { display_name: string }[] | null;
+};
 
 type Screening = {
   status: string;
@@ -20,12 +34,16 @@ type OfferRow = {
         sport: string;
         starts_at: string;
         zip_code: string;
+        city: string | null;
+        state: string | null;
       }
     | {
         title: string;
         sport: string;
         starts_at: string;
         zip_code: string;
+        city: string | null;
+        state: string | null;
       }[]
     | null;
 };
@@ -38,6 +56,7 @@ export default function RefereeDashboardClient() {
   const [slots, setSlots] = useState<{ id: string; start_at: string; end_at: string }[]>([]);
   const [rate, setRate] = useState("");
   const [sport, setSport] = useState("Basketball");
+  const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [cert, setCert] = useState("Youth / Recreational");
   const [bio, setBio] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -51,6 +70,11 @@ export default function RefereeDashboardClient() {
   const [certDocPath, setCertDocPath] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
   const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [isAssignor, setIsAssignor] = useState(false);
+  const [assignorSaving, setAssignorSaving] = useState(false);
+  const [rosterEntries, setRosterEntries] = useState<AssignorRosterEntry[]>([]);
+  const [rosterSaving, setRosterSaving] = useState(false);
+  const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
 
   const load = useCallback(async () => {
     const {
@@ -68,7 +92,7 @@ export default function RefereeDashboardClient() {
     const { data: o } = await supabase
       .from("assignment_offers")
       .select(
-        "id, status, offered_pay, scheduled_events ( title, sport, starts_at, zip_code )"
+        "id, status, offered_pay, scheduled_events ( title, sport, starts_at, zip_code, city, state )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
@@ -84,13 +108,15 @@ export default function RefereeDashboardClient() {
     const { data: rp } = await supabase
       .from("ref_profiles")
       .select(
-        "rate_per_game, primary_sport, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+        "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
       )
       .eq("member_id", user.id)
       .maybeSingle();
     if (rp) {
       setRate(rp.rate_per_game != null ? String(rp.rate_per_game) : "");
       setSport(rp.primary_sport || "Basketball");
+      setAdditionalSports(Array.isArray(rp.additional_sports) ? rp.additional_sports : []);
+      setIsAssignor(Boolean(rp.is_assignor));
       setCert(rp.certification_level || "Youth / Recreational");
       setBio(rp.bio || "");
       setVerificationMethod(
@@ -108,6 +134,25 @@ export default function RefereeDashboardClient() {
       .eq("ref_member_id", user.id)
       .maybeSingle();
     setVerificationStatus(vs?.status || "draft");
+
+    const { data: inq } = await supabase
+      .from("ref_inquiries")
+      .select("id, subject, message, created_at, organizer_member_id, members ( display_name )")
+      .eq("ref_member_id", user.id)
+      .order("created_at", { ascending: false });
+    setInquiries((inq as unknown as InquiryRow[]) || []);
+
+    if (rp?.is_assignor) {
+      try {
+        const rosterRes = await fetch("/api/assignor/roster");
+        const rosterJson = (await rosterRes.json()) as { entries?: AssignorRosterEntry[] };
+        setRosterEntries(rosterJson.entries ?? []);
+      } catch {
+        setRosterEntries([]);
+      }
+    } else {
+      setRosterEntries([]);
+    }
 
     setLoading(false);
   }, [supabase]);
@@ -128,12 +173,90 @@ export default function RefereeDashboardClient() {
       .update({
         rate_per_game: rateNum,
         primary_sport: sport,
+        additional_sports: additionalSports,
         certification_level: cert,
         bio,
         updated_at: new Date().toISOString(),
       })
       .eq("member_id", user.id);
     setMsg(error ? error.message : "Profile saved.");
+  }
+
+  async function toggleAssignor(enabled: boolean) {
+    setAssignorSaving(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/assignor/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_assignor: enabled }),
+      });
+      const json = (await res.json()) as { error?: string; isAssignor?: boolean };
+      if (!res.ok) {
+        setMsg(json.error || "Could not update assignor mode.");
+        return;
+      }
+      setIsAssignor(Boolean(json.isAssignor));
+      setMsg(enabled ? "Assignor mode enabled. Add refs you work with below." : "Assignor mode turned off.");
+      if (enabled) {
+        const rosterRes = await fetch("/api/assignor/roster");
+        const rosterJson = (await rosterRes.json()) as { entries?: AssignorRosterEntry[] };
+        setRosterEntries(rosterJson.entries ?? []);
+      } else {
+        setRosterEntries([]);
+      }
+    } catch {
+      setMsg("Could not reach the server.");
+    } finally {
+      setAssignorSaving(false);
+    }
+  }
+
+  async function addRosterRef(payload: {
+    display_name: string;
+    primary_sport: string;
+    additional_sports: string[];
+    certification_level: string;
+    rate_per_game: number | null;
+    availability: { start_at: string; end_at: string }[];
+    notes: string;
+  }) {
+    setRosterSaving(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/assignor/roster", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: payload.display_name,
+          primary_sport: payload.primary_sport,
+          additional_sports: payload.additional_sports,
+          certification_level: payload.certification_level,
+          rate_per_game: payload.rate_per_game,
+          availability: payload.availability,
+          notes: payload.notes || undefined,
+        }),
+      });
+      const json = (await res.json()) as { error?: string; entry?: AssignorRosterEntry };
+      if (!res.ok) {
+        setMsg(json.error || "Could not add ref.");
+        return;
+      }
+      if (json.entry) setRosterEntries((prev) => [json.entry!, ...prev]);
+      setMsg("Ref saved to your assignor roster.");
+    } catch {
+      setMsg("Could not reach the server.");
+    } finally {
+      setRosterSaving(false);
+    }
+  }
+
+  async function removeRosterRef(id: string) {
+    const res = await fetch(`/api/assignor/roster?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (res.ok) {
+      setRosterEntries((prev) => prev.filter((e) => e.id !== id));
+      setMsg("Removed from roster.");
+    }
   }
 
   async function addSlot() {
@@ -341,6 +464,39 @@ export default function RefereeDashboardClient() {
 
       <RefEventCalendar />
 
+      {inquiries.length > 0 && (
+        <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <h2 className="font-display text-xl font-bold text-[var(--blue)]">Organizer messages</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Event organizers reach you through {BRAND_NAME} — their messages appear here, not your personal email.
+          </p>
+          <ul className="mt-4 space-y-3 text-sm">
+            {inquiries.map((inq) => {
+              const org = Array.isArray(inq.members) ? inq.members[0] : inq.members;
+              return (
+                <li key={inq.id} className="rounded border border-[var(--border)] px-3 py-3">
+                  <p className="font-medium text-[var(--navy)]">{inq.subject}</p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    From {org?.display_name ?? "Event organizer"} · {new Date(inq.created_at).toLocaleString()}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-[var(--slate)]">{inq.message}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <AssignorRosterPanel
+        isAssignor={isAssignor}
+        assignorSaving={assignorSaving}
+        entries={rosterEntries}
+        rosterSaving={rosterSaving}
+        onToggleAssignor={(enabled) => void toggleAssignor(enabled)}
+        onAddRef={addRosterRef}
+        onRemoveRef={(id) => void removeRosterRef(id)}
+      />
+
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Already verified elsewhere?</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
@@ -375,7 +531,7 @@ export default function RefereeDashboardClient() {
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Background screening</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          GoTRefs uses a third-party provider (Checkr) to run criminal and other screenings permitted
+          {BRAND_NAME} uses a third-party provider (Checkr) to run criminal and other screenings permitted
           under law. You must be <strong>clear</strong> before you can accept paid offers.
         </p>
         <p className="mt-3 text-sm">
@@ -396,40 +552,35 @@ export default function RefereeDashboardClient() {
       </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">ID & certification package</h2>
+        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Verification package</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Upload your documents, complete your profile below, then submit for review. Files are stored in private
-          storage with row-level security.
+          Upload both documents below, complete your profile, then submit for review. Files stay in private storage.
         </p>
-        <p className="mt-2 text-sm">
-          Submission status:{" "}
+        <p className="mt-3 text-sm">
+          Status:{" "}
           <span className="font-semibold capitalize text-[var(--blue)]">{verificationStatus.replace(/_/g, " ")}</span>
         </p>
-        <label className="mt-4 flex flex-col gap-1 text-sm">
-          Government ID (JPG, PNG, PDF)
-          <input
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
-            className="text-sm"
-            onChange={(e) => void uploadVerificationFile(e, "government_id_path")}
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <VerificationUploadField
+            title="Government ID"
+            description="Driver license, passport, or state ID — required for all referees."
+            uploaded={Boolean(govIdPath)}
+            uploadedLabel="✓ Government ID on file"
+            onFile={(e) => void uploadVerificationFile(e, "government_id_path")}
           />
-          {govIdPath && <span className="text-green-700">Government ID on file.</span>}
-        </label>
-        <label className="mt-3 flex flex-col gap-1 text-sm">
-          Certification / license document
-          <input
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
-            className="text-sm"
-            onChange={(e) => void uploadVerificationFile(e, "certification_document_path")}
+          <VerificationUploadField
+            title="Certification / license document"
+            description="NFHS, state association, or league certification — required to verify your credentials."
+            uploaded={Boolean(certDocPath)}
+            uploadedLabel="✓ Certification document on file"
+            onFile={(e) => void uploadVerificationFile(e, "certification_document_path")}
           />
-          {certDocPath && <span className="text-green-700">Certification document on file.</span>}
-        </label>
+        </div>
         <button
           type="button"
           disabled={submittingVerification || verificationStatus === "submitted" || verificationStatus === "under_review"}
           onClick={() => void submitVerificationPackage()}
-          className="mt-4 rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="mt-6 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
         >
           {submittingVerification
             ? "Submitting…"
@@ -442,14 +593,12 @@ export default function RefereeDashboardClient() {
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Profile & rate</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            Primary sport
-            <input
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={sport}
-              onChange={(e) => setSport(e.target.value)}
-            />
-          </label>
+          <SportsFields
+            primarySport={sport}
+            additionalSports={additionalSports}
+            onPrimaryChange={setSport}
+            onAdditionalChange={setAdditionalSports}
+          />
           <label className="flex flex-col gap-1 text-sm">
             Certification level
             <input
@@ -541,7 +690,8 @@ export default function RefereeDashboardClient() {
                 <div>
                   <p className="font-medium text-[var(--navy)]">{ev?.title}</p>
                   <p className="text-sm text-[var(--muted)]">
-                    {ev?.sport} · {ev?.starts_at && new Date(ev.starts_at).toLocaleString()} · ZIP {ev?.zip_code}
+                    {ev?.sport} · {ev?.starts_at && new Date(ev.starts_at).toLocaleString()}
+                    {ev ? ` · ${formatEventLocation(ev.city, ev.state, ev.zip_code)}` : ""}
                   </p>
                   <p className="text-sm">
                     Pay offered:{" "}

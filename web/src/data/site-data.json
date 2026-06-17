@@ -1,9 +1,9 @@
 {
-  "$comment": "Marketing copy + form definitions from the original GoTRefs landing page. Domain: gotrefs.org",
+  "$comment": "Marketing copy + form definitions from the original GotREFS landing page. Domain: gotrefs.org",
   "meta": {
-    "siteName": "GoTRefs",
+    "siteName": "GotREFS",
     "domain": "gotrefs.org",
-    "defaultTitle": "GoTRefs — Find Certified Referees Instantly"
+    "defaultTitle": "GotREFS — Find Certified Referees Instantly"
   },
   "nav": {
     "refereeCta": "I'm a Referee",
@@ -94,7 +94,7 @@
   },
   "ctaBanner": {
     "title": "Ready to Get in the Game?",
-    "subtext": "Join thousands of refs and organizers already using GoTRefs.",
+    "subtext": "Join thousands of refs and organizers already using GotREFS.",
     "primaryButton": "I'm a Referee — Sign Me Up",
     "secondaryButton": "Find a Ref for My Event"
   },
@@ -126,7 +126,7 @@
         ]
       }
     ],
-    "copyright": "© 2026 GoTRefs, Inc. All rights reserved.",
+    "copyright": "© 2026 GotREFS, Inc. All rights reserved.",
     "legalLine": "Terms · Privacy · Cookies"
   },
   "featureTabs": {
@@ -136,7 +136,7 @@
       {
         "id": "refs",
         "title": "For Referees",
-        "description": "GoTRefs gives verified officials one place to build a profile, browse published events, request assignments, and accept offers — without chasing organizers by text or email.",
+        "description": "GotREFS gives verified officials one place to build a profile, browse published events, request assignments, and accept offers — without chasing organizers by text or email.",
         "bullets": [
           "Set your sports, availability, and rate per game",
           "Browse events from organizers nationwide",
@@ -162,7 +162,7 @@
       {
         "id": "verification",
         "title": "Verification & Trust",
-        "description": "Every referee on GoTRefs completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
+        "description": "Every referee on GotREFS completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
         "bullets": [
           "Government ID and certification document upload",
           "Background screening via Checkr integration",
@@ -188,7 +188,7 @@
     ]
   },
   "apart": {
-    "title": "What Sets GoTRefs Apart",
+    "title": "What Sets GotREFS Apart",
     "items": [
       {
         "icon": "✓",
@@ -209,7 +209,7 @@
   },
   "statsBanner": {
     "title": "The Numbers That Matter",
-    "subtext": "The value of GoTRefs is simple: less manual work, clearer visibility, and more time back for the people running games, leagues, and tournaments.",
+    "subtext": "The value of GotREFS is simple: less manual work, clearer visibility, and more time back for the people running games, leagues, and tournaments.",
     "stats": [
       {
         "icon": "shield",
@@ -238,26 +238,26 @@
     ]
   },
   "seeHowItWorks": {
-    "title": "See How GoTRefs Works",
-    "body": "Take a walkthrough of the GoTRefs platform and see how organizers post events, review ref requests, and confirm assignments — while refs browse games, complete verification, and accept offers from one connected dashboard.",
+    "title": "See How GotREFS Works",
+    "body": "Take a walkthrough of the GotREFS platform and see how organizers post events, review ref requests, and confirm assignments — while refs browse games, complete verification, and accept offers from one connected dashboard.",
     "ctaLabel": "Book a Demo",
-    "ctaHref": "mailto:hello@gotrefs.org?subject=GoTRefs%20Demo%20Request"
+    "ctaHref": "mailto:hello@gotrefs.org?subject=GotREFS%20Demo%20Request"
   },
   "faqs": [
     {
-      "q": "What is GoTRefs?",
-      "a": "GoTRefs is a referee marketplace that connects certified officials with event organizers. Refs find games, set availability, and get paid. Organizers post events and hire verified refs in minutes."
+      "q": "What is GotREFS?",
+      "a": "GotREFS is a referee marketplace that connects certified officials with event organizers. Refs find games, set availability, and get paid. Organizers post events and hire verified refs in minutes."
     },
     {
-      "q": "Who uses GoTRefs?",
-      "a": "Youth leagues, school athletic departments, tournament directors, and independent referees use GoTRefs to staff games and find officiating work."
+      "q": "Who uses GotREFS?",
+      "a": "Youth leagues, school athletic departments, tournament directors, and independent referees use GotREFS to staff games and find officiating work."
     },
     {
       "q": "How does verification work?",
       "a": "Refs upload ID and certification documents, complete background screening, and submit a verification package. Organizers can only send offers to eligible refs."
     },
     {
-      "q": "Is GoTRefs free to join?",
+      "q": "Is GotREFS free to join?",
       "a": "Yes — create a free account as a referee or organizer. Sign up, complete your profile, and start using the marketplace."
     }
   ],

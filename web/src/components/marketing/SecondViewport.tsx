@@ -53,7 +53,7 @@ export function SecondViewport({
         </div>
       </div>
 
-      {/* See How GoTRefs Works */}
+      {/* See How GotREFS Works */}
       <div className="min-h-0 overflow-hidden bg-white px-4 py-4 md:py-5" id="features">
         <div className="mx-auto grid h-full max-w-6xl grid-cols-1 items-center gap-4 lg:grid-cols-2 lg:gap-8">
           <div>

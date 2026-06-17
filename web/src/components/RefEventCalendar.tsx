@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+import { formatEventLocation } from "@/data/sports";
+
 export type CalendarEvent = {
   id: string;
   title: string;
   sport: string;
   starts_at: string;
   ends_at: string;
+  city: string | null;
+  state: string | null;
   zip_code: string;
   officials_needed: number;
   pay_offer: number | null;
@@ -58,7 +62,7 @@ export function RefEventCalendar() {
     const { data: ev, error: evErr } = await supabase
       .from("scheduled_events")
       .select(
-        "id, title, sport, starts_at, ends_at, zip_code, officials_needed, pay_offer, notes, organizer_member_id"
+        "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes, organizer_member_id"
       )
       .eq("status", "published")
       .gte("starts_at", start.toISOString())
@@ -248,7 +252,8 @@ export function RefEventCalendar() {
           >
             <h3 className="font-display text-xl font-bold text-[var(--navy)]">{selected.title}</h3>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              {selected.sport} · {new Date(selected.starts_at).toLocaleString()} · ZIP {selected.zip_code}
+              {selected.sport} · {new Date(selected.starts_at).toLocaleString()} ·{" "}
+              {formatEventLocation(selected.city, selected.state, selected.zip_code)}
             </p>
             <p className="mt-1 text-sm">
               Officials needed: {selected.officials_needed}

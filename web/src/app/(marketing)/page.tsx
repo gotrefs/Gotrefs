@@ -1,19 +1,18 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
+import { ApartSection } from "@/components/marketing/ApartSection";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
+import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
-import { SecondViewport } from "@/components/marketing/SecondViewport";
+import { VerifiedRefCardSection } from "@/components/marketing/VerifiedRefCardSection";
 
 type SD = typeof siteData;
 
 export default function HomePage() {
   const d = siteData as SD;
   const hero = d.hero;
-  const stats = d.statsBanner;
-  const seeHow = d.seeHowItWorks;
   const apart = d.apart;
-  const faqs = d.faqs;
   const cta = d.ctaBanner;
 
   return (
@@ -33,7 +32,7 @@ export default function HomePage() {
             </p>
             <div className="mt-6" id="for-organizers">
               <Link
-                href="mailto:hello@gotrefs.org?subject=GoTRefs%20Demo%20Request"
+                href="mailto:hello@gotrefs.org?subject=GotREFS%20Demo%20Request"
                 className="btn-demo-hero"
               >
                 Book a Demo
@@ -46,60 +45,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Screen 2 — Numbers That Matter + See How (one viewport) */}
-      <SecondViewport
-        statsTitle={stats.title}
-        statsSubtext={stats.subtext}
-        stats={stats.stats}
-        seeHowTitle={seeHow.title}
-        seeHowBody={seeHow.body}
-        seeHowCtaLabel={seeHow.ctaLabel}
-        seeHowCtaHref={seeHow.ctaHref}
-      />
+      {/* Screen 2 — Verified ref digital player card */}
+      <VerifiedRefCardSection />
 
       {/* Screen 3 — What sets us apart */}
-      <section className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4">
-        <div className="mx-auto w-full max-w-6xl">
-          <h2 className="mb-8 text-center text-2xl font-bold uppercase tracking-wide text-[#1b2132] md:text-3xl">
-            {apart.title}
-          </h2>
-          <div className="grid gap-8 md:grid-cols-3">
-            {apart.items.map((item) => (
-              <div key={item.title}>
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--red-light)] text-lg text-[var(--red)]">
-                  {item.icon}
-                </div>
-                <h3 className="mb-1 text-base font-bold uppercase text-[#1b2132]">{item.title}</h3>
-                <p className="text-sm leading-relaxed text-[var(--muted)]">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ApartSection title={apart.title} items={apart.items} />
 
-      {/* Screen 4 — Trust + FAQ */}
-      <section className="viewport-screen flex flex-col justify-center bg-white px-4" id="faq">
-        <div className="mx-auto w-full max-w-3xl">
-          <div className="mb-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-semibold text-[#1b2132] md:text-sm">
-            {d.trustStrip.items.map((t) => (
-              <span key={t.label}>
-                <span className="text-[var(--red)]">✓</span> {t.label}
-              </span>
-            ))}
-          </div>
-          <h2 className="mb-6 text-center text-2xl font-bold text-[#1b2132] md:text-3xl">FAQs</h2>
-          <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-white">
-            {faqs.map((faq) => (
-              <details key={faq.q} className="group px-4 py-3 md:px-5 md:py-4">
-                <summary className="cursor-pointer list-none text-sm font-semibold text-[#1b2132] marker:content-none group-open:text-[var(--red)] md:text-base">
-                  {faq.q}
-                </summary>
-                <p className="mt-2 text-xs leading-relaxed text-[var(--muted)] md:text-sm">{faq.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Screen 4 — FAQ */}
+      <MarketingFaqSection />
 
       {/* Screen 5 — CTA */}
       <section className="hero-arbiter-bg viewport-screen flex flex-col items-center justify-center px-4 text-center text-white">

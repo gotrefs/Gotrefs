@@ -17,7 +17,7 @@ export function BrandLogo({
   const img = (
     <Image
       src="/gotrefs-logo.png"
-      alt="GotRefs"
+      alt="GotREFS"
       width={320}
       height={120}
       className={imageClassName}
