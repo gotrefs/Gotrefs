@@ -6,6 +6,7 @@ type BrandLogoProps = {
   className?: string;
   imageClassName?: string;
   priority?: boolean;
+  src?: string;
 };
 
 export function BrandLogo({
@@ -13,10 +14,11 @@ export function BrandLogo({
   className = "",
   imageClassName = "h-9 w-auto",
   priority = false,
+  src = "/gotrefs-logo.png",
 }: BrandLogoProps) {
   const img = (
     <Image
-      src="/gotrefs-logo.png"
+      src={src}
       alt="GotREFS"
       width={320}
       height={120}

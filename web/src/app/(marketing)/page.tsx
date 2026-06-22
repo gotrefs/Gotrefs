@@ -1,6 +1,7 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
 import { ApartSection } from "@/components/marketing/ApartSection";
+import { DemoRequestButton } from "@/components/marketing/DemoRequestButton";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
 import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
@@ -31,12 +32,7 @@ export default function HomePage() {
               {hero.subtext}
             </p>
             <div className="mt-6" id="for-organizers">
-              <Link
-                href="mailto:hello@gotrefs.org?subject=GotREFS%20Demo%20Request"
-                className="btn-demo-hero"
-              >
-                Book a Demo
-              </Link>
+              <DemoRequestButton className="btn-demo-hero" />
             </div>
           </div>
           <div className="flex h-[min(50vh,400px)] items-center justify-center lg:h-[min(72vh,calc(100svh-10rem))]">

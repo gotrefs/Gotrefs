@@ -15,6 +15,15 @@ type RegisterBody = {
   lastName?: string;
   role?: "ref" | "organizer";
   organizationName?: string;
+  primarySport?: string;
+  additionalSports?: string[];
+  certificationLevel?: string;
+  certifiedBy?: string;
+  gotrefsId?: string;
+  baseCity?: string;
+  workRegions?: string[];
+  travelRadius?: number | null;
+  verificationSkipped?: boolean;
 };
 
 export async function POST(request: NextRequest) {
@@ -41,6 +50,20 @@ export async function POST(request: NextRequest) {
   const lastName = (body.lastName ?? "").trim();
   const role = body.role === "organizer" ? "organizer" : "ref";
   const organizationName = (body.organizationName ?? "").trim();
+  const primarySport = (body.primarySport ?? "").trim();
+  const additionalSports = Array.isArray(body.additionalSports)
+    ? body.additionalSports.filter((sport) => typeof sport === "string" && sport.trim()).map((sport) => sport.trim())
+    : [];
+  const certificationLevel = (body.certificationLevel ?? "").trim();
+  const certifiedBy = (body.certifiedBy ?? "").trim();
+  const gotrefsId = (body.gotrefsId ?? "").trim();
+  const baseCity = (body.baseCity ?? "").trim();
+  const workRegions = Array.isArray(body.workRegions)
+    ? body.workRegions.filter((region) => typeof region === "string" && region.trim()).map((region) => region.trim())
+    : [];
+  const travelRadius =
+    typeof body.travelRadius === "number" && Number.isFinite(body.travelRadius) ? body.travelRadius : null;
+  const verificationSkipped = body.verificationSkipped === true;
 
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
@@ -64,6 +87,15 @@ export async function POST(request: NextRequest) {
     full_name: `${firstName} ${lastName}`.trim(),
     organization_name: role === "organizer" ? organizationName : null,
     role,
+    primary_sport: role === "ref" ? primarySport || "Basketball" : null,
+    additional_sports: role === "ref" ? additionalSports : [],
+    certification_level: role === "ref" ? certificationLevel || "Youth / Recreational" : null,
+    certified_by: role === "ref" ? certifiedBy || null : null,
+    gotrefs_id: role === "ref" ? gotrefsId || null : null,
+    base_city: role === "ref" ? baseCity || null : null,
+    work_regions: role === "ref" ? workRegions : [],
+    travel_radius_miles: role === "ref" ? travelRadius : null,
+    verification_skipped: role === "ref" ? verificationSkipped : false,
   };
 
   const sessionResponse = NextResponse.next();
@@ -105,6 +137,17 @@ export async function POST(request: NextRequest) {
 
     if (authUser) {
       await syncMemberAccount(admin, authUser);
+      if (role === "ref") {
+        await admin
+          .from("ref_profiles")
+          .update({
+            primary_sport: primarySport || "Basketball",
+            additional_sports: additionalSports,
+            certification_level: certificationLevel || "Youth / Recreational",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("member_id", authUser.id);
+      }
     }
 
     const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
@@ -148,6 +191,17 @@ export async function POST(request: NextRequest) {
   };
 
   if (data.session) {
+    if (role === "ref" && data.user?.id) {
+      await supabase
+        .from("ref_profiles")
+        .update({
+          primary_sport: primarySport || "Basketball",
+          additional_sports: additionalSports,
+          certification_level: certificationLevel || "Youth / Recreational",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("member_id", data.user.id);
+    }
     return jsonWithSessionCookies(sessionResponse, payload);
   }
 

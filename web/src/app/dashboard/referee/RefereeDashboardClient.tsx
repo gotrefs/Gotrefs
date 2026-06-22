@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
+import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { SportsFields } from "@/components/SportsFields";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { formatEventLocation } from "@/data/sports";
 import { BRAND_NAME } from "@/lib/brand";
-import { refOfferEligible } from "@/lib/ref-eligibility";
+import { refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
 
 type InquiryRow = {
   id: string;
@@ -48,12 +49,49 @@ type OfferRow = {
     | null;
 };
 
+type AvailabilitySlot = { id: string; start_at: string; end_at: string };
+type VerificationStep = "id" | "certification" | "screening" | "external" | "submit";
+
+function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
+  if (slots.length === 0) return "Add availability";
+  const next = [...slots].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+  )[0];
+  const formatRangePoint = (value: string) => {
+    const date = new Date(value);
+    const day = date.toLocaleDateString(undefined, {
+      month: "numeric",
+      day: "numeric",
+      year: "2-digit",
+    });
+    const time = date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return `${day} ${time}`;
+  };
+  const extra = slots.length > 1 ? ` +${slots.length - 1} more` : "";
+  return `${formatRangePoint(next.start_at)} - ${formatRangePoint(next.end_at)}${extra}`;
+}
+
 export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
+  const editorRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeEditor, setActiveEditor] = useState<EditableRefCardField | "assignor" | null>(null);
+  const [verificationStep, setVerificationStep] = useState<VerificationStep>("id");
+  const [displayName, setDisplayName] = useState("");
+  const [cardMeta, setCardMeta] = useState<{
+    gotrefsId?: string;
+    certifiedBy?: string;
+    baseCity?: string;
+    workRegions?: string[];
+    travelRadius?: string;
+    verificationSkipped?: boolean;
+  }>({});
   const [screening, setScreening] = useState<Screening | null>(null);
   const [offers, setOffers] = useState<OfferRow[]>([]);
-  const [slots, setSlots] = useState<{ id: string; start_at: string; end_at: string }[]>([]);
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [rate, setRate] = useState("");
   const [sport, setSport] = useState("Basketball");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
@@ -81,6 +119,26 @@ export default function RefereeDashboardClient() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    const meta = user.user_metadata ?? {};
+    setDisplayName(
+      String(meta.full_name ?? "").trim() ||
+        `${String(meta.first_name ?? "").trim()} ${String(meta.last_name ?? "").trim()}`.trim() ||
+        user.email?.split("@")[0] ||
+        "Referee"
+    );
+    setCardMeta({
+      gotrefsId: typeof meta.gotrefs_id === "string" ? meta.gotrefs_id : undefined,
+      certifiedBy: typeof meta.certified_by === "string" ? meta.certified_by : undefined,
+      baseCity: typeof meta.base_city === "string" ? meta.base_city : undefined,
+      workRegions: Array.isArray(meta.work_regions)
+        ? meta.work_regions.filter((region): region is string => typeof region === "string")
+        : undefined,
+      travelRadius:
+        typeof meta.travel_radius_miles === "number" || typeof meta.travel_radius_miles === "string"
+          ? String(meta.travel_radius_miles)
+          : undefined,
+      verificationSkipped: meta.verification_skipped === true,
+    });
 
     const { data: sc } = await supabase
       .from("screening_checks")
@@ -158,8 +216,16 @@ export default function RefereeDashboardClient() {
   }, [supabase]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
+
+  useEffect(() => {
+    if (!activeEditor) return;
+    const frame = window.requestAnimationFrame(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeEditor]);
 
   async function saveProfile() {
     setMsg(null);
@@ -180,6 +246,19 @@ export default function RefereeDashboardClient() {
       })
       .eq("member_id", user.id);
     setMsg(error ? error.message : "Profile saved.");
+  }
+
+  async function saveCardMetadata() {
+    setMsg(null);
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        certified_by: cardMeta.certifiedBy || null,
+        base_city: cardMeta.baseCity || null,
+        work_regions: cardMeta.workRegions ?? [],
+        travel_radius_miles: cardMeta.travelRadius ? Number(cardMeta.travelRadius) : null,
+      },
+    });
+    setMsg(error ? error.message : "Card details saved.");
   }
 
   async function toggleAssignor(enabled: boolean) {
@@ -265,27 +344,54 @@ export default function RefereeDashboardClient() {
       setMsg("Choose start and end times.");
       return;
     }
+    if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
+      setMsg("End time must be after start time.");
+      return;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const { error } = await supabase.from("ref_availability").insert({
-      ref_member_id: user.id,
-      start_at: new Date(startAt).toISOString(),
-      end_at: new Date(endAt).toISOString(),
-    });
+    const startIso = new Date(startAt).toISOString();
+    const endIso = new Date(endAt).toISOString();
+    const { data, error } = await supabase
+      .from("ref_availability")
+      .insert({
+        ref_member_id: user.id,
+        start_at: startIso,
+        end_at: endIso,
+      })
+      .select("id, start_at, end_at")
+      .single();
     if (error) {
       setMsg(error.message);
       return;
     }
+    const nextSlot = (data as AvailabilitySlot | null) ?? {
+      id: crypto.randomUUID(),
+      start_at: startIso,
+      end_at: endIso,
+    };
+    setSlots((prev) =>
+      [...prev, nextSlot].sort(
+        (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      )
+    );
     setStartAt("");
     setEndAt("");
-    await load();
+    setMsg("Availability added. Your ref ID card is updated.");
   }
 
   async function removeSlot(id: string) {
-    await supabase.from("ref_availability").delete().eq("id", id);
-    await load();
+    const previous = slots;
+    setSlots((prev) => prev.filter((slot) => slot.id !== id));
+    const { error } = await supabase.from("ref_availability").delete().eq("id", id);
+    if (error) {
+      setSlots(previous);
+      setMsg(error.message);
+      return;
+    }
+    setMsg("Availability removed. Your ref ID card is updated.");
   }
 
   async function startScreening() {
@@ -446,6 +552,70 @@ export default function RefereeDashboardClient() {
       certification_level: cert,
     },
   });
+  const profileComplete = refProfilePackageComplete({
+    government_id_path: govIdPath,
+    verification_doc_path: govIdPath,
+    certification_document_path: certDocPath,
+    bio,
+    primary_sport: sport,
+    certification_level: cert,
+  });
+  const verificationSubmitted = ["submitted", "under_review", "approved"].includes(verificationStatus);
+  const canAcceptOffers = isVerified;
+  const profileReady = Boolean(bio.trim() && sport.trim() && cert.trim());
+  const idReady = Boolean(govIdPath);
+  const certificationReady = Boolean(certDocPath);
+  const backgroundReady = screening?.status === "clear" || verificationSubmitted;
+  const missingActions: {
+    label: string;
+    description: string;
+    field: EditableRefCardField;
+    step?: VerificationStep;
+  }[] = [
+    !profileReady && {
+      label: "Profile",
+      description: "Add sport, certification level, rate, and bio.",
+      field: "profile" as const,
+    },
+    !idReady && {
+      label: "Government ID",
+      description: "Upload a driver license, passport, or state ID.",
+      field: "verification" as const,
+      step: "id" as const,
+    },
+    !certificationReady && {
+      label: "Certification",
+      description: "Upload NFHS, state association, or league credentials.",
+      field: "verification" as const,
+      step: "certification" as const,
+    },
+    !backgroundReady && {
+      label: "Background / review",
+      description: "Start screening, add outside proof, or submit the package.",
+      field: "verification" as const,
+      step: "screening" as const,
+    },
+  ].filter(Boolean) as {
+    label: string;
+    description: string;
+    field: EditableRefCardField;
+    step?: VerificationStep;
+  }[];
+  const availabilitySummary = formatAvailabilityForCard(slots);
+  const avatarLabel = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "REF";
+
+  function openEditor(field: EditableRefCardField | "assignor", step?: VerificationStep) {
+    if (step) setVerificationStep(step);
+    setActiveEditor(field);
+    window.requestAnimationFrame(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   if (loading) {
     return <p className="text-[var(--muted)]">Loading…</p>;
@@ -453,16 +623,434 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="rounded-xl border border-[var(--red)]/20 bg-gradient-to-r from-[var(--red)]/5 to-white p-6">
-        <h1 className="font-display text-3xl font-bold text-[var(--red)]">Referee dashboard</h1>
-        <p className="mt-1 text-sm text-[var(--slate)]">
-          Set your profile, verify your credentials, browse events, and accept paid assignments.
-        </p>
+      <div className="grid gap-6 rounded-[2rem] border border-[var(--red)]/20 bg-gradient-to-br from-[var(--red)]/10 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">
+            {canAcceptOffers ? "Verified profile" : "Pending verification"}
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
+            Browse games now. Finish badges to accept.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
+            Your profile is live as a pending ref, so you can see available games in your area immediately.
+            Complete the ID, certification, and background badges when you are ready to accept paid assignments.
+          </p>
+          <div className="mt-5 rounded-2xl border border-[var(--border)] bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)]">
+              Missing info
+            </p>
+            {missingActions.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {missingActions.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => openEditor(action.field, action.step)}
+                    className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-bold text-[var(--navy)] shadow-sm transition hover:border-[var(--red)] hover:bg-[var(--red)] hover:text-white"
+                    title={action.description}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+                All profile badges are complete.
+              </p>
+            )}
+          </div>
+        </div>
+        <RefereeIdCard
+          fullName={displayName}
+          gotrefsId={cardMeta.gotrefsId}
+          primarySport={sport}
+          additionalSports={additionalSports}
+          certificationLevel={cert}
+          certifiedBy={cardMeta.certifiedBy}
+          rate={rate}
+          avatarLabel={avatarLabel}
+          baseCity={cardMeta.baseCity}
+          workRegions={cardMeta.workRegions}
+          travelRadius={cardMeta.travelRadius}
+          availabilitySummary={availabilitySummary}
+          govIdUploaded={Boolean(govIdPath)}
+          certUploaded={Boolean(certDocPath)}
+          backgroundStatus={screening?.status}
+          verificationStatus={verificationStatus}
+          verificationSkipped={cardMeta.verificationSkipped}
+          profileComplete={profileComplete}
+          onEditField={(field) => openEditor(field)}
+        />
       </div>
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
       <RefEventCalendar />
+
+      {activeEditor && (
+        <section ref={editorRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Edit card</p>
+              <h2 className="mt-1 font-display text-2xl font-bold text-[var(--navy)]">
+                {activeEditor === "availability"
+                  ? "Availability"
+                  : activeEditor === "verification"
+                    ? "How to become verified"
+                    : activeEditor === "location"
+                      ? "Location & travel range"
+                      : "Profile details"}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveEditor(null)}
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-sm font-medium"
+            >
+              Close
+            </button>
+          </div>
+
+          {(activeEditor === "profile" ||
+            activeEditor === "photo" ||
+            activeEditor === "sports" ||
+            activeEditor === "certification" ||
+            activeEditor === "rate") && (
+            <div className="mt-5">
+              {activeEditor === "photo" && (
+                <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Photo upload is preview-only during signup right now. Permanent headshots need a small Supabase
+                  storage field next.
+                </p>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SportsFields
+                  primarySport={sport}
+                  additionalSports={additionalSports}
+                  onPrimaryChange={setSport}
+                  onAdditionalChange={setAdditionalSports}
+                />
+                <label className="flex flex-col gap-1 text-sm">
+                  Certified by
+                  <input
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={cardMeta.certifiedBy ?? ""}
+                    placeholder="NFHS, AIA, USSF, local association"
+                    onChange={(e) => setCardMeta((prev) => ({ ...prev, certifiedBy: e.target.value }))}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  Certification level
+                  <input
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={cert}
+                    onChange={(e) => setCert(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  Rate per game ($)
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={rate}
+                    onChange={(e) => setRate(e.target.value)}
+                  />
+                </label>
+              </div>
+              <label className="mt-4 flex flex-col gap-1 text-sm">
+                Bio
+                <textarea
+                  className="min-h-[80px] rounded border border-[var(--border)] px-2 py-1"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                />
+              </label>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveProfile()}
+                  className="rounded-lg bg-[var(--orange)] px-4 py-2 text-sm font-medium text-white"
+                >
+                  Save profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveCardMetadata()}
+                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white"
+                >
+                  Save card details
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeEditor === "location" && (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-sm">
+                Base city
+                <input
+                  className="rounded border border-[var(--border)] px-2 py-1"
+                  value={cardMeta.baseCity ?? ""}
+                  placeholder="Phoenix, AZ"
+                  onChange={(e) => setCardMeta((prev) => ({ ...prev, baseCity: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                Travel radius (miles)
+                <input
+                  type="number"
+                  min={0}
+                  className="rounded border border-[var(--border)] px-2 py-1"
+                  value={cardMeta.travelRadius ?? ""}
+                  onChange={(e) => setCardMeta((prev) => ({ ...prev, travelRadius: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                Regions willing to work
+                <input
+                  className="rounded border border-[var(--border)] px-2 py-1"
+                  value={(cardMeta.workRegions ?? []).join(", ")}
+                  placeholder="County-wide, Statewide, Tournament travel"
+                  onChange={(e) =>
+                    setCardMeta((prev) => ({
+                      ...prev,
+                      workRegions: e.target.value
+                        .split(",")
+                        .map((item) => item.trim())
+                        .filter(Boolean),
+                    }))
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void saveCardMetadata()}
+                className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white sm:w-fit"
+              >
+                Save location
+              </button>
+            </div>
+          )}
+
+          {activeEditor === "availability" && (
+            <div className="mt-5">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-sm">
+                  Start
+                  <input
+                    type="datetime-local"
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  End
+                  <input
+                    type="datetime-local"
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={endAt}
+                    onChange={(e) => setEndAt(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void addSlot()}
+                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm text-white"
+                >
+                  Add window
+                </button>
+              </div>
+              <ul className="mt-4 space-y-2 text-sm">
+                {slots.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between rounded border border-[var(--border)] px-3 py-2">
+                    <span>
+                      {new Date(s.start_at).toLocaleString()} → {new Date(s.end_at).toLocaleString()}
+                    </span>
+                    <button type="button" className="text-red-600 underline" onClick={() => void removeSlot(s.id)}>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+                {slots.length === 0 && <li className="text-[var(--muted)]">No availability yet.</li>}
+              </ul>
+            </div>
+          )}
+
+          {activeEditor === "verification" && (
+            <div className="mt-5 grid gap-5">
+              <div className="rounded-xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4 text-sm text-[var(--slate)]">
+                <p className="font-bold text-[var(--navy)]">How a pending ref becomes verified</p>
+                <p className="mt-2">
+                  Upload a government ID, upload a certification/license document, complete your profile, then submit
+                  the verification package. You can also start Checkr screening or upload proof if you were verified
+                  elsewhere.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["id", "Government ID"],
+                  ["certification", "Certification"],
+                  ["screening", "Background"],
+                  ["external", "Verified elsewhere"],
+                  ["submit", "Submit"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setVerificationStep(key as VerificationStep)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                      verificationStep === key
+                        ? "bg-[var(--red)] text-white"
+                        : "border border-[var(--border)] bg-white text-[var(--muted)]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {verificationStep === "id" && (
+                <VerificationUploadField
+                  title="Government ID"
+                  description="Driver license, passport, or state ID — required for all referees."
+                  uploaded={Boolean(govIdPath)}
+                  uploadedLabel="✓ Government ID on file"
+                  onFile={(e) => void uploadVerificationFile(e, "government_id_path")}
+                />
+              )}
+
+              {verificationStep === "certification" && (
+                <VerificationUploadField
+                  title="Certification / license document"
+                  description="NFHS, state association, or league certification — required to verify your credentials."
+                  uploaded={Boolean(certDocPath)}
+                  uploadedLabel="✓ Certification document on file"
+                  onFile={(e) => void uploadVerificationFile(e, "certification_document_path")}
+                />
+              )}
+
+              {verificationStep === "screening" && (
+                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
+                  <p className="font-display text-lg font-bold text-[var(--navy)]">Background screening</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Start or refresh the background screening connected to your referee profile.
+                  </p>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Current status: <strong>{screening?.status || "unknown"}</strong>
+                </p>
+                <button
+                  type="button"
+                  disabled={screeningLoading}
+                  onClick={() => void startScreening()}
+                  className="mt-3 rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {screeningLoading ? "Updating…" : "Start / refresh screening"}
+                </button>
+              </div>
+              )}
+
+              {verificationStep === "external" && (
+                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
+                  <p className="font-display text-lg font-bold text-[var(--navy)]">Already verified elsewhere?</p>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Upload a receipt or screenshot from another company/association.
+                </p>
+                <label className="mt-3 flex flex-col gap-1 text-sm">
+                  Verifying company / organization
+                  <input
+                    className="rounded border border-[var(--border)] px-2 py-1"
+                    value={externalCompany}
+                    onChange={(e) => setExternalCompany(e.target.value)}
+                    placeholder="e.g. NFHS, local assignor, prior platform"
+                  />
+                </label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  className="mt-3 text-sm"
+                  onChange={(e) => void saveExternalVerification(e)}
+                />
+              </div>
+              )}
+
+              {verificationStep === "submit" && (
+                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
+                  <p className="font-display text-lg font-bold text-[var(--navy)]">Submit verification package</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Submit after your government ID, certification, and profile information are complete.
+                  </p>
+                <p className="text-sm">
+                  Verification package status:{" "}
+                  <span className="font-semibold capitalize text-[var(--blue)]">
+                    {verificationStatus.replace(/_/g, " ")}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  disabled={
+                    submittingVerification ||
+                    verificationStatus === "submitted" ||
+                    verificationStatus === "under_review"
+                  }
+                  onClick={() => void submitVerificationPackage()}
+                  className="mt-3 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {submittingVerification
+                    ? "Submitting…"
+                    : verificationStatus === "submitted" || verificationStatus === "under_review"
+                      ? "Submitted — awaiting review"
+                      : "Submit verification package"}
+                </button>
+              </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={verificationStep === "id"}
+                  onClick={() => {
+                    const steps: VerificationStep[] = ["id", "certification", "screening", "external", "submit"];
+                    const index = steps.indexOf(verificationStep);
+                    setVerificationStep(steps[Math.max(0, index - 1)]);
+                  }}
+                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium disabled:opacity-40"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  disabled={verificationStep === "submit"}
+                  onClick={() => {
+                    const steps: VerificationStep[] = ["id", "certification", "screening", "external", "submit"];
+                    const index = steps.indexOf(verificationStep);
+                    setVerificationStep(steps[Math.min(steps.length - 1, index + 1)]);
+                  }}
+                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeEditor === "assignor" && (
+            <div className="mt-5">
+              <AssignorRosterPanel
+                isAssignor={isAssignor}
+                assignorSaving={assignorSaving}
+                entries={rosterEntries}
+                rosterSaving={rosterSaving}
+                onToggleAssignor={(enabled) => void toggleAssignor(enabled)}
+                onAddRef={addRosterRef}
+                onRemoveRef={(id) => void removeRosterRef(id)}
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       {inquiries.length > 0 && (
         <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -486,198 +1074,6 @@ export default function RefereeDashboardClient() {
           </ul>
         </section>
       )}
-
-      <AssignorRosterPanel
-        isAssignor={isAssignor}
-        assignorSaving={assignorSaving}
-        entries={rosterEntries}
-        rosterSaving={rosterSaving}
-        onToggleAssignor={(enabled) => void toggleAssignor(enabled)}
-        onAddRef={addRosterRef}
-        onRemoveRef={(id) => void removeRosterRef(id)}
-      />
-
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Already verified elsewhere?</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          If another company already background-checked or certified you, enter their name and upload a
-          receipt or screenshot. That lets you request events and accept offers without running Checkr again.
-        </p>
-        <label className="mt-4 flex flex-col gap-1 text-sm">
-          Verifying company / organization
-          <input
-            className="rounded border border-[var(--border)] px-2 py-1"
-            value={externalCompany}
-            onChange={(e) => setExternalCompany(e.target.value)}
-            placeholder="e.g. NFHS, local assignor, prior platform"
-          />
-        </label>
-        <label className="mt-3 flex flex-col gap-1 text-sm">
-          Receipt or screenshot (JPG, PNG, PDF)
-          <input
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
-            className="text-sm"
-            onChange={(e) => void saveExternalVerification(e)}
-          />
-        </label>
-        {externalProofPath && (
-          <p className="mt-2 text-sm text-green-700">
-            External proof on file{verificationMethod === "external" ? " — verified via third party" : ""}.
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Background screening</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          {BRAND_NAME} uses a third-party provider (Checkr) to run criminal and other screenings permitted
-          under law. You must be <strong>clear</strong> before you can accept paid offers.
-        </p>
-        <p className="mt-3 text-sm">
-          Status:{" "}
-          <span className="font-semibold text-[var(--navy)]">{screening?.status || "unknown"}</span>
-        </p>
-        {screening?.summary && (
-          <p className="mt-1 text-xs text-[var(--muted)]">{screening.summary}</p>
-        )}
-        <button
-          type="button"
-          disabled={screeningLoading}
-          onClick={() => void startScreening()}
-          className="mt-4 rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {screeningLoading ? "Updating…" : "Start / refresh screening"}
-        </button>
-      </section>
-
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Verification package</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Upload both documents below, complete your profile, then submit for review. Files stay in private storage.
-        </p>
-        <p className="mt-3 text-sm">
-          Status:{" "}
-          <span className="font-semibold capitalize text-[var(--blue)]">{verificationStatus.replace(/_/g, " ")}</span>
-        </p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <VerificationUploadField
-            title="Government ID"
-            description="Driver license, passport, or state ID — required for all referees."
-            uploaded={Boolean(govIdPath)}
-            uploadedLabel="✓ Government ID on file"
-            onFile={(e) => void uploadVerificationFile(e, "government_id_path")}
-          />
-          <VerificationUploadField
-            title="Certification / license document"
-            description="NFHS, state association, or league certification — required to verify your credentials."
-            uploaded={Boolean(certDocPath)}
-            uploadedLabel="✓ Certification document on file"
-            onFile={(e) => void uploadVerificationFile(e, "certification_document_path")}
-          />
-        </div>
-        <button
-          type="button"
-          disabled={submittingVerification || verificationStatus === "submitted" || verificationStatus === "under_review"}
-          onClick={() => void submitVerificationPackage()}
-          className="mt-6 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {submittingVerification
-            ? "Submitting…"
-            : verificationStatus === "submitted" || verificationStatus === "under_review"
-              ? "Submitted — awaiting review"
-              : "Submit verification package"}
-        </button>
-      </section>
-
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Profile & rate</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <SportsFields
-            primarySport={sport}
-            additionalSports={additionalSports}
-            onPrimaryChange={setSport}
-            onAdditionalChange={setAdditionalSports}
-          />
-          <label className="flex flex-col gap-1 text-sm">
-            Certification level
-            <input
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={cert}
-              onChange={(e) => setCert(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Rate per game ($)
-            <input
-              type="number"
-              min={0}
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-            />
-          </label>
-        </div>
-        <label className="mt-4 flex flex-col gap-1 text-sm">
-          Bio
-          <textarea
-            className="min-h-[80px] rounded border border-[var(--border)] px-2 py-1"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => void saveProfile()}
-          className="mt-4 rounded-lg bg-[var(--orange)] px-4 py-2 text-sm font-medium text-white"
-        >
-          Save profile
-        </button>
-      </section>
-
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Availability</h2>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Start
-            <input
-              type="datetime-local"
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            End
-            <input
-              type="datetime-local"
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={endAt}
-              onChange={(e) => setEndAt(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void addSlot()}
-            className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm text-white"
-          >
-            Add window
-          </button>
-        </div>
-        <ul className="mt-4 space-y-2 text-sm">
-          {slots.map((s) => (
-            <li key={s.id} className="flex items-center justify-between rounded border border-[var(--border)] px-3 py-2">
-              <span>
-                {new Date(s.start_at).toLocaleString()} → {new Date(s.end_at).toLocaleString()}
-              </span>
-              <button type="button" className="text-red-600 underline" onClick={() => void removeSlot(s.id)}>
-                Remove
-              </button>
-            </li>
-          ))}
-          {slots.length === 0 && <li className="text-[var(--muted)]">No availability yet.</li>}
-        </ul>
-      </section>
 
       <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Offers</h2>

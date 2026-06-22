@@ -30,7 +30,7 @@ export function HeroVideoShowcase({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg bg-[var(--blue-hero)] shadow-xl ring-1 ring-white/10 ${
+      className={`relative overflow-hidden rounded-lg ${
         fitContainer ? "flex h-full min-h-0 w-full items-center justify-center" : "w-full"
       } ${className}`}
     >
