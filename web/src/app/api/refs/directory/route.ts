@@ -67,10 +67,15 @@ export async function GET() {
 
     const { data: authUser } = await admin.auth.admin.getUserById(m.id);
     const email = authUser?.user?.email ?? "";
+    const gotrefsId =
+      typeof authUser?.user?.user_metadata?.gotrefs_id === "string"
+        ? authUser.user.user_metadata.gotrefs_id
+        : `GR-${m.id.slice(0, 8).toUpperCase()}`;
     const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
 
     refs.push({
       id: m.id,
+      gotrefsId,
       displayName: m.display_name,
       primarySport,
       sportEmoji: sportEmoji(primarySport),

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Got refs? Scroll Video</title>
+    <style>
+      :root {
+        --scrub-height: 520vh;
+        --bg: #020617;
+        --white: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-height: 100%;
+        background: var(--bg);
+        scroll-behavior: auto;
+      }
+
+      body {
+        min-height: var(--scrub-height);
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--bg);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.08), transparent 34rem),
+          var(--bg);
+        isolation: isolate;
+      }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        background:
+          linear-gradient(to bottom, rgba(2, 6, 23, 0.28), transparent 24%, transparent 72%, rgba(2, 6, 23, 0.5)),
+          radial-gradient(circle at center, transparent 42%, rgba(2, 6, 23, 0.25));
+      }
+
+      video {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: var(--bg);
+        transform: translateZ(0);
+        will-change: transform;
+      }
+
+      .soccer-ball {
+        position: absolute;
+        left: 0;
+        top: 0;
+        z-index: 3;
+        width: clamp(3.4rem, 7vw, 7rem);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 50% 50%, #111 0 9%, transparent 10%),
+          radial-gradient(circle at 24% 30%, #111 0 9%, transparent 10%),
+          radial-gradient(circle at 76% 30%, #111 0 9%, transparent 10%),
+          radial-gradient(circle at 32% 76%, #111 0 9%, transparent 10%),
+          radial-gradient(circle at 70% 74%, #111 0 9%, transparent 10%),
+          radial-gradient(circle at 34% 26%, #f8fafc 0 20%, transparent 21%),
+          linear-gradient(135deg, #ffffff 0%, #dbeafe 54%, #94a3b8 100%);
+        border: 0.22rem solid rgba(255, 255, 255, 0.92);
+        box-shadow:
+          0 1.5rem 3rem rgba(0, 0, 0, 0.5),
+          inset -0.75rem -0.9rem 1.4rem rgba(15, 23, 42, 0.22),
+          inset 0.7rem 0.8rem 1.2rem rgba(255, 255, 255, 0.8);
+        opacity: 0.96;
+        transform: translate3d(10vw, 75vh, 0) rotate(0deg) scale(1);
+        transform-origin: center;
+        will-change: transform, opacity, filter;
+        pointer-events: none;
+      }
+
+      .soccer-ball::after {
+        content: "";
+        position: absolute;
+        left: 18%;
+        right: 18%;
+        bottom: -34%;
+        height: 22%;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.38);
+        filter: blur(10px);
+        transform: scaleX(1.35);
+      }
+
+      .headline {
+        position: relative;
+        z-index: 3;
+        margin: 0;
+        padding: 0 1.5rem;
+        color: var(--white);
+        font-size: clamp(4rem, 14vw, 13rem);
+        font-weight: 950;
+        letter-spacing: -0.08em;
+        line-height: 0.9;
+        text-align: center;
+        text-shadow: 0 1.25rem 4rem rgba(0, 0, 0, 0.55);
+        opacity: 0;
+        transform: translateY(2rem) scale(0.96);
+        filter: blur(10px);
+        transition:
+          opacity 700ms ease,
+          transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1),
+          filter 900ms ease;
+        pointer-events: none;
+      }
+
+      .headline.is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+
+      .loading {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 5;
+        translate: -50% -50%;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(2, 6, 23, 0.72);
+        padding: 0.8rem 1rem;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 0.9rem;
+        font-weight: 700;
+        backdrop-filter: blur(14px);
+        transition: opacity 300ms ease;
+      }
+
+      .loading.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .hint {
+        position: fixed;
+        bottom: 1.25rem;
+        left: 50%;
+        z-index: 4;
+        translate: -50% 0;
+        border-radius: 999px;
+        background: rgba(2, 6, 23, 0.55);
+        padding: 0.65rem 0.9rem;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        backdrop-filter: blur(12px);
+        transition:
+          opacity 300ms ease,
+          transform 300ms ease;
+      }
+
+      .hint.is-hidden {
+        opacity: 0;
+        transform: translateY(0.75rem);
+      }
+
+      .fallback {
+        position: fixed;
+        inset: auto 1rem 1rem 1rem;
+        z-index: 6;
+        display: none;
+        border-radius: 1rem;
+        background: rgba(127, 29, 29, 0.92);
+        padding: 1rem;
+        color: white;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .fallback.is-visible {
+        display: block;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        body {
+          min-height: 100vh;
+        }
+
+        .headline {
+          opacity: 1;
+          transform: none;
+          filter: none;
+        }
+
+        .hint {
+          display: none;
+        }
+
+        .soccer-ball {
+          transform: translate3d(58vw, 44vh, 0) scale(0.55);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage" aria-label="Scroll-driven soccer shot animation">
+      <video id="scrubVideo" muted playsinline preload="auto" poster=""></video>
+      <div id="soccerBall" class="soccer-ball" aria-hidden="true"></div>
+      <h1 id="headline" class="headline">Got refs?</h1>
+    </main>
+
+    <div id="loading" class="loading">Loading video...</div>
+    <div id="hint" class="hint">Scroll to take the shot</div>
+    <div id="fallback" class="fallback">
+      Video could not be loaded. Put <strong>soccer-shot.mp4</strong> next to this file, or keep <strong>0623.mov</strong>
+      in this folder as the fallback source.
+    </div>
+
+    <script>
+      (() => {
+        const video = document.getElementById("scrubVideo");
+        const headline = document.getElementById("headline");
+        const soccerBall = document.getElementById("soccerBall");
+        const loading = document.getElementById("loading");
+        const hint = document.getElementById("hint");
+        const fallback = document.getElementById("fallback");
+
+        const videoSources = ["soccer-shot.mp4", "0623.mov"];
+        const endFadeStart = 0.94;
+        const snapToEndThreshold = 0.992;
+        const ease = 0.075;
+
+        let duration = 1;
+        let targetProgress = 0;
+        let smoothProgress = 0;
+        let isReady = false;
+        let rafId = 0;
+        let currentSourceIndex = 0;
+
+        function setVideoSource(index) {
+          currentSourceIndex = index;
+          video.src = videoSources[index];
+          video.load();
+        }
+
+        function clamp(value, min = 0, max = 1) {
+          return Math.min(max, Math.max(min, value));
+        }
+
+        function scrollProgress() {
+          const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+          return clamp(window.scrollY / maxScroll);
+        }
+
+        function updateTarget() {
+          targetProgress = scrollProgress();
+        }
+
+        function updateEndText(progress) {
+          const textAmount = clamp((progress - endFadeStart) / (1 - endFadeStart));
+          headline.style.opacity = textAmount.toFixed(3);
+          headline.style.transform = `translateY(${(1 - textAmount) * 2}rem) scale(${0.96 + textAmount * 0.04})`;
+          headline.style.filter = `blur(${(1 - textAmount) * 10}px)`;
+          headline.classList.toggle("is-visible", textAmount > 0.98);
+          hint.classList.toggle("is-hidden", progress > 0.12 || textAmount > 0.1);
+        }
+
+        function moveSoccerBall(progress) {
+          // Curved path: starts low/near camera, lifts slightly, then shrinks into the goal.
+          const shot = clamp(progress / 0.94);
+          const arc = Math.sin(shot * Math.PI);
+          const x = 10 + shot * 54;
+          const y = 74 - shot * 35 - arc * 10;
+          const scale = 1.06 - shot * 0.58 + arc * 0.05;
+          const rotate = shot * 980;
+          const opacity = clamp(1 - Math.max(0, progress - 0.94) / 0.06);
+          const blur = shot > 0.78 ? (shot - 0.78) * 4 : 0;
+
+          soccerBall.style.transform = `translate3d(${x}vw, ${y}vh, 0) rotate(${rotate}deg) scale(${scale})`;
+          soccerBall.style.opacity = opacity.toFixed(3);
+          soccerBall.style.filter = `blur(${blur.toFixed(2)}px)`;
+        }
+
+        function tick() {
+          rafId = requestAnimationFrame(tick);
+          if (!isReady) return;
+
+          updateTarget();
+          smoothProgress += (targetProgress - smoothProgress) * ease;
+
+          if (targetProgress >= snapToEndThreshold) {
+            smoothProgress += (1 - smoothProgress) * 0.16;
+          }
+
+          const progress = clamp(smoothProgress);
+          const nextTime = Math.min(duration - 0.015, progress * duration);
+
+          if (Number.isFinite(nextTime) && Math.abs(video.currentTime - nextTime) > 0.012) {
+            try {
+              video.currentTime = nextTime;
+            } catch {
+              // Some browsers briefly reject seeks while decoding; the next RAF will retry.
+            }
+          }
+
+          updateEndText(progress);
+          moveSoccerBall(progress);
+        }
+
+        function primeVideo() {
+          // Helps mobile browsers allow frame-accurate seeking after metadata loads.
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise
+              .then(() => {
+                video.pause();
+              })
+              .catch(() => {
+                video.pause();
+              });
+          }
+        }
+
+        video.addEventListener("loadedmetadata", () => {
+          duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+          isReady = true;
+          loading.classList.add("is-hidden");
+          primeVideo();
+          updateTarget();
+        });
+
+        video.addEventListener("error", () => {
+          if (currentSourceIndex < videoSources.length - 1) {
+            setVideoSource(currentSourceIndex + 1);
+          } else {
+            loading.classList.add("is-hidden");
+            fallback.classList.add("is-visible");
+          }
+        });
+
+        window.addEventListener("scroll", updateTarget, { passive: true });
+        window.addEventListener("resize", updateTarget, { passive: true });
+        window.addEventListener("beforeunload", () => cancelAnimationFrame(rafId));
+
+        setVideoSource(0);
+        tick();
+      })();
+    </script>
+  </body>
+</html>

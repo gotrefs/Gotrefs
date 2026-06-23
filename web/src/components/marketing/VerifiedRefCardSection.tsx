@@ -10,18 +10,19 @@ export function VerifiedRefCardSection() {
       className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
       id="features"
     >
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
+      <div id="ref-verification" className="scroll-mt-[4.25rem]" aria-hidden="true" />
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-[var(--red)]">Verified officials</p>
           <h2 className="mt-2 text-2xl font-bold leading-tight text-[#1b2132] md:text-3xl lg:text-4xl">
             Your digital ref ID when you&apos;re verified
           </h2>
-          <p className="mt-4 text-sm leading-relaxed text-[var(--muted)] md:text-base">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)] md:mt-4 md:text-base">
             Every verified referee on GotREFS receives a digital player card — the same kind of trusted ID used
             in elite sports. Organizers see at a glance that you&apos;re background-checked, identity-verified, and
             certified for the sports you officiate.
           </p>
-          <ul className="mt-6 space-y-3 text-sm text-[#1b2132]">
+          <ul className="mt-5 space-y-2.5 text-sm text-[#1b2132] md:mt-6 md:space-y-3">
             <li className="flex gap-2">
               <span className="font-bold text-[var(--red)]">✓</span>
               <span>
@@ -41,11 +42,11 @@ export function VerifiedRefCardSection() {
               </span>
             </li>
           </ul>
-          <p className="mt-6 text-sm text-[var(--muted)]">
+          <p className="mt-5 text-sm text-[var(--muted)] md:mt-6">
             Complete your profile, upload your documents, and pass verification — then your card goes live on
             GotREFS for organizers hiring refs they can trust.
           </p>
-          <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-6 inline-flex">
+          <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-5 inline-flex w-full md:mt-6 md:w-auto">
             Get verified as a ref
           </Link>
         </div>

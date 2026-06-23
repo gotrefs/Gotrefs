@@ -126,9 +126,18 @@ body {
 /* One full screen below the sticky header */
 .hero-fullscreen,
 .viewport-screen {
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.hero-fullscreen {
   min-height: calc(100svh - 4.25rem);
-  height: calc(100svh - 4.25rem);
-  overflow: hidden;
+}
+
+.viewport-screen {
+  padding-top: 3rem;
+  padding-bottom: 3rem;
 }
 
 .section-padding {
@@ -137,6 +146,18 @@ body {
 }
 
 @media (min-width: 1024px) {
+  .hero-fullscreen,
+  .viewport-screen {
+    min-height: calc(100svh - 4.25rem);
+    height: calc(100svh - 4.25rem);
+    overflow: hidden;
+  }
+
+  .viewport-screen {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
   .section-padding {
     padding-top: 5rem;
     padding-bottom: 5rem;

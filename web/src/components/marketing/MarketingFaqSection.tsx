@@ -135,7 +135,7 @@ export function MarketingFaqSection() {
 
   return (
     <section className="viewport-screen flex flex-col bg-white px-4 py-5 md:py-6" id="faq">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col">
+      <div className="mx-auto flex w-full max-w-4xl flex-col lg:h-full lg:min-h-0">
         <h2 className="shrink-0 text-center text-xl font-bold text-[#1b2132] md:text-2xl">
           {FAQ_PAGE_TITLE}
         </h2>
@@ -176,7 +176,7 @@ export function MarketingFaqSection() {
               ))}
             </div>
 
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--border)] bg-white">
+            <div className="mt-3 rounded-xl border border-[var(--border)] bg-white lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
               <div className="divide-y divide-[var(--border)]">
                 {visibleItems.map((item) => (
                   <details
@@ -209,7 +209,7 @@ export function MarketingFaqSection() {
             </div>
           </>
         ) : (
-          <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40">
+          <div className="mt-4 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 lg:min-h-0 lg:flex-1">
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] bg-white px-4 py-2">
               <p className="text-sm font-semibold text-[#1b2132]">GotREFS FAQ helper</p>
               <button

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
-import { dashboardPathForRole } from "@/lib/member-role";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { serverEnv } from "@/lib/env/server";
@@ -15,6 +14,7 @@ type RegisterBody = {
   lastName?: string;
   role?: "ref" | "organizer";
   organizationName?: string;
+  phone?: string;
   primarySport?: string;
   additionalSports?: string[];
   certificationLevel?: string;
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
   const lastName = (body.lastName ?? "").trim();
   const role = body.role === "organizer" ? "organizer" : "ref";
   const organizationName = (body.organizationName ?? "").trim();
+  const phone = (body.phone ?? "").trim();
   const primarySport = (body.primarySport ?? "").trim();
   const additionalSports = Array.isArray(body.additionalSports)
     ? body.additionalSports.filter((sport) => typeof sport === "string" && sport.trim()).map((sport) => sport.trim())
@@ -77,15 +78,12 @@ export async function POST(request: NextRequest) {
   const pwErr = validatePasswordStrength(password);
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
 
-  if (role === "organizer" && !organizationName) {
-    return NextResponse.json({ error: "Organization name is required for organizers." }, { status: 400 });
-  }
-
   const userMetadata = {
     first_name: firstName,
     last_name: lastName,
     full_name: `${firstName} ${lastName}`.trim(),
     organization_name: role === "organizer" ? organizationName : null,
+    phone: role === "organizer" ? phone || null : null,
     role,
     primary_sport: role === "ref" ? primarySport || "Basketball" : null,
     additional_sports: role === "ref" ? additionalSports : [],
@@ -164,7 +162,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       needsEmailConfirmation: false,
       role: sync.role,
-      redirect: dashboardPathForRole(sync.role),
+      redirect: "/dashboard",
     });
   }
 
@@ -187,7 +185,7 @@ export async function POST(request: NextRequest) {
     needsEmailConfirmation: !data.session,
     userId: data.user?.id ?? null,
     role,
-    redirect: dashboardPathForRole(role),
+    redirect: "/dashboard",
   };
 
   if (data.session) {

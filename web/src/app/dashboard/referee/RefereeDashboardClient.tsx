@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
@@ -29,6 +30,7 @@ type OfferRow = {
   id: string;
   status: string;
   offered_pay: number | null;
+  message: string | null;
   scheduled_events:
     | {
         title: string;
@@ -76,7 +78,11 @@ function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
 
 export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
   const editorRef = useRef<HTMLElement | null>(null);
+  const notificationsRef = useRef<HTMLElement | null>(null);
+  const messagesRef = useRef<HTMLElement | null>(null);
+  const offersRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeEditor, setActiveEditor] = useState<EditableRefCardField | "assignor" | null>(null);
   const [verificationStep, setVerificationStep] = useState<VerificationStep>("id");
@@ -150,7 +156,7 @@ export default function RefereeDashboardClient() {
     const { data: o } = await supabase
       .from("assignment_offers")
       .select(
-        "id, status, offered_pay, scheduled_events ( title, sport, starts_at, zip_code, city, state )"
+        "id, status, offered_pay, message, scheduled_events ( title, sport, starts_at, zip_code, city, state )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
@@ -226,6 +232,16 @@ export default function RefereeDashboardClient() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeEditor]);
+
+  useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (!panel || loading) return;
+    window.requestAnimationFrame(() => {
+      if (panel === "offers") offersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "messages") messagesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "notifications") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [loading, searchParams]);
 
   async function saveProfile() {
     setMsg(null);
@@ -566,6 +582,8 @@ export default function RefereeDashboardClient() {
   const idReady = Boolean(govIdPath);
   const certificationReady = Boolean(certDocPath);
   const backgroundReady = screening?.status === "clear" || verificationSubmitted;
+  const pendingOffers = offers.filter((offer) => offer.status === "pending");
+  const refNotificationCount = pendingOffers.length + inquiries.length;
   const missingActions: {
     label: string;
     description: string;
@@ -685,7 +703,58 @@ export default function RefereeDashboardClient() {
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
-      <RefEventCalendar />
+      <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
+              {refNotificationCount > 0 && (
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
+                  ! {refNotificationCount}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Organizer invites and messages show up here the moment they reach out.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {pendingOffers.slice(0, 4).map((offer) => {
+            const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+            return (
+              <article key={offer.id} className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New organizer invite</p>
+                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                  {ev?.title ?? "An organizer"} invited you to work a game.
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {ev?.sport} {ev?.starts_at ? `· ${new Date(ev.starts_at).toLocaleString()}` : ""}
+                </p>
+              </article>
+            );
+          })}
+          {inquiries.slice(0, 4).map((inq) => {
+            const org = Array.isArray(inq.members) ? inq.members[0] : inq.members;
+            return (
+              <article key={inq.id} className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-amber-700">Organizer message</p>
+                <p className="mt-1 text-sm font-bold text-[var(--navy)]">{inq.subject}</p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  From {org?.display_name ?? "Event organizer"} · {new Date(inq.created_at).toLocaleString()}
+                </p>
+              </article>
+            );
+          })}
+          {refNotificationCount === 0 && (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)] md:col-span-2">
+              No organizer invites yet. When an organizer messages or invites you, you&apos;ll see it here.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <RefEventCalendar canApplyToEvents={profileReady} onRequireProfile={() => openEditor("profile")} />
 
       {activeEditor && (
         <section ref={editorRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -1053,7 +1122,7 @@ export default function RefereeDashboardClient() {
       )}
 
       {inquiries.length > 0 && (
-        <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <section ref={messagesRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <h2 className="font-display text-xl font-bold text-[var(--blue)]">Organizer messages</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Event organizers reach you through {BRAND_NAME} — their messages appear here, not your personal email.
@@ -1075,7 +1144,7 @@ export default function RefereeDashboardClient() {
         </section>
       )}
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+      <section ref={offersRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="font-display text-xl font-bold text-[var(--navy)]">Offers</h2>
         <ul className="mt-4 space-y-3">
           {offers.map((o) => {
@@ -1094,6 +1163,11 @@ export default function RefereeDashboardClient() {
                     {o.offered_pay != null ? `$${Number(o.offered_pay).toFixed(2)}` : "—"} · Status:{" "}
                     <strong>{o.status}</strong>
                   </p>
+                  {o.message && (
+                    <p className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--grey-light)]/40 px-3 py-2 text-sm text-[var(--slate)]">
+                      {o.message}
+                    </p>
+                  )}
                 </div>
                 {o.status === "pending" && isVerified && (
                   <div className="flex gap-2">

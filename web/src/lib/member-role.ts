@@ -36,7 +36,7 @@ export async function resolveMemberRole(
     .eq("id", user.id)
     .maybeSingle();
 
-  let role = roleFromMemberRow(member, user.user_metadata);
+  const role = roleFromMemberRow(member, user.user_metadata);
 
   if (role === "ref") {
     const { data: orgProfile } = await supabase

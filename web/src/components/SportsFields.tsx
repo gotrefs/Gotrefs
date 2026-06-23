@@ -30,9 +30,11 @@ export function SportsFields({
   const [otherAdditional, setOtherAdditional] = useState("");
 
   useEffect(() => {
-    const p = sportPickerFromStored(primarySport);
-    setSelectValue(p.select);
-    setCustomPrimary(p.custom);
+    queueMicrotask(() => {
+      const p = sportPickerFromStored(primarySport);
+      setSelectValue(p.select);
+      setCustomPrimary(p.custom);
+    });
   }, [primarySport]);
 
   function updatePrimary(select: string, custom: string) {
@@ -64,31 +66,36 @@ export function SportsFields({
     <>
       <label className="flex flex-col gap-1 text-sm">
         {primaryLabel}
-        <select
-          className="rounded border border-[var(--border)] px-2 py-1"
-          value={selectValue}
-          onChange={(e) => updatePrimary(e.target.value, customPrimary)}
-        >
-          {PRIMARY_SPORTS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-          {ADDITIONAL_SPORTS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-          <option value={OTHER_SPORT_VALUE}>Other (type your sport)</option>
-        </select>
+        <div className="relative">
+          <select
+            className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm font-semibold text-[var(--navy)] outline-none transition-all duration-200 focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+            value={selectValue}
+            onChange={(e) => updatePrimary(e.target.value, customPrimary)}
+          >
+            {PRIMARY_SPORTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+            {ADDITIONAL_SPORTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+            <option value={OTHER_SPORT_VALUE}>Something else...</option>
+          </select>
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+            ▾
+          </span>
+        </div>
       </label>
       {selectValue === OTHER_SPORT_VALUE && (
         <label className="flex flex-col gap-1 text-sm">
           Your sport
           <input
-            className="rounded border border-[var(--border)] px-2 py-1"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition-all duration-200 focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
             value={customPrimary}
-            placeholder="e.g. Cornhole, Bocce, Kickball"
+            placeholder="e.g., Flag Football, Pickleball..."
             onChange={(e) => updatePrimary(OTHER_SPORT_VALUE, e.target.value)}
           />
         </label>
@@ -96,18 +103,18 @@ export function SportsFields({
       <fieldset className="sm:col-span-2">
         <legend className="text-sm font-medium text-[var(--blue-text)]">Additional sports</legend>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Select all formats you officiate (7v7, flag football, etc.) or add your own below.
+          Add any other sports or formats you want people to find you for.
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 sm:gap-3">
           {ADDITIONAL_SPORTS.map((s) => {
             const checked = additionalSports.includes(s);
             return (
               <label
                 key={s}
-                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-black transition-all duration-200 ${
                   checked
-                    ? "border-[var(--blue)] bg-[var(--blue)]/10 text-[var(--blue)]"
-                    : "border-[var(--border)] bg-white text-[var(--muted)] hover:border-[var(--blue)]/40"
+                    ? "border-[var(--navy)] bg-[var(--navy)] text-white shadow-sm"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:scale-[1.02] hover:border-[var(--blue)]/50 hover:bg-white hover:text-[var(--navy)]"
                 }`}
               >
                 <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggle(s)} />
@@ -121,12 +128,12 @@ export function SportsFields({
             {customAdditionalTags.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--blue)] bg-[var(--blue)]/10 px-3 py-1 text-xs font-medium text-[var(--blue)]"
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--navy)] bg-[var(--navy)] px-3 py-1.5 text-xs font-black text-white shadow-sm"
               >
                 {s}
                 <button
                   type="button"
-                  className="text-[var(--blue)] hover:opacity-70"
+                  className="text-white/80 transition-opacity duration-200 hover:opacity-70"
                   aria-label={`Remove ${s}`}
                   onClick={() => onAdditionalChange(additionalSports.filter((x) => x !== s))}
                 >
@@ -136,11 +143,11 @@ export function SportsFields({
             ))}
           </div>
         )}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-[var(--blue)] focus-within:ring-2 focus-within:ring-[var(--blue)]/15">
           <input
-            className="min-w-[160px] flex-1 rounded border border-[var(--border)] px-2 py-1 text-sm"
+            className="min-w-0 flex-1 border-0 px-3 py-2.5 text-sm outline-none"
             value={otherAdditional}
-            placeholder="Other sport (type and add)"
+            placeholder="e.g., Flag Football, Pickleball..."
             onChange={(e) => setOtherAdditional(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -151,7 +158,7 @@ export function SportsFields({
           />
           <button
             type="button"
-            className="rounded border border-[var(--border)] px-3 py-1 text-xs font-medium"
+            className="border-l border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-black text-[var(--navy)] transition-all duration-200 hover:bg-slate-100"
             onClick={addCustomAdditional}
           >
             Add sport

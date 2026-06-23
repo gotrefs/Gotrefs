@@ -1,7 +1,6 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
 import { ApartSection } from "@/components/marketing/ApartSection";
-import { DemoRequestButton } from "@/components/marketing/DemoRequestButton";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
 import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
@@ -20,22 +19,29 @@ export default function HomePage() {
     <>
       <MarketingHeader />
 
-      {/* Screen 1 — headline left, full video right */}
-      <section className="hero-arbiter-bg hero-fullscreen flex items-center text-white">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-4 lg:grid-cols-2 lg:gap-12">
-          <div id="for-referees">
-            <h1 className="text-3xl font-bold leading-[1.1] tracking-tight md:text-4xl lg:text-[3.25rem]">
-              <span className="block text-white">The Referee Marketplace</span>
-              <span className="mt-1 block text-[var(--red)]">For Every Sport</span>
+      {/* Screen 1 — marketplace hero with original video */}
+      <section className="hero-arbiter-bg hero-fullscreen flex items-center py-8 text-white sm:py-10 lg:py-0">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-6 px-4 sm:gap-8 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-sm sm:tracking-[0.22em]">
+              GotREFS Marketplace
+            </p>
+            <h1 className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-tight sm:mt-4 sm:text-5xl md:text-6xl">
+              The Referee Marketplace For Every Sport
             </h1>
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/85 md:text-base lg:text-lg">
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/85 sm:mt-5 md:text-lg md:leading-7">
               {hero.subtext}
             </p>
-            <div className="mt-6" id="for-organizers">
-              <DemoRequestButton className="btn-demo-hero" />
+            <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+              <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
+                Get verified as a ref
+              </Link>
+              <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
+                I need refs
+              </Link>
             </div>
           </div>
-          <div className="flex h-[min(50vh,400px)] items-center justify-center lg:h-[min(72vh,calc(100svh-10rem))]">
+          <div className="flex h-[30svh] min-h-[210px] items-center justify-center sm:h-[min(44vh,360px)] lg:h-[min(72vh,calc(100svh-10rem))]">
             <HeroVideoShowcase fitContainer className="h-full w-full" />
           </div>
         </div>
@@ -56,10 +62,10 @@ export default function HomePage() {
           <h2 className="text-2xl font-bold md:text-3xl">{cta.title}</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm text-[var(--grey-light)] md:text-base">{cta.subtext}</p>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/auth/signup?role=ref" className="btn-primary">
+            <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
               {cta.primaryButton}
             </Link>
-            <Link href="/auth/signup?role=organizer" className="btn-outline-light">
+            <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
               {cta.secondaryButton}
             </Link>
           </div>

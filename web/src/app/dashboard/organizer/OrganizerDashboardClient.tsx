@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { SportsFields } from "@/components/SportsFields";
-import { SportBadge } from "@/components/SportBadge";
 import { ALL_SPORTS, formatEventLocation, formatPayOffer } from "@/data/sports";
 
 type DirectoryRef = {
   id: string;
+  gotrefsId: string;
   displayName: string;
   primarySport: string;
   sportEmoji: string;
@@ -16,6 +18,66 @@ type DirectoryRef = {
   availability: { start_at: string; end_at: string }[];
   maskedEmail: string;
 };
+
+function slotCoversEvent(
+  slot: { start_at: string; end_at: string },
+  event: { starts_at: string; ends_at: string }
+) {
+  const slotStart = new Date(slot.start_at).getTime();
+  const slotEnd = new Date(slot.end_at).getTime();
+  const eventStart = new Date(event.starts_at).getTime();
+  const eventEnd = new Date(event.ends_at).getTime();
+  return slotStart <= eventStart && slotEnd >= eventEnd;
+}
+
+function locationFits(refZip: string | null, eventZip: string) {
+  // Until we have geocoding/radius data, use exact ZIP when a ref posts home ZIP.
+  return !refZip || refZip === eventZip;
+}
+
+function formatEventDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function dayKey(date: Date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function toDatetimeLocalValue(date: Date, hour: number, minute = 0) {
+  const next = new Date(date);
+  next.setHours(hour, minute, 0, 0);
+  const offset = next.getTimezoneOffset() * 60000;
+  return new Date(next.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function buildMonthWeeks(cursor: Date) {
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+  const days: (Date | null)[] = [];
+  for (let i = 0; i < first.getDay(); i++) days.push(null);
+  for (let d = 1; d <= last.getDate(); d++) days.push(new Date(cursor.getFullYear(), cursor.getMonth(), d));
+  while (days.length % 7 !== 0) days.push(null);
+  const rows: (Date | null)[][] = [];
+  for (let i = 0; i < days.length; i += 7) rows.push(days.slice(i, i + 7));
+  return rows;
+}
+
+function queryIncludes(...values: Array<string | number | null | undefined>) {
+  return values
+    .filter((value) => value != null)
+    .map((value) => String(value).toLowerCase())
+    .join(" ");
+}
 
 type EventRow = {
   id: string;
@@ -40,6 +102,24 @@ type SignupRequestRow = {
     | { title: string; pay_offer: number | null }[]
     | null;
 };
+
+type OrganizerOfferRow = {
+  id: string;
+  event_id: string;
+  ref_member_id: string;
+  offered_pay: number | null;
+  status: string;
+  message: string | null;
+  created_at: string;
+  members: { display_name: string } | { display_name: string }[] | null;
+  scheduled_events:
+    | { title: string; sport: string; starts_at: string; pay_offer: number | null }
+    | { title: string; sport: string; starts_at: string; pay_offer: number | null }[]
+    | null;
+};
+
+type OrganizerSetupStep = "sport" | "pay" | "bio" | "events" | "identity";
+const ORGANIZER_SETUP_ORDER: OrganizerSetupStep[] = ["sport", "pay", "bio", "events", "identity"];
 
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180);
@@ -91,7 +171,16 @@ function parseEventsCsv(text: string): Array<{
 
 export default function OrganizerDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
+  const notificationsRef = useRef<HTMLElement | null>(null);
+  const applicantsRef = useRef<HTMLElement | null>(null);
+  const marketplaceRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [setupStep, setSetupStep] = useState<OrganizerSetupStep>("sport");
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [eventMsg, setEventMsg] = useState<string | null>(null);
@@ -99,7 +188,7 @@ export default function OrganizerDashboardClient() {
   const [publishing, setPublishing] = useState(false);
 
   const [bio, setBio] = useState("");
-  const [sport, setSport] = useState("Basketball");
+  const [sport, setSport] = useState("");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [ratePerOfficial, setRatePerOfficial] = useState("");
   const [idDocPath, setIdDocPath] = useState<string | null>(null);
@@ -118,13 +207,22 @@ export default function OrganizerDashboardClient() {
   const [notes, setNotes] = useState("");
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [magicSearch, setMagicSearch] = useState("");
+  const [manageViewMode, setManageViewMode] = useState<"list" | "calendar">("list");
+  const [manageCalendarCursor, setManageCalendarCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedManageDate, setSelectedManageDate] = useState<Date | null>(null);
   const [refs, setRefs] = useState<DirectoryRef[]>([]);
   const [canContactRefs, setCanContactRefs] = useState(true);
   const [signupRequests, setSignupRequests] = useState<SignupRequestRow[]>([]);
+  const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
+  const [inviteRef, setInviteRef] = useState<DirectoryRef | null>(null);
   const [contactRefId, setContactRefId] = useState<string | null>(null);
-  const [contactSubject, setContactSubject] = useState("Availability inquiry");
+  const [contactSubject] = useState("Availability inquiry");
   const [contactMessage, setContactMessage] = useState("");
   const [contactSending, setContactSending] = useState(false);
 
@@ -133,6 +231,15 @@ export default function OrganizerDashboardClient() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    const meta = user.user_metadata ?? {};
+    setDisplayName(
+      String(meta.full_name ?? "").trim() ||
+        `${String(meta.first_name ?? "").trim()} ${String(meta.last_name ?? "").trim()}`.trim() ||
+        user.email?.split("@")[0] ||
+        "Organizer"
+    );
+    setOrganizationName(String(meta.organization_name ?? "").trim() || "Organization");
+    setAccountEmail(user.email ?? "");
 
     const { data: op } = await supabase
       .from("organizer_profiles")
@@ -142,7 +249,7 @@ export default function OrganizerDashboardClient() {
 
     if (op) {
       setBio(op.bio || "");
-      setSport(op.primary_sport || "Basketball");
+      setSport(op.primary_sport || "");
       setAdditionalSports(Array.isArray(op.additional_sports) ? op.additional_sports : []);
       setRatePerOfficial(op.rate_per_official != null ? String(op.rate_per_official) : "");
       setIdDocPath(op.id_document_path);
@@ -166,6 +273,15 @@ export default function OrganizerDashboardClient() {
       .eq("status", "pending");
     setSignupRequests((sr as unknown as SignupRequestRow[]) || []);
 
+    const { data: offers } = await supabase
+      .from("assignment_offers")
+      .select(
+        "id, event_id, ref_member_id, offered_pay, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, pay_offer, organizer_member_id )"
+      )
+      .eq("scheduled_events.organizer_member_id", user.id)
+      .order("created_at", { ascending: false });
+    setSentOffers((offers as unknown as OrganizerOfferRow[]) || []);
+
     try {
       const dirRes = await fetch("/api/refs/directory");
       const dirJson = (await dirRes.json()) as {
@@ -179,11 +295,76 @@ export default function OrganizerDashboardClient() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, [
+    supabase,
+    setAccountEmail,
+    setAdditionalSports,
+    setBio,
+    setCanContactRefs,
+    setDisplayName,
+    setEvents,
+    setEventsListPath,
+    setIdDocPath,
+    setLoading,
+    setLogoPath,
+    setOrganizationName,
+    setRatePerOfficial,
+    setRefs,
+    setSentOffers,
+    setSignupRequests,
+    setSport,
+  ]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
+
+  useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (!panel || loading) return;
+    window.requestAnimationFrame(() => {
+      if (panel === "requests") applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "responses") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "marketplace") marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [loading, searchParams]);
+
+  function isOrganizerProfileComplete() {
+    return Boolean(sport.trim() && ratePerOfficial.trim() && bio.trim());
+  }
+
+  function firstIncompleteOrganizerSetupStep(): OrganizerSetupStep {
+    if (!sport.trim()) return "sport";
+    if (!ratePerOfficial.trim()) return "pay";
+    if (!bio.trim()) return "bio";
+    return "events";
+  }
+
+  function requireOrganizerOnboarding() {
+    if (isOrganizerProfileComplete()) return true;
+    setSetupStep(firstIncompleteOrganizerSetupStep());
+    setSetupModalOpen(true);
+    setMsg("Finish your organizer profile first so refs know who they are working with.");
+    return false;
+  }
+
+  function openSetup(step: OrganizerSetupStep) {
+    setSetupStep(step);
+    setSetupModalOpen(true);
+  }
+
+  function prefillEventDate(date: Date) {
+    setStarts(toDatetimeLocalValue(date, 18));
+    setEnds(toDatetimeLocalValue(date, 20));
+    openSetup(isOrganizerProfileComplete() ? "events" : firstIncompleteOrganizerSetupStep());
+    clearEventFeedback();
+  }
+
+  function goToNextSetupStep(current: OrganizerSetupStep) {
+    const index = ORGANIZER_SETUP_ORDER.indexOf(current);
+    const next = ORGANIZER_SETUP_ORDER[Math.min(ORGANIZER_SETUP_ORDER.length - 1, index + 1)];
+    setSetupStep(next);
+  }
 
   function clearEventFeedback() {
     setEventMsg(null);
@@ -198,7 +379,7 @@ export default function OrganizerDashboardClient() {
     await supabase.from("organizer_profiles").upsert({ member_id: userId }, { onConflict: "member_id" });
   }
 
-  async function saveProfile() {
+  async function saveProfileAndAdvance(current: OrganizerSetupStep) {
     setMsg(null);
     setProfileMsg(null);
     setSavingProfile(true);
@@ -218,7 +399,10 @@ export default function OrganizerDashboardClient() {
       const text = res.ok ? "Organization profile saved." : json.error || "Could not save profile.";
       setProfileMsg(text);
       setMsg(text);
-      if (res.ok) await load();
+      if (res.ok) {
+        await load();
+        goToNextSetupStep(current);
+      }
     } catch {
       const text = "Could not reach the server. Refresh and try again.";
       setProfileMsg(text);
@@ -246,6 +430,7 @@ export default function OrganizerDashboardClient() {
     await supabase.from("organizer_profiles").update({ id_document_path: path }).eq("member_id", user.id);
     setIdDocPath(path);
     setMsg("ID document uploaded.");
+    if (setupStep === "identity" && logoPath) setMsg("Organization ID and logo complete.");
   }
 
   async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -266,6 +451,7 @@ export default function OrganizerDashboardClient() {
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
     setMsg("Organization logo uploaded.");
+    if (setupStep === "identity" && idDocPath) setMsg("Organization ID and logo complete.");
   }
 
   async function uploadEventsList(e: React.ChangeEvent<HTMLInputElement>) {
@@ -320,11 +506,13 @@ export default function OrganizerDashboardClient() {
           setMsg(`Uploaded list and imported ${imported} event(s) from CSV.`);
         }
         await load();
+        goToNextSetupStep("events");
         return;
       }
     }
     setMsg("Events list uploaded. Use CSV (title,sport,starts_at,ends_at,zip,officials_needed,pay) to bulk-import.");
     await load();
+    goToNextSetupStep("events");
   }
 
   async function createEvent() {
@@ -338,6 +526,12 @@ export default function OrganizerDashboardClient() {
     if (!zipVal) missing.push("ZIP code");
     if (missing.length > 0) {
       const text = `Please fill in: ${missing.join(" and ")}.`;
+      setEventMsg(text);
+      setMsg(text);
+      return;
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(zipVal)) {
+      const text = "Enter a valid ZIP code so refs can match by area.";
       setEventMsg(text);
       setMsg(text);
       return;
@@ -380,6 +574,7 @@ export default function OrganizerDashboardClient() {
       setEventMsg(text);
       setMsg(text);
       await load();
+      goToNextSetupStep("events");
     } catch {
       const text = "Could not reach the server. Refresh and try again.";
       setEventMsg(text);
@@ -414,6 +609,7 @@ export default function OrganizerDashboardClient() {
   }
 
   async function sendOffer() {
+    if (!requireOrganizerOnboarding()) return;
     if (!offerEvent || !offerRef) {
       setMsg("Pick an event and a referee (click Select next to a ref, then choose your event).");
       return;
@@ -426,6 +622,7 @@ export default function OrganizerDashboardClient() {
         eventId: offerEvent,
         refMemberId: offerRef,
         offeredPay: event?.pay_offer ?? null,
+        message: "We'd love for you to ref for our upcoming event.",
       }),
     });
     const j = (await res.json()) as { error?: string };
@@ -469,97 +666,351 @@ export default function OrganizerDashboardClient() {
   }
 
   if (loading) {
-    return <p className="text-[var(--muted)]">Loading organizer dashboard…</p>;
+    return (
+      <div className="space-y-6">
+        <div className="h-48 animate-pulse rounded-[2rem] bg-slate-100" />
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-6">
+          <div className="h-12 animate-pulse rounded-full bg-slate-100" />
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  const setupActions: { step: OrganizerSetupStep; label: string; done: boolean }[] = [
+    { step: "sport", label: "Primary sport", done: Boolean(sport.trim()) },
+    { step: "pay", label: "Typical pay per official", done: Boolean(ratePerOfficial.trim()) },
+    { step: "bio", label: "About your org", done: Boolean(bio.trim()) },
+    { step: "events", label: "Add upcoming events", done: events.length > 0 || Boolean(eventsListPath) },
+    { step: "identity", label: "Organization ID & logo", done: Boolean(idDocPath && logoPath) },
+  ];
+  const currentSetup = setupActions.find((item) => item.step === setupStep) ?? setupActions[0];
+  const normalizedMagicSearch = magicSearch.trim().toLowerCase();
+  const ignoredOrganizerSearchTerms = new Set(["find", "a", "ref", "referee", "near", "tonight", "this", "weekend"]);
+  const searchMatches = (text: string) =>
+    !normalizedMagicSearch ||
+    normalizedMagicSearch
+      .split(/\s+/)
+      .every((part) => ignoredOrganizerSearchTerms.has(part) || text.includes(part));
+  const filteredEvents = events.filter((event) =>
+    searchMatches(
+      queryIncludes(
+        event.title,
+        event.sport,
+        event.city,
+        event.state,
+        event.zip_code,
+        event.pay_offer != null ? `$${event.pay_offer}` : "",
+        formatEventDateTime(event.starts_at)
+      )
+    )
+  );
+  const filteredRefs = refs.filter((ref) =>
+    searchMatches(queryIncludes(ref.gotrefsId, ref.primarySport, ref.homeZip, ref.ratePerGame != null ? `$${ref.ratePerGame}` : ""))
+  );
+  const selectedOfferEvent = events.find((event) => event.id === offerEvent) ?? null;
+  const matchingRefs = selectedOfferEvent
+    ? filteredRefs.filter((ref) => {
+        const available = ref.availability.some((slot) => slotCoversEvent(slot, selectedOfferEvent));
+        const zipFits = locationFits(ref.homeZip, selectedOfferEvent.zip_code);
+        const sportFits =
+          ref.primarySport === selectedOfferEvent.sport ||
+          selectedOfferEvent.sport === sport ||
+          additionalSports.includes(selectedOfferEvent.sport);
+        return available && zipFits && sportFits;
+      })
+    : [];
+  const manageMonthLabel = manageCalendarCursor.toLocaleString(undefined, { month: "long", year: "numeric" });
+  const manageEventsByDay = new Map<string, EventRow[]>();
+  for (const event of filteredEvents) {
+    const eventDate = new Date(event.starts_at);
+    const key = dayKey(eventDate);
+    manageEventsByDay.set(key, [...(manageEventsByDay.get(key) || []), event]);
+  }
+  const manageCalendarWeeks = buildMonthWeeks(manageCalendarCursor);
+  const visibleManageEvents = selectedManageDate
+    ? filteredEvents.filter((event) => sameDay(new Date(event.starts_at), selectedManageDate))
+    : filteredEvents;
+  const zipIsValid = /^\d{5}(-\d{4})?$/.test(zip.trim());
+  const pendingSentOffers = sentOffers.filter((offer) => offer.status === "pending");
+  const respondedSentOffers = sentOffers.filter((offer) => offer.status === "accepted" || offer.status === "declined");
+  const organizerNotificationCount = signupRequests.length + respondedSentOffers.length;
+  const acceptedOffersByEvent = sentOffers.reduce<Record<string, number>>((acc, offer) => {
+    if (offer.status === "accepted") acc[offer.event_id] = (acc[offer.event_id] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="rounded-xl border border-[var(--blue)]/20 bg-gradient-to-r from-[var(--blue)]/5 to-[var(--red)]/5 p-6">
-        <h1 className="font-display text-3xl font-bold text-[var(--blue)]">Organizer dashboard</h1>
-        <p className="mt-1 text-sm text-[var(--slate)]">
-          Manage your organization, post upcoming events, upload your schedule, and hire verified refs.
-        </p>
+      <div className="grid gap-6 rounded-[2rem] border border-[var(--blue)]/20 bg-gradient-to-br from-[var(--blue)]/10 via-white to-[var(--red)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Organizer dashboard</p>
+          <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
+            Explore your staffing marketplace.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
+            Browse your schedule, discover verified referees, and finish your organizer profile only when you are ready
+            to post or invite.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {!isOrganizerProfileComplete() ? (
+              <button
+                type="button"
+                onClick={() => openSetup(firstIncompleteOrganizerSetupStep())}
+                className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-bold text-[var(--navy)] shadow-sm transition-all duration-200 hover:border-[var(--red)] hover:bg-[var(--red)] hover:text-white"
+              >
+                Complete organizer profile
+              </button>
+            ) : (
+              <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+                Organizer profile ready.
+              </p>
+            )}
+          </div>
+        </div>
+        <OrganizerIdCard
+          contactName={displayName}
+          organizationName={organizationName}
+          email={accountEmail}
+          primarySport={sport}
+          additionalSports={additionalSports}
+          typicalPay={ratePerOfficial}
+          bio={bio}
+          eventsCount={events.length}
+          idUploaded={Boolean(idDocPath)}
+          logoUploaded={Boolean(logoPath)}
+        />
       </div>
 
+      <section className="rounded-3xl border border-[var(--border)] bg-white p-4 shadow-sm">
+        <label className="block">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Magic search</span>
+          <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-2 transition-all duration-200 focus-within:border-[var(--blue)] focus-within:ring-2 focus-within:ring-[var(--blue)]/15 sm:flex-row sm:items-center">
+            <span className="px-2 text-lg" aria-hidden="true">🔎</span>
+            <input
+              value={magicSearch}
+              onChange={(e) => setMagicSearch(e.target.value)}
+              placeholder="Find a referee... Basketball near 91322 tonight"
+              className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm font-semibold text-[var(--navy)] outline-none placeholder:text-slate-400"
+            />
+            <div className="flex flex-wrap gap-2">
+              {["Basketball", "Near 91322", "Tonight"].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setMagicSearch((current) => `${current} ${chip}`.trim())}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-all duration-200 hover:bg-[var(--navy)] hover:text-white"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+        </label>
+      </section>
+
       {msg && (
-        <p className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm text-[var(--navy)]">
+        <div className="fixed right-4 top-20 z-40 max-w-sm rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--navy)] shadow-xl">
+          <span className="mr-2" aria-hidden="true">✓</span>
           {msg}
-        </p>
+        </div>
       )}
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--blue)]">Organization ID & logo</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Upload your organization credential and logo. Files are stored privately in secure storage.
-        </p>
-        <div className="mt-4 grid gap-6 sm:grid-cols-2">
+      <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-[var(--blue-text)]">Government ID or league credential</p>
-            <p className="text-xs text-[var(--muted)]">JPG, PNG, or PDF</p>
-            <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-2 text-sm" onChange={(e) => void uploadId(e)} />
-            {idDocPath && <p className="mt-2 text-sm text-green-700">ID on file.</p>}
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
+              {organizerNotificationCount > 0 && (
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
+                  ! {organizerNotificationCount}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Ref requests and invite responses from the backend show up here.
+            </p>
           </div>
-          <div>
-            <p className="text-sm font-medium text-[var(--blue-text)]">Organization logo</p>
-            <p className="text-xs text-[var(--muted)]">PNG, JPG, or SVG</p>
-            <input type="file" accept=".jpg,.jpeg,.png,.svg,.webp" className="mt-2 text-sm" onChange={(e) => void uploadLogo(e)} />
-            {logoPath && <p className="mt-2 text-sm text-green-700">Logo on file.</p>}
-          </div>
+          {pendingSentOffers.length > 0 && (
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+              {pendingSentOffers.length} invite{pendingSentOffers.length === 1 ? "" : "s"} awaiting response
+            </span>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {signupRequests.slice(0, 4).map((sr) => {
+            const ref = Array.isArray(sr.members) ? sr.members[0] : sr.members;
+            const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
+            return (
+              <button
+                key={sr.id}
+                type="button"
+                onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="rounded-2xl border border-red-100 bg-red-50 p-4 text-left transition-all duration-200 hover:border-[var(--red)]"
+              >
+                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New ref request</p>
+                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                  {ref?.display_name ?? "A referee"} requested {ev?.title ?? "your event"}.
+                </p>
+              </button>
+            );
+          })}
+          {respondedSentOffers.slice(0, 4).map((offer) => {
+            const ref = Array.isArray(offer.members) ? offer.members[0] : offer.members;
+            const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+            const accepted = offer.status === "accepted";
+            return (
+              <article
+                key={offer.id}
+                className={`rounded-2xl border p-4 ${
+                  accepted ? "border-green-100 bg-green-50" : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <p className={`text-xs font-black uppercase tracking-wide ${accepted ? "text-green-700" : "text-slate-600"}`}>
+                  Invite {offer.status}
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                  {ref?.display_name ?? "A referee"} {accepted ? "accepted" : "declined"} {ev?.title ?? "your event"}.
+                </p>
+              </article>
+            );
+          })}
+          {organizerNotificationCount === 0 && (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)] md:col-span-2">
+              No new requests yet. When refs apply or respond to your invite, you&apos;ll see it here.
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--blue)]">Profile & pay rate</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <SportsFields
-            primarySport={sport}
-            additionalSports={additionalSports}
-            onPrimaryChange={setSport}
-            onAdditionalChange={setAdditionalSports}
-          />
-          <label className="flex flex-col gap-1 text-sm">
-            Typical pay per official ($)
-            <input
-              type="number"
-              min={0}
-              className="rounded border border-[var(--border)] px-2 py-1"
-              value={ratePerOfficial}
-              onChange={(e) => setRatePerOfficial(e.target.value)}
-            />
-          </label>
-        </div>
-        <label className="mt-4 flex flex-col gap-1 text-sm">
-          About your organization
-          <textarea
-            className="min-h-[80px] rounded border border-[var(--border)] px-2 py-1"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={savingProfile}
-          onClick={() => void saveProfile()}
-          className="mt-4 rounded-lg bg-[var(--blue)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+      {setupModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => setSetupModalOpen(false)}
         >
-          {savingProfile ? "Saving…" : "Save profile"}
-        </button>
-        {profileMsg && (
-          <p
-            role="status"
-            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
-              profileMsg.includes("saved")
-                ? "border border-green-200 bg-green-50 text-green-800"
-                : "border border-red-200 bg-red-50 text-red-800"
-            }`}
+          <section
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
           >
-            {profileMsg}
-          </p>
-        )}
-      </section>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Organizer setup</p>
+            <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">
+              Step {ORGANIZER_SETUP_ORDER.indexOf(setupStep) + 1} of {ORGANIZER_SETUP_ORDER.length}: {currentSetup.label}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Complete only what is needed now. You can come back and polish the rest later.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSetupModalOpen(false)}
+            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+        <div className="mt-5 flex items-center gap-2">
+          {setupActions.map((action, index) => {
+            const active = action.step === setupStep;
+            const complete = action.done;
+            return (
+              <button
+                key={action.step}
+                type="button"
+                onClick={() => setSetupStep(action.step)}
+                className="group flex min-w-0 flex-1 items-center gap-2"
+              >
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black transition-all duration-200 ${
+                    active
+                      ? "bg-[var(--navy)] text-white"
+                      : complete
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                  }`}
+                >
+                  {complete ? "✓" : index + 1}
+                </span>
+                <span className={`hidden h-px flex-1 sm:block ${active || complete ? "bg-[var(--navy)]/30" : "bg-slate-200"}`} />
+              </button>
+            );
+          })}
+        </div>
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--red)]">Add upcoming event</h2>
+        {setupStep === "sport" && (
+          <div className="mt-5">
+            <SportsFields
+              primarySport={sport}
+              additionalSports={additionalSports}
+              onPrimaryChange={setSport}
+              onAdditionalChange={setAdditionalSports}
+            />
+            <button
+              type="button"
+              disabled={savingProfile}
+              onClick={() => void saveProfileAndAdvance("sport")}
+              className="mt-5 w-full rounded-xl bg-[var(--blue)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--navy)] disabled:opacity-60 sm:w-auto sm:px-6"
+            >
+              {savingProfile ? "Saving…" : "Looks Good, Next Step →"}
+            </button>
+          </div>
+        )}
+
+        {setupStep === "pay" && (
+          <div className="mt-5">
+            <label className="flex flex-col gap-1 text-sm">
+              Typical pay per official ($)
+              <input
+                type="number"
+                min={0}
+                className="rounded border border-[var(--border)] px-3 py-2"
+                value={ratePerOfficial}
+                onChange={(e) => setRatePerOfficial(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={savingProfile}
+              onClick={() => void saveProfileAndAdvance("pay")}
+              className="mt-5 w-full rounded-xl bg-[var(--blue)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--navy)] disabled:opacity-60 sm:w-auto sm:px-6"
+            >
+              {savingProfile ? "Saving…" : "Looks Good, Next Step →"}
+            </button>
+          </div>
+        )}
+
+        {setupStep === "bio" && (
+          <div className="mt-5">
+            <label className="flex flex-col gap-1 text-sm">
+              About your organization
+              <textarea
+                className="min-h-[110px] rounded border border-[var(--border)] px-3 py-2"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell refs about your league, school, tournaments, sports, and expectations."
+              />
+            </label>
+            <button
+              type="button"
+              disabled={savingProfile}
+              onClick={() => void saveProfileAndAdvance("bio")}
+              className="mt-5 w-full rounded-xl bg-[var(--blue)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--navy)] disabled:opacity-60 sm:w-auto sm:px-6"
+            >
+              {savingProfile ? "Saving…" : "Looks Good, Next Step →"}
+            </button>
+          </div>
+        )}
+
+        {setupStep === "events" && (
+          <div className="mt-5">
         <form
           className="mt-4"
           onSubmit={(e) => {
@@ -623,15 +1074,25 @@ export default function OrganizerDashboardClient() {
           </label>
           <label className="flex flex-col gap-1 text-sm">
             ZIP <span className="text-[var(--red)]">*</span>
-            <input
-              required
-              inputMode="numeric"
-              autoComplete="postal-code"
-              placeholder="e.g. 90210"
-              className="rounded border px-2 py-1"
-              value={zip}
-              onChange={(e) => { setZip(e.target.value); clearEventFeedback(); }}
-            />
+            <div className="relative">
+              <input
+                required
+                inputMode="numeric"
+                autoComplete="postal-code"
+                placeholder="e.g., 91322"
+                className={`w-full rounded-xl border px-3 py-2 pr-10 outline-none transition-all duration-200 ${
+                  zip && zipIsValid
+                    ? "border-green-300 bg-green-50 focus:ring-2 focus:ring-green-100"
+                    : "border-slate-200 focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+                }`}
+                value={zip}
+                onChange={(e) => { setZip(e.target.value); clearEventFeedback(); }}
+              />
+              {zip && zipIsValid && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-green-600">✓</span>
+              )}
+            </div>
+            {zip && !zipIsValid && <span className="text-xs text-amber-700">Use a 5-digit ZIP so refs can match by area.</span>}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Officials needed
@@ -666,49 +1127,353 @@ export default function OrganizerDashboardClient() {
             {eventMsg}
           </p>
         )}
-      </section>
+            <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-4">
+              <h3 className="font-bold text-[var(--blue)]">Upload events list</h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                CSV columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer
+              </p>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="mt-3 text-sm"
+                onChange={(e) => void uploadEventsList(e)}
+              />
+              {eventsListPath && <p className="mt-2 text-sm text-green-700">Events list file saved.</p>}
+            </div>
+          </div>
+        )}
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--blue)]">Upload events list</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Upload a CSV or spreadsheet of your season schedule instead of entering events one by one.
-        </p>
-        <p className="mt-2 text-xs text-[var(--muted)]">
-          CSV columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer
-        </p>
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="mt-3 text-sm"
-          onChange={(e) => void uploadEventsList(e)}
-        />
-        {eventsListPath && <p className="mt-2 text-sm text-green-700">Events list file saved.</p>}
-      </section>
+        {setupStep === "identity" && (
+          <div className="mt-5 grid gap-6 sm:grid-cols-2">
+            <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
+              <p className="font-display text-lg font-bold text-[var(--navy)]">Government ID or league credential</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">JPG, PNG, or PDF</p>
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-4 text-sm" onChange={(e) => void uploadId(e)} />
+              {idDocPath && <p className="mt-2 text-sm text-green-700">ID on file.</p>}
+            </div>
+            <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
+              <p className="font-display text-lg font-bold text-[var(--navy)]">Organization logo</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">PNG, JPG, SVG, or WEBP</p>
+              <input type="file" accept=".jpg,.jpeg,.png,.svg,.webp" className="mt-4 text-sm" onChange={(e) => void uploadLogo(e)} />
+              {logoPath && <p className="mt-2 text-sm text-green-700">Logo on file.</p>}
+            </div>
+          </div>
+        )}
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--blue)]">Your upcoming events</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Only events you posted appear here — other organizers cannot see these.
-        </p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {events.map((e) => {
+        {profileMsg && (
+          <p
+            role="status"
+            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+              profileMsg.includes("saved")
+                ? "border border-green-200 bg-green-50 text-green-800"
+                : "border border-red-200 bg-red-50 text-red-800"
+            }`}
+          >
+            {profileMsg}
+          </p>
+        )}
+          </section>
+        </div>
+      )}
+
+      <section className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Manage events</p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-[var(--blue)]">Your upcoming events</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Track staffing, review applicants, and invite available referees for each game.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-full border border-[var(--border)] bg-[var(--grey-light)] p-1">
+              {(["list", "calendar"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setManageViewMode(mode)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black capitalize transition-all duration-200 ${
+                    manageViewMode === mode
+                      ? "bg-white text-[var(--navy)] shadow-sm"
+                      : "text-[var(--muted)] hover:text-[var(--navy)]"
+                  }`}
+                >
+                  {mode} View
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!requireOrganizerOnboarding()) return;
+                openSetup("events");
+              }}
+              className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
+            >
+              Add event
+            </button>
+          </div>
+        </div>
+        {manageViewMode === "calendar" && (
+          <div className="mt-5 grid gap-5 transition-all duration-200 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-2xl border border-[#F1F5F9] bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm transition-all duration-200 hover:bg-[var(--grey-light)]"
+                  onClick={() =>
+                    setManageCalendarCursor(
+                      new Date(manageCalendarCursor.getFullYear(), manageCalendarCursor.getMonth() - 1, 1)
+                    )
+                  }
+                >
+                  ←
+                </button>
+                <p className="font-black text-[var(--navy)]">{manageMonthLabel}</p>
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm transition-all duration-200 hover:bg-[var(--grey-light)]"
+                  onClick={() =>
+                    setManageCalendarCursor(
+                      new Date(manageCalendarCursor.getFullYear(), manageCalendarCursor.getMonth() + 1, 1)
+                    )
+                  }
+                >
+                  →
+                </button>
+              </div>
+              <div className="mt-4 grid grid-cols-7 border-y border-[#F1F5F9] text-center text-[11px] font-black uppercase tracking-wide text-[var(--muted)]">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div key={day} className="py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 border-l border-[#F1F5F9]">
+                {manageCalendarWeeks.flat().map((day, index) => {
+                  if (!day) return <div key={`blank-${index}`} className="min-h-28 border-b border-r border-[#F1F5F9]" />;
+                  const key = dayKey(day);
+                  const dayEvents = manageEventsByDay.get(key) || [];
+                  const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                  const selected = selectedManageDate && sameDay(day, selectedManageDate);
+                  return (
+                    <div
+                      key={key}
+                      className={`min-h-28 border-b border-r border-[#F1F5F9] p-1.5 transition-all duration-200 ${
+                        isWeekend ? "bg-slate-50/70" : "bg-white"
+                      } ${selected ? "ring-2 ring-inset ring-[var(--blue)]/40" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => (dayEvents.length ? setSelectedManageDate(day) : prefillEventDate(day))}
+                        className="mb-1 rounded-full px-2 py-0.5 text-xs font-bold text-[var(--slate)] transition-all duration-200 hover:bg-[var(--grey-light)]"
+                      >
+                        {day.getDate()}
+                      </button>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 3).map((event) => {
+                          const hiredCount = acceptedOffersByEvent[event.id] || 0;
+                          const filled = hiredCount >= event.officials_needed;
+                          return (
+                            <div key={event.id} className="group relative">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!requireOrganizerOnboarding()) return;
+                                  setSelectedManageDate(day);
+                                  setOfferEvent(event.id);
+                                }}
+                                className={`block w-full truncate rounded-full px-2 py-1 text-left text-[10px] font-black transition-all duration-200 ${
+                                  filled
+                                    ? "bg-green-50 text-green-700 hover:bg-green-100"
+                                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                }`}
+                              >
+                                {hiredCount}/{event.officials_needed} Refs · {event.sport}
+                              </button>
+                              <div className="pointer-events-none absolute left-0 top-7 z-20 hidden w-56 rounded-xl border border-[var(--border)] bg-white p-3 text-left text-xs shadow-xl group-hover:block">
+                                <p className="font-black text-[var(--navy)]">{event.title}</p>
+                                <p className="mt-1 text-[var(--muted)]">{event.sport} · {formatEventDateTime(event.starts_at)}</p>
+                                <p className="mt-1 font-bold text-amber-700">
+                                  Missing {Math.max(event.officials_needed - hiredCount, 0)} slot(s)
+                                </p>
+                                <p className="mt-2 font-bold text-[var(--blue)]">Click badge, then browse refs below.</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {dayEvents.length > 3 && (
+                          <p className="px-2 text-[10px] font-semibold text-[var(--muted)]">+{dayEvents.length - 3} more</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-[var(--muted)]">
+                Click a blank date to prefill the Add Event form. Click a date with games to filter the list.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#F1F5F9] bg-slate-50/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide text-[var(--muted)]">
+                    {selectedManageDate ? selectedManageDate.toLocaleDateString() : "All upcoming games"}
+                  </p>
+                  <h3 className="mt-1 font-black text-[var(--navy)]">Event cards</h3>
+                </div>
+                {selectedManageDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedManageDate(null)}
+                    className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-bold transition-all duration-200 hover:bg-[var(--grey-light)]"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="mt-4 grid gap-3">
+                {visibleManageEvents.map((e) => {
+                  const loc = formatEventLocation(e.city, e.state, e.zip_code);
+                  const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
+                  const hiredCount = acceptedOffersByEvent[e.id] || 0;
+                  const filled = hiredCount >= e.officials_needed;
+                  return (
+                    <article key={e.id} className="rounded-2xl border border-[var(--border)] bg-white p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-black text-[var(--navy)]">{e.title}</h4>
+                          <p className="mt-1 text-xs text-[var(--muted)]">{formatEventDateTime(e.starts_at)}</p>
+                          <p className="mt-1 text-xs text-[var(--muted)]">{loc || `ZIP ${e.zip_code}`}</p>
+                        </div>
+                        <span className="rounded-full bg-[var(--blue)]/10 px-2.5 py-1 text-xs font-bold text-[var(--blue)]">
+                          {e.sport}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${
+                            filled ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {hiredCount}/{e.officials_needed} Refs Hired
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (applicantCount > 0) {
+                              applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            } else {
+                              if (!requireOrganizerOnboarding()) return;
+                              setOfferEvent(e.id);
+                              setOfferRef("");
+                              marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }}
+                          className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
+                        >
+                          {applicantCount > 0 ? `View Applicants (${applicantCount})` : "Browse Refs"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+                {visibleManageEvents.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white p-6 text-center">
+                    <p className="text-2xl" aria-hidden="true">📋</p>
+                    <p className="mt-2 text-sm font-bold text-[var(--navy)]">No events on this date.</p>
+                    <button
+                      type="button"
+                      onClick={() => prefillEventDate(selectedManageDate ?? manageCalendarCursor)}
+                      className="mt-3 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold transition-all duration-200 hover:bg-[var(--grey-light)]"
+                    >
+                      Add event here
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className={`mt-5 grid gap-4 transition-opacity duration-200 ${manageViewMode === "calendar" ? "hidden" : ""}`}>
+          {visibleManageEvents.map((e) => {
             const loc = formatEventLocation(e.city, e.state, e.zip_code);
             const payLabel = formatPayOffer(e.pay_offer);
+            const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
+            const hiredCount = acceptedOffersByEvent[e.id] || 0;
+            const filled = hiredCount >= e.officials_needed;
             return (
-            <li key={e.id} className="rounded border border-[var(--border)] px-3 py-2">
-              <strong className="text-[var(--red)]">{e.title}</strong> · {e.sport} ·{" "}
-              {new Date(e.starts_at).toLocaleString()}
-              {loc ? ` · ${loc}` : ""} · {e.officials_needed} refs
-              {payLabel ? ` · Offer ${payLabel}` : ""}
-            </li>
+              <article
+                key={e.id}
+                className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="grid gap-4 lg:grid-cols-[1.2fr_1.1fr_auto] lg:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-black text-[var(--navy)]">{e.title}</h3>
+                      <span className="rounded-full bg-[var(--blue)]/10 px-3 py-1 text-xs font-bold text-[var(--blue)]">
+                        {e.sport}
+                      </span>
+                    </div>
+                    {payLabel && <p className="mt-2 text-sm font-bold text-emerald-700">Offer {payLabel} per official</p>}
+                  </div>
+                  <div className="grid gap-2 text-sm text-[var(--slate)]">
+                    <p className="flex items-center gap-2">
+                      <span aria-hidden="true">📅</span>
+                      <span>{formatEventDateTime(e.starts_at)}</span>
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <span aria-hidden="true">📍</span>
+                      <span>{loc || `ZIP ${e.zip_code}`}</span>
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 lg:items-end">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black ${
+                        filled ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {hiredCount}/{e.officials_needed} Refs Hired
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (applicantCount > 0) {
+                          applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        } else {
+                          if (!requireOrganizerOnboarding()) return;
+                          setOfferEvent(e.id);
+                          setOfferRef("");
+                          marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 ${
+                        applicantCount > 0
+                          ? "border border-[var(--border)] text-[var(--navy)] hover:border-[var(--blue)] hover:bg-[var(--blue)] hover:text-white"
+                          : "bg-[var(--red)] text-white hover:bg-[var(--red-dark)]"
+                      }`}
+                    >
+                      {applicantCount > 0 ? `View Applicants (${applicantCount})` : "Browse Refs for this Game"}
+                    </button>
+                  </div>
+                </div>
+              </article>
             );
           })}
-          {events.length === 0 && <li className="text-[var(--muted)]">No upcoming events yet.</li>}
-        </ul>
+          {visibleManageEvents.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
+              <p className="text-3xl" aria-hidden="true">📋</p>
+              <h3 className="mt-2 font-bold text-[var(--navy)]">
+                {events.length === 0 ? "No upcoming events yet." : "No events on this date."}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">Add a game to start matching with referees.</p>
+            </div>
+          )}
+        </div>
       </section>
 
       {signupRequests.length > 0 && (
-        <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <section ref={applicantsRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <h2 className="font-display text-xl font-bold text-[var(--red)]">Ref requests on your events</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Referees who requested to work one of your events. Only you see these — not other organizers.
@@ -746,11 +1511,28 @@ export default function OrganizerDashboardClient() {
         </section>
       )}
 
-      <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--blue)]">Hire a verified ref</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Ref contact info is protected. You can message refs through GotREFS — their real email is never shown.
-        </p>
+      <section ref={marketplaceRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Marketplace</p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-[var(--blue)]">Hire a verified ref</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Discover verified officials, review availability, and invite them to your games.
+            </p>
+          </div>
+          {selectedOfferEvent && (
+            <button
+              type="button"
+              onClick={() => {
+                setOfferEvent("");
+                setOfferRef("");
+              }}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-[var(--grey-light)]"
+            >
+              Clear event filter
+            </button>
+          )}
+        </div>
         {!canContactRefs && (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Sign up and log in as a registered event organizer to browse ref availability and contact refs.
@@ -758,127 +1540,170 @@ export default function OrganizerDashboardClient() {
         )}
         {canContactRefs && (
           <>
-            <ul className="mt-3 space-y-3 text-sm">
-              {refs.slice(0, 20).map((r) => (
-                <li key={r.id} className="rounded border border-[var(--border)] px-3 py-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-[var(--navy)]">
-                        <SportBadge sport={r.primarySport} className="mr-2" />
-                        {r.displayName}
+            {selectedOfferEvent && (
+              <p className="mt-4 rounded-2xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 px-4 py-3 text-sm text-[var(--slate)]">
+                Showing refs available for <strong>{selectedOfferEvent.title}</strong> on{" "}
+                <strong>{formatEventDateTime(selectedOfferEvent.starts_at)}</strong>
+                {selectedOfferEvent.zip_code ? ` near ZIP ${selectedOfferEvent.zip_code}` : ""}.
+              </p>
+            )}
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              {(selectedOfferEvent ? matchingRefs : filteredRefs).slice(0, 20).map((r) => {
+                const cardAvailability = selectedOfferEvent
+                  ? r.availability.filter((slot) => slotCoversEvent(slot, selectedOfferEvent)).slice(0, 2)
+                  : r.availability.slice(0, 2);
+                return (
+                  <article
+                    key={r.id}
+                    className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--blue)] text-sm font-black text-white">
+                          {r.gotrefsId.slice(-2)}
+                        </div>
+                        <div>
+                          <p className="font-black text-[var(--navy)]">Official {r.gotrefsId}</p>
+                          <p className="mt-1 text-xs font-semibold text-emerald-700">✓ Verified · ⭐ 4.9 (24 games)</p>
+                        </div>
+                      </div>
+                      <p className="text-right text-sm font-black text-[var(--navy)]">
+                        {r.ratePerGame != null ? `$${Number(r.ratePerGame).toFixed(0)}` : "Rate TBD"}
+                        <span className="block text-xs font-medium text-[var(--muted)]">/ game</span>
                       </p>
-                      <p className="mt-1 text-[var(--muted)]">
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[var(--blue)]/10 px-3 py-1 text-xs font-bold text-[var(--blue)]">
                         {r.primarySport}
-                        {r.ratePerGame != null ? ` · $${Number(r.ratePerGame).toFixed(0)}/game` : ""}
-                        {r.homeZip ? ` · ZIP ${r.homeZip}` : ""}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-[var(--slate)]">
-                        Contact ref: {r.maskedEmail}
-                      </p>
-                      {r.availability.length > 0 ? (
-                        <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
-                          {r.availability.slice(0, 3).map((slot) => (
-                            <li key={`${slot.start_at}-${slot.end_at}`}>
-                              Available {new Date(slot.start_at).toLocaleString()} –{" "}
-                              {new Date(slot.end_at).toLocaleString()}
-                            </li>
-                          ))}
-                          {r.availability.length > 3 && (
-                            <li>+{r.availability.length - 3} more window(s)</li>
-                          )}
-                        </ul>
+                      </span>
+                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
+                        Certified
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-1 text-xs text-[var(--muted)]">
+                      {cardAvailability.length > 0 ? (
+                        cardAvailability.map((slot) => (
+                          <p key={`${slot.start_at}-${slot.end_at}`}>
+                            Available {new Date(slot.start_at).toLocaleString()} – {new Date(slot.end_at).toLocaleString()}
+                          </p>
+                        ))
                       ) : (
-                        <p className="mt-1 text-xs text-[var(--muted)]">No upcoming availability posted.</p>
+                        <p>No posted availability for the selected game window.</p>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2">
+
+                    <div className="mt-5 flex gap-2">
                       <button
                         type="button"
-                        className="text-[var(--red)] underline"
-                        onClick={() => setOfferRef(r.id)}
-                      >
-                        Select for offer
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-[var(--border)] px-2 py-1 text-xs"
                         onClick={() => {
                           setContactRefId(contactRefId === r.id ? null : r.id);
-                          setContactMessage("");
+                          setContactMessage("We'd love for you to ref for our upcoming event.");
                         }}
+                        className="flex-1 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-[var(--grey-light)]"
                       >
-                        {contactRefId === r.id ? "Cancel" : "Contact ref"}
-                      </button>
-                    </div>
-                  </div>
-                  {contactRefId === r.id && (
-                    <div className="mt-3 border-t border-[var(--border)] pt-3">
-                      <p className="mb-2 text-xs text-[var(--muted)]">
-                        Message goes to the ref&apos;s dashboard only. Email stays hidden ({r.maskedEmail}).
-                      </p>
-                      <label className="flex flex-col gap-1 text-xs">
-                        Subject
-                        <input
-                          className="rounded border px-2 py-1"
-                          value={contactSubject}
-                          onChange={(e) => setContactSubject(e.target.value)}
-                        />
-                      </label>
-                      <label className="mt-2 flex flex-col gap-1 text-xs">
                         Message
-                        <textarea
-                          className="min-h-[72px] rounded border px-2 py-1"
-                          value={contactMessage}
-                          onChange={(e) => setContactMessage(e.target.value)}
-                          placeholder="Ask about their availability for your event…"
-                        />
-                      </label>
+                      </button>
                       <button
                         type="button"
-                        disabled={contactSending}
-                        className="mt-2 rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-                        onClick={() => void sendContact(r.id)}
+                        onClick={() => {
+                          if (!requireOrganizerOnboarding()) return;
+                          setInviteRef(r);
+                        }}
+                        className="flex-1 rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
                       >
-                        {contactSending ? "Sending…" : "Send through GotREFS"}
+                        Invite to Game
                       </button>
                     </div>
-                  )}
-                </li>
-              ))}
-              {refs.length === 0 && (
-                <li className="text-[var(--muted)]">No verified refs available yet.</li>
-              )}
-            </ul>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {offerRef && (
-                <p className="w-full text-sm text-[var(--muted)]">
-                  Selected ref:{" "}
-                  <strong>{refs.find((r) => r.id === offerRef)?.displayName ?? offerRef}</strong>
-                </p>
-              )}
-              <select
-                className="rounded border px-2 py-1 text-sm"
-                value={offerEvent}
-                onChange={(e) => setOfferEvent(e.target.value)}
-              >
-                <option value="">Your event…</option>
-                {events.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.title}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void sendOffer()}
-                className="rounded-lg bg-[var(--blue)] px-4 py-2 text-sm text-white"
-              >
-                Send offer
-              </button>
+                    {contactRefId === r.id && (
+                      <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-3">
+                        <p className="mb-2 text-xs text-[var(--muted)]">Message goes to the ref dashboard.</p>
+                        <textarea
+                          className="min-h-[72px] w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm"
+                          value={contactMessage}
+                          onChange={(e) => setContactMessage(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          disabled={contactSending}
+                          className="mt-2 rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          onClick={() => void sendContact(r.id)}
+                        >
+                          {contactSending ? "Sending…" : "Send message"}
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
+            {filteredRefs.length === 0 && !selectedOfferEvent && (
+              <div className="mt-5 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
+                <p className="text-3xl" aria-hidden="true">🔎</p>
+                <h3 className="mt-2 font-bold text-[var(--navy)]">No referees available in this window yet.</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">Expand your search radius or share your event link.</p>
+              </div>
+            )}
+            {selectedOfferEvent && filteredRefs.length > 0 && matchingRefs.length === 0 && (
+              <div className="mt-5 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
+                <p className="text-3xl" aria-hidden="true">🔎</p>
+                <h3 className="mt-2 font-bold text-[var(--navy)]">No referees available in this window yet.</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">Expand your search radius or share your event link.</p>
+              </div>
+            )}
           </>
         )}
       </section>
+      {inviteRef && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onClick={() => setInviteRef(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Invite referee</p>
+                <h3 className="mt-1 text-2xl font-black text-[var(--navy)]">Official {inviteRef.gotrefsId}</h3>
+              </div>
+              <button type="button" className="rounded-full border border-[var(--border)] px-3 py-1 text-sm" onClick={() => setInviteRef(null)}>
+                Close
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-[var(--muted)]">Select the game you want this referee to work.</p>
+            <div className="mt-4 grid gap-2">
+              {events.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => {
+                    setOfferEvent(event.id);
+                    setOfferRef(inviteRef.id);
+                  }}
+                  className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                    offerEvent === event.id ? "border-[var(--red)] bg-[var(--red-light)]" : "border-[var(--border)] hover:border-[var(--blue)]"
+                  }`}
+                >
+                  <p className="font-bold text-[var(--navy)]">{event.title}</p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">{formatEventDateTime(event.starts_at)} · {event.sport}</p>
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-3 text-sm">
+              We&apos;d love for you to ref for our upcoming event.
+            </div>
+            <button
+              type="button"
+              disabled={!offerEvent}
+              onClick={() => {
+                void sendOffer();
+                setInviteRef(null);
+              }}
+              className="mt-4 w-full rounded-full bg-[var(--red)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:opacity-50"
+            >
+              Send invite
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

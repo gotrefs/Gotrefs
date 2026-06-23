@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get("type");
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
 
-  let response = NextResponse.redirect(new URL(next, requestUrl.origin));
+  const response = NextResponse.redirect(new URL(next, requestUrl.origin));
 
   if (!code && !(tokenHash && type)) {
     return NextResponse.redirect(

@@ -163,16 +163,16 @@ export function RefereeIdCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[2rem] border border-white/25 bg-slate-950 p-5 text-white shadow-2xl shadow-slate-950/30 backdrop-blur ${className}`}
+      className={`relative overflow-hidden rounded-[1.5rem] border border-white/25 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/30 backdrop-blur sm:rounded-[2rem] sm:p-5 ${className}`}
     >
       <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(13,27,59,0.96),rgba(8,18,38,0.92)_45%,rgba(127,29,29,0.88)),radial-gradient(circle_at_top_right,rgba(239,68,68,0.45),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.45),transparent_36%)]" />
       <div className="absolute inset-x-0 top-0 h-24 bg-white/15 blur-3xl" />
       <div className="absolute -right-16 top-16 h-44 w-44 rounded-full border border-white/10" />
       <div className="absolute -bottom-20 -left-16 h-56 w-56 rounded-full border border-white/10" />
       <div className="relative">
-        <div className="flex items-start justify-between gap-4">
-          <div className="rounded-xl bg-white/95 px-3 py-2 shadow-lg">
-            <Image src="/gotrefs-logo.png" alt="GotREFS" width={150} height={56} className="h-8 w-auto" />
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="rounded-xl bg-white/95 px-2.5 py-2 shadow-lg sm:px-3">
+            <Image src="/gotrefs-logo.png" alt="GotREFS" width={150} height={56} className="h-6 w-auto sm:h-8" />
           </div>
           <div className="text-right">
             {id && (
@@ -186,7 +186,7 @@ export function RefereeIdCard({
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-[7.5rem_1fr] gap-4">
+        <div className="mt-5 grid grid-cols-[5.75rem_1fr] gap-3 sm:mt-6 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
           <div className="relative">
             <button
               type="button"
@@ -198,7 +198,7 @@ export function RefereeIdCard({
                 // Uploaded photos are browser object URLs/data URLs, so use a native image.
                 <img src={avatarUrl} alt={`${name} avatar`} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] text-3xl font-black">
+                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] text-2xl font-black sm:text-3xl">
                   {avatarLabel}
                 </div>
               )}
@@ -213,16 +213,16 @@ export function RefereeIdCard({
               {cardTitle || `${BRAND_NAME} verified official`}
             </p>
             <button type="button" onClick={() => onEditField?.("profile")} className="block max-w-full text-left">
-              <h3 className="mt-2 min-h-9 truncate text-3xl font-black tracking-tight hover:text-cyan-100">
+              <h3 className="mt-2 min-h-8 truncate text-2xl font-black tracking-tight hover:text-cyan-100 sm:min-h-9 sm:text-3xl">
                 {name}
               </h3>
             </button>
             <button type="button" onClick={() => onEditField?.("sports")} className="mt-1 text-left">
-              <p className="min-h-6 text-base font-bold text-cyan-100 hover:text-white">
+              <p className="min-h-5 text-sm font-bold text-cyan-100 hover:text-white sm:min-h-6 sm:text-base">
                 {sport}
               </p>
             </button>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+            <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:mt-4 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => onEditField?.("certification")}

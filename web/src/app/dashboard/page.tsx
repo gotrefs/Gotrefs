@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { resolveMemberRole, dashboardPathForRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
+import { DashboardIndexClient } from "./DashboardIndexClient";
 
 export default async function DashboardIndexPage() {
   const supabase = await createClient();
@@ -11,6 +11,5 @@ export default async function DashboardIndexPage() {
     redirect("/auth/login");
   }
 
-  const role = await resolveMemberRole(supabase, user);
-  redirect(dashboardPathForRole(role));
+  return <DashboardIndexClient />;
 }

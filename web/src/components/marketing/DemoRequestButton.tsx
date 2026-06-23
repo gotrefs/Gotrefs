@@ -45,7 +45,7 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 text-[var(--navy)] shadow-2xl"
+            className="max-h-[92svh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 text-[var(--navy)] shadow-2xl sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-labelledby="demo-request-title"

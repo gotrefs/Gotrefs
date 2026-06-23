@@ -42,6 +42,7 @@ export function SignupForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"ref" | "organizer">(
     requestedRole === "organizer" || requestedRole === "ref" ? requestedRole : "ref"
   );
@@ -149,11 +150,6 @@ export function SignupForm() {
       return;
     }
 
-    if (role === "organizer" && !organizationName.trim()) {
-      setError("Organization name is required for organizers.");
-      return;
-    }
-
     if (role === "ref" && !verificationChoice) {
       setError("Choose Upload documents now or Skip for now.");
       return;
@@ -182,6 +178,7 @@ export function SignupForm() {
           lastName: lastName.trim(),
           role,
           organizationName: role === "organizer" ? organizationName.trim() : undefined,
+          phone: role === "organizer" ? phone.trim() : undefined,
           primarySport: role === "ref" ? primarySport.trim() : undefined,
           additionalSports: role === "ref" ? additionalSports : undefined,
           certificationLevel: role === "ref" ? certificationLevel.trim() : undefined,
@@ -207,9 +204,7 @@ export function SignupForm() {
         setInfo("Check your email to confirm your account, then log in.");
         return;
       }
-      const dest =
-        json.redirect ||
-        (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
+      const dest = json.redirect || "/dashboard";
       window.location.href = dest;
     } catch {
       setError(
@@ -221,11 +216,13 @@ export function SignupForm() {
   }
 
   return (
-    <div className="mx-auto min-h-[70vh] max-w-6xl px-4 py-10 md:py-16">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto min-h-[70vh] max-w-6xl px-3 py-6 sm:px-4 sm:py-10 md:py-16">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Create your profile</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-[var(--blue-text)]">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)] sm:text-sm sm:tracking-[0.18em]">
+            Create your profile
+          </p>
+          <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight text-[var(--blue-text)] sm:text-4xl">
             Build your ref ID as you sign up.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
@@ -241,8 +238,8 @@ export function SignupForm() {
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-3xl gap-6">
-        <div className="rounded-[2rem] border border-[var(--border)] bg-white/90 p-6 shadow-xl shadow-slate-200/70">
+      <div className="mx-auto grid max-w-3xl gap-5 sm:gap-6">
+        <div className="rounded-[1.5rem] border border-[var(--border)] bg-white/90 p-4 shadow-xl shadow-slate-200/70 sm:rounded-[2rem] sm:p-6">
           {!isSupabaseConfigured() && (
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {SUPABASE_SETUP_HINT}
@@ -251,7 +248,7 @@ export function SignupForm() {
 
           {!roleConfirmed && (
             <div>
-              <h2 className="text-2xl font-black text-[var(--navy)]">Step 1: I am a...</h2>
+              <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a...</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Choose your role. Selecting referee starts your live digital ID card.
               </p>
@@ -285,13 +282,13 @@ export function SignupForm() {
           )}
 
           {isRef && (
-            <div className="mt-6 flex gap-2">
+            <div className="mt-5 flex gap-1.5 overflow-x-auto pb-1 sm:mt-6 sm:gap-2">
               {stepLabels.map((label, index) => (
                 <button
                   key={label}
                   type="button"
                   onClick={() => setStep(index)}
-                  className={`flex-1 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] transition ${
+                  className={`min-w-[6.5rem] flex-1 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition sm:text-xs sm:tracking-[0.14em] ${
                     index === step
                       ? "bg-[var(--red)] text-white"
                       : index < step
@@ -305,10 +302,10 @@ export function SignupForm() {
             </div>
           )}
 
-          {roleConfirmed && <form ref={formRef} onSubmit={onSubmit} className="mt-8 flex flex-col gap-5">
+          {roleConfirmed && <form ref={formRef} onSubmit={onSubmit} className="mt-6 flex flex-col gap-5 sm:mt-8">
             {isRef && step === 0 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 1: I am a referee</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a referee</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Fill in the fields below and watch your GotREFS Referee card update above.
                 </p>
@@ -338,7 +335,7 @@ export function SignupForm() {
                     />
                   </label>
                 </div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-5">
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
                   {REF_AVATARS.map((avatar) => {
                     const active = selectedAvatar === avatar.id && !avatarPhotoUrl;
                     return (
@@ -416,7 +413,7 @@ export function SignupForm() {
 
             {isRef && step === 1 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 2: Logistics & availability</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 2: Logistics & availability</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Regions, travel radius, and availability populate the card instantly.
                 </p>
@@ -488,7 +485,7 @@ export function SignupForm() {
 
             {isRef && step === 2 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 3: Verification core</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 3: Verification core</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Upload now to mark checks as processing, or skip for now to show red unverified badges.
                 </p>
@@ -573,7 +570,7 @@ export function SignupForm() {
                 )}
                 <div className="mt-5 rounded-2xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 px-4 py-3">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Generated ID</p>
-                  <p className="mt-1 text-2xl font-black text-[var(--navy)]">{gotrefsId}</p>
+                  <p className="mt-1 break-all text-xl font-black text-[var(--navy)] sm:text-2xl">{gotrefsId}</p>
                 </div>
                 <div className="mt-5 grid gap-3">
                   <label className="flex flex-col gap-1 text-sm">
@@ -606,7 +603,7 @@ export function SignupForm() {
 
             {isRef && step === 3 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 4: Sports selection</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 4: Sports selection</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Selecting sports unlocks and highlights the eligible sport icons on the card.
                 </p>
@@ -651,7 +648,7 @@ export function SignupForm() {
 
             {isRef && step === 4 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 5: Certifications</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 5: Certifications</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Certification details populate the Certified By section. The upload badge stays pending until the
                   credential is uploaded and reviewed.
@@ -683,7 +680,7 @@ export function SignupForm() {
 
             {isRef && step === 5 && (
               <div>
-                <h2 className="text-2xl font-black text-[var(--navy)]">Step 6: Verification checks</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 6: Verification checks</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Your card starts in pending verification. Identity, background, and certified official badges turn
                   bright when those checks are completed and approved.
@@ -705,7 +702,7 @@ export function SignupForm() {
 
             {roleConfirmed && role === "organizer" && (
               <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="font-medium text-[var(--blue-text)]">First name</span>
                     <input
@@ -730,14 +727,25 @@ export function SignupForm() {
                   </label>
                 </div>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-[var(--blue-text)]">Organization name</span>
+                  <span className="font-medium text-[var(--blue-text)]">Organization name (optional)</span>
                   <input
                     type="text"
-                    required
                     value={organizationName}
                     onChange={(e) => setOrganizationName(e.target.value)}
                     placeholder="Westside Youth Basketball"
                     className="rounded-lg border border-[var(--border)] px-3 py-2"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-[var(--blue-text)]">Phone number</span>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    className="rounded-lg border border-[var(--border)] px-3 py-2"
+                    autoComplete="tel"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
