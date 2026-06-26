@@ -4,13 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Email confirm / magic links land on Site URL (/) — forward once to callback.
+  // Auth links can land on the Site URL or auth pages — forward once to callback.
   const code = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
-  if (pathname === "/" && (code || (tokenHash && type))) {
+  const canForwardAuthCode = pathname === "/" || pathname === "/auth/login" || pathname === "/auth/signup";
+  if (canForwardAuthCode && (code || (tokenHash && type))) {
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = "/auth/callback";
+    if (!callbackUrl.searchParams.get("next")) {
+      callbackUrl.searchParams.set("next", "/dashboard");
+    }
     return NextResponse.redirect(callbackUrl);
   }
 

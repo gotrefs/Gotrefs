@@ -49,17 +49,17 @@ export function LandingAuthPopup() {
 
         <div className="flex items-center p-8 md:p-10">
           <div className="w-full">
-            <h1 className="text-2xl font-black tracking-tight md:text-3xl">Create a new account</h1>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">Welcome to GotREFS</h1>
             <p className="mt-3 text-base text-[var(--slate)]">
-              Already have an account?{" "}
+              One clean login and signup flow for refs, organizers, and assignors.{" "}
               <Link href="/auth/login" className="font-bold text-[var(--navy)] underline">
-                Sign in
+                Continue
               </Link>
             </p>
 
             <div className="mt-10 text-center">
-              <Link href="/auth/signup" className="text-sm font-bold text-[var(--navy)] underline">
-                Sign up using email
+              <Link href="/auth/signup" className="rounded-full bg-[var(--navy)] px-5 py-3 text-sm font-black text-white transition hover:bg-[var(--blue-mid)]">
+                Continue with email
               </Link>
             </div>
 

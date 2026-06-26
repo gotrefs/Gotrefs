@@ -6,7 +6,7 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#1b2132]">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
-        <BrandLogo href="/" src="/gotrefs-shield-logo.png" imageClassName="h-10 w-auto sm:h-14" priority />
+        <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-10 w-auto sm:h-14" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
           <Link href="#features" className="hover:text-white">
             How it works
@@ -16,6 +16,9 @@ export function MarketingHeader() {
           </Link>
           <Link href="/auth/signup?role=organizer" className="hover:text-white">
             For Organizers
+          </Link>
+          <Link href="/auth/signup?role=assignor" className="hover:text-white">
+            For Assignors
           </Link>
           <Link href="#faq" className="hover:text-white">
             FAQ

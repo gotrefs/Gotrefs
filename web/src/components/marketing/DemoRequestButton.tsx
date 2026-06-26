@@ -6,7 +6,7 @@ type DemoRequestButtonProps = {
   className?: string;
 };
 
-const CALENDLY_URL = "https://calendly.com/gotrefs/demo";
+const DEMO_SCHEDULER_URL = "https://scheduler.zoom.us/s34t/gotrefs";
 
 export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
   const [open, setOpen] = useState(false);
@@ -25,7 +25,7 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
       "Message:",
       message,
       "",
-      `Calendly invite: ${CALENDLY_URL}`,
+      `Demo scheduler: ${DEMO_SCHEDULER_URL}`,
     ].join("\n");
     window.location.href = `mailto:hello@gotrefs.org?subject=${encodeURIComponent(
       "GotREFS Demo Request"
@@ -58,7 +58,7 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
                   Book a demo
                 </h2>
                 <p className="mt-2 text-sm text-[var(--muted)]">
-                  Tell us how to reach you, then choose a time on Calendly.
+                  Tell us how to reach you, then choose a time on our Zoom scheduler.
                 </p>
               </div>
               <button
@@ -114,17 +114,17 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
               </label>
 
               <div className="rounded-xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4">
-                <p className="text-sm font-bold">Calendly invite</p>
+                <p className="text-sm font-bold">Zoom scheduler</p>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Choose a time that works for you after sending the request.
                 </p>
                 <a
-                  href={CALENDLY_URL}
+                  href={DEMO_SCHEDULER_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 inline-flex rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Open Calendly
+                  Open Zoom Scheduler
                 </a>
               </div>
 

@@ -190,22 +190,19 @@ export function RefEventCalendar({
       return;
     }
 
-    const { error } = await supabase.from("event_signup_requests").upsert(
-      {
-        event_id: event.id,
-        ref_member_id: user.id,
-        status: "pending",
-        message: "Ref requested via event calendar",
-      },
-      { onConflict: "event_id,ref_member_id" }
-    );
+    const res = await fetch("/api/events/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: event.id }),
+    });
+    const json = (await res.json()) as { error?: string; eventTitle?: string };
 
     setSubmitting(false);
-    if (error) {
-      setMsg(error.message);
+    if (!res.ok) {
+      setMsg(json.error || "Could not send your application.");
       return;
     }
-    setMsg(`Request sent for "${event.title}". The organizer can follow up with an offer.`);
+    setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
     await load();
   }
 
@@ -260,7 +257,17 @@ export function RefEventCalendar({
         </div>
       </div>
 
-      {msg && <p className="mt-3 text-sm text-[var(--navy)]">{msg}</p>}
+      {msg && (
+        <p
+          className={`mt-3 rounded-xl px-3 py-2 text-sm font-bold ${
+            msg.startsWith("✓")
+              ? "border border-green-200 bg-green-50 text-green-700"
+              : "text-[var(--navy)]"
+          }`}
+        >
+          {msg}
+        </p>
+      )}
 
       <label className="mt-5 block">
         <span className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Magic search</span>
@@ -324,9 +331,13 @@ export function RefEventCalendar({
                     type="button"
                     disabled={submitting || status === "pending" || status === "accepted"}
                     onClick={() => void requestSignup(event)}
-                    className="mt-5 w-full rounded-full bg-[var(--red)] px-4 py-2.5 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:opacity-50"
+                    className={`mt-5 w-full rounded-full px-4 py-2.5 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
+                      status === "pending" || status === "accepted"
+                        ? "bg-green-600"
+                        : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
+                    }`}
                   >
-                    {status === "pending" ? "Application sent" : status === "accepted" ? "Accepted" : "Apply to Ref"}
+                    {status === "pending" ? "✓ Request success" : status === "accepted" ? "✓ Accepted" : "Apply to Ref"}
                   </button>
                 </article>
               );
@@ -448,9 +459,13 @@ export function RefEventCalendar({
                 type="button"
                 disabled={submitting || requestStatus(selected.id) === "pending"}
                 onClick={() => void requestSignup(selected)}
-                className="w-full rounded-full bg-[var(--red)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:opacity-50"
+                className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
+                  requestStatus(selected.id) === "pending"
+                    ? "bg-green-600"
+                    : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
+                }`}
               >
-                {requestStatus(selected.id) === "pending" ? "Request pending" : "Request to Work Game"}
+                {requestStatus(selected.id) === "pending" ? "✓ Request success" : "Request to Work Game"}
               </button>
             </div>
           </div>

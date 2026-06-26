@@ -8,7 +8,6 @@ import { RefEventCalendar } from "@/components/RefEventCalendar";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { SportsFields } from "@/components/SportsFields";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
-import { formatEventLocation } from "@/data/sports";
 import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
 
@@ -82,7 +81,6 @@ export default function RefereeDashboardClient() {
   const editorRef = useRef<HTMLElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
-  const offersRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeEditor, setActiveEditor] = useState<EditableRefCardField | "assignor" | null>(null);
   const [verificationStep, setVerificationStep] = useState<VerificationStep>("id");
@@ -237,7 +235,7 @@ export default function RefereeDashboardClient() {
     const panel = searchParams.get("panel");
     if (!panel || loading) return;
     window.requestAnimationFrame(() => {
-      if (panel === "offers") offersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "offers") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       if (panel === "messages") messagesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       if (panel === "notifications") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -439,22 +437,6 @@ export default function RefereeDashboardClient() {
     } finally {
       setScreeningLoading(false);
     }
-  }
-
-  async function respondOffer(id: string, action: "accept" | "decline") {
-    setMsg(null);
-    const res = await fetch(`/api/offers/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const j = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setMsg(j.error || "Could not update offer");
-      return;
-    }
-    setMsg(action === "accept" ? "Offer accepted — booking created." : "Offer declined.");
-    await load();
   }
 
   async function uploadVerificationFile(
@@ -703,6 +685,8 @@ export default function RefereeDashboardClient() {
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
+      <RefEventCalendar />
+
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -710,7 +694,7 @@ export default function RefereeDashboardClient() {
               <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
               {refNotificationCount > 0 && (
                 <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
-                  ! {refNotificationCount}
+                  {refNotificationCount}!
                 </span>
               )}
             </div>
@@ -753,8 +737,6 @@ export default function RefereeDashboardClient() {
           )}
         </div>
       </section>
-
-      <RefEventCalendar canApplyToEvents={profileReady} onRequireProfile={() => openEditor("profile")} />
 
       {activeEditor && (
         <section ref={editorRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
@@ -1144,62 +1126,6 @@ export default function RefereeDashboardClient() {
         </section>
       )}
 
-      <section ref={offersRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="font-display text-xl font-bold text-[var(--navy)]">Offers</h2>
-        <ul className="mt-4 space-y-3">
-          {offers.map((o) => {
-            const ev = Array.isArray(o.scheduled_events) ? o.scheduled_events[0] : o.scheduled_events;
-            return (
-            <li key={o.id} className="rounded-lg border border-[var(--border)] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-[var(--navy)]">{ev?.title}</p>
-                  <p className="text-sm text-[var(--muted)]">
-                    {ev?.sport} · {ev?.starts_at && new Date(ev.starts_at).toLocaleString()}
-                    {ev ? ` · ${formatEventLocation(ev.city, ev.state, ev.zip_code)}` : ""}
-                  </p>
-                  <p className="text-sm">
-                    Pay offered:{" "}
-                    {o.offered_pay != null ? `$${Number(o.offered_pay).toFixed(2)}` : "—"} · Status:{" "}
-                    <strong>{o.status}</strong>
-                  </p>
-                  {o.message && (
-                    <p className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--grey-light)]/40 px-3 py-2 text-sm text-[var(--slate)]">
-                      {o.message}
-                    </p>
-                  )}
-                </div>
-                {o.status === "pending" && isVerified && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded bg-green-600 px-3 py-1 text-sm text-white"
-                      onClick={() => void respondOffer(o.id, "accept")}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-[var(--border)] px-3 py-1 text-sm"
-                      onClick={() => void respondOffer(o.id, "decline")}
-                    >
-                      Decline
-                    </button>
-                  </div>
-                )}
-                {o.status === "pending" && !isVerified && (
-                  <p className="text-xs text-amber-700">
-                    Upload ID + certification, complete your profile, then submit verification — or complete
-                    screening — before accepting.
-                  </p>
-                )}
-              </div>
-            </li>
-            );
-          })}
-          {offers.length === 0 && <li className="text-[var(--muted)]">No offers yet.</li>}
-        </ul>
-      </section>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
-import { syncMemberAccount } from "@/lib/auth/sync-member";
+import { confirmUserEmail } from "@/lib/auth/admin-users";
 import { validatePasswordStrength } from "@/lib/auth/password";
+import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { serverEnv } from "@/lib/env/server";
+import { dashboardPathForRole } from "@/lib/member-role";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -13,6 +14,7 @@ type RegisterBody = {
   firstName?: string;
   lastName?: string;
   role?: "ref" | "organizer";
+  isAssignor?: boolean;
   organizationName?: string;
   phone?: string;
   primarySport?: string;
@@ -23,6 +25,8 @@ type RegisterBody = {
   baseCity?: string;
   workRegions?: string[];
   travelRadius?: number | null;
+  governingBodies?: string;
+  crewInvite?: string;
   verificationSkipped?: boolean;
 };
 
@@ -49,6 +53,7 @@ export async function POST(request: NextRequest) {
   const firstName = (body.firstName ?? "").trim();
   const lastName = (body.lastName ?? "").trim();
   const role = body.role === "organizer" ? "organizer" : "ref";
+  const isAssignor = body.isAssignor === true && role === "ref";
   const organizationName = (body.organizationName ?? "").trim();
   const phone = (body.phone ?? "").trim();
   const primarySport = (body.primarySport ?? "").trim();
@@ -64,6 +69,8 @@ export async function POST(request: NextRequest) {
     : [];
   const travelRadius =
     typeof body.travelRadius === "number" && Number.isFinite(body.travelRadius) ? body.travelRadius : null;
+  const governingBodies = (body.governingBodies ?? "").trim();
+  const crewInvite = (body.crewInvite ?? "").trim();
   const verificationSkipped = body.verificationSkipped === true;
 
   const emailErr = validateEmail(email);
@@ -93,85 +100,21 @@ export async function POST(request: NextRequest) {
     base_city: role === "ref" ? baseCity || null : null,
     work_regions: role === "ref" ? workRegions : [],
     travel_radius_miles: role === "ref" ? travelRadius : null,
+    is_assignor: isAssignor,
+    governing_bodies: isAssignor ? governingBodies || null : null,
+    crew_invite_seed: isAssignor ? crewInvite || null : null,
     verification_skipped: role === "ref" ? verificationSkipped : false,
   };
 
   const sessionResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, sessionResponse);
 
-  let admin;
-  try {
-    admin = createServiceClient();
-  } catch {
-    admin = null;
-  }
-
-  if (admin) {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: userMetadata,
-    });
-
-    let authUser = created.user;
-
-    if (createErr) {
-      const msg = createErr.message.toLowerCase();
-      if (msg.includes("already") || msg.includes("registered")) {
-        authUser = await findUserByEmail(admin, email);
-        if (!authUser) {
-          return NextResponse.json({ error: createErr.message }, { status: 400 });
-        }
-        await admin.auth.admin.updateUserById(authUser.id, {
-          user_metadata: userMetadata,
-          password,
-        });
-        await confirmUserEmail(admin, authUser.id);
-      } else {
-        return NextResponse.json({ error: createErr.message }, { status: 400 });
-      }
-    }
-
-    if (authUser) {
-      await syncMemberAccount(admin, authUser);
-      if (role === "ref") {
-        await admin
-          .from("ref_profiles")
-          .update({
-            primary_sport: primarySport || "Basketball",
-            additional_sports: additionalSports,
-            certification_level: certificationLevel || "Youth / Recreational",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("member_id", authUser.id);
-      }
-    }
-
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInErr) {
-      return NextResponse.json({ error: signInErr.message }, { status: 400 });
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const sync = user ? await syncMemberAccount(admin, user) : { ok: true, role: role as "ref" | "organizer" };
-
-    return jsonWithSessionCookies(sessionResponse, {
-      ok: true,
-      needsEmailConfirmation: false,
-      role: sync.role,
-      redirect: "/dashboard",
-    });
-  }
-
   const siteUrl = serverEnv.siteUrl();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
+      emailRedirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
       data: userMetadata,
     },
   });
@@ -180,28 +123,64 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const payload = {
-    ok: true,
-    needsEmailConfirmation: !data.session,
-    userId: data.user?.id ?? null,
-    role,
-    redirect: "/dashboard",
-  };
+  const userId = data.user?.id ?? null;
+  let redirect = dashboardPathForRole(role);
 
-  if (data.session) {
-    if (role === "ref" && data.user?.id) {
-      await supabase
-        .from("ref_profiles")
-        .update({
-          primary_sport: primarySport || "Basketball",
-          additional_sports: additionalSports,
-          certification_level: certificationLevel || "Youth / Recreational",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("member_id", data.user.id);
+  if (!data.session && userId) {
+    try {
+      const admin = createServiceClient();
+      await confirmUserEmail(admin, userId);
+      const sync = await syncMemberAccount(admin, data.user!);
+      redirect = dashboardPathForRole(sync.role);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Account created, but auto-confirm is not configured. Add SUPABASE_SERVICE_ROLE_KEY locally or disable email confirmation in Supabase Auth.",
+        },
+        { status: 503 }
+      );
     }
-    return jsonWithSessionCookies(sessionResponse, payload);
   }
 
-  return NextResponse.json(payload);
+  const { data: signInData, error: signInError } = data.session
+    ? { data, error: null }
+    : await supabase.auth.signInWithPassword({ email, password });
+
+  if (signInError) {
+    return NextResponse.json({ error: signInError.message }, { status: 400 });
+  }
+
+  if (isAssignor && userId) {
+    try {
+      const admin = createServiceClient();
+      await admin
+        .from("ref_profiles")
+        .upsert(
+          {
+            member_id: userId,
+            is_assignor: true,
+            primary_sport: primarySport || "Basketball",
+            additional_sports: additionalSports,
+            certification_level: certificationLevel || "Youth / Recreational",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "member_id" }
+        );
+    } catch {
+      return NextResponse.json(
+        { error: "Account created, but assignor mode could not be enabled." },
+        { status: 503 }
+      );
+    }
+  }
+
+  return jsonWithSessionCookies(sessionResponse, {
+    ok: true,
+    needsEmailConfirmation: false,
+    userId: signInData.user?.id ?? userId,
+    role,
+    redirect,
+    message: "Account created. You are signed in.",
+  });
 }

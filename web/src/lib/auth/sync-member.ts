@@ -24,6 +24,9 @@ export async function syncMemberAccount(
   const metaRole: MemberRole = meta.role === "organizer" ? "organizer" : "ref";
   const fn = String(meta.first_name ?? "").trim();
   const ln = String(meta.last_name ?? "").trim();
+  const phone = String(meta.phone ?? "").trim();
+  const email = user.email?.trim().toLowerCase() || null;
+  const now = new Date().toISOString();
   const displayName =
     `${fn} ${ln}`.trim() ||
     String(meta.full_name ?? "").trim() ||
@@ -37,6 +40,15 @@ export async function syncMemberAccount(
     .maybeSingle();
 
   if (existing) {
+    await admin
+      .from("members")
+      .update({
+        email,
+        phone: phone || null,
+        last_login_at: now,
+      })
+      .eq("id", user.id);
+
     const resolved = roleFromMemberRow(existing, meta);
     const shouldBeOrganizer = resolved === "organizer" || metaRole === "organizer";
     if (existing.role === "ref" && shouldBeOrganizer) {
@@ -67,6 +79,10 @@ export async function syncMemberAccount(
     display_name: displayName,
     first_name: fn || null,
     last_name: ln || null,
+    email,
+    phone: phone || null,
+    is_onboarded: false,
+    last_login_at: now,
     organization_name: metaRole === "organizer" ? meta.organization_name ?? null : null,
   });
 

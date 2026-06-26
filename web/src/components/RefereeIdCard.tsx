@@ -196,6 +196,7 @@ export function RefereeIdCard({
             >
               {avatarUrl ? (
                 // Uploaded photos are browser object URLs/data URLs, so use a native image.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt={`${name} avatar`} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] text-2xl font-black sm:text-3xl">

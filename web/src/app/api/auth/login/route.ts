@@ -50,31 +50,28 @@ export async function POST(request: NextRequest) {
     if (msg.includes("email not confirmed")) {
       try {
         const admin = createServiceClient();
-        const existing = await findUserByEmail(admin, email);
-        if (existing) {
-          await confirmUserEmail(admin, existing.id);
+        const authUser = await findUserByEmail(admin, email);
+        if (authUser) {
+          await confirmUserEmail(admin, authUser.id);
           const retry = await supabase.auth.signInWithPassword({ email, password });
           data = retry.data;
           error = retry.error;
         }
       } catch {
-        /* no service role — fall through */
+        return NextResponse.json(
+          {
+            error:
+              "This account is not confirmed yet, and auto-confirm is not configured. Add SUPABASE_SERVICE_ROLE_KEY locally.",
+          },
+          { status: 503 }
+        );
       }
+      if (error) {
+        return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+      }
+    } else {
+      return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
-  }
-
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("email not confirmed")) {
-      return NextResponse.json(
-        {
-          error:
-            "Email not confirmed. Check inbox/spam, or ask an admin to confirm your account in Supabase.",
-        },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 
   let role: "ref" | "organizer" = "ref";

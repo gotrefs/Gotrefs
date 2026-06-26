@@ -128,8 +128,8 @@ export function DashboardNotificationCenter() {
           return {
             id: `request-${request.id}`,
             kind: "system" as const,
-            title: "New ref request",
-            body: `${member?.display_name ?? "A referee"} requested ${event?.title ?? "your event"}.`,
+            title: "New ref application",
+            body: `${member?.display_name ?? "A referee"} applied to ref ${event?.title ?? "your event"}.`,
             targetUrl: "/dashboard/organizer?panel=requests",
             tone: "red" as const,
           };

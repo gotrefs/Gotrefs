@@ -200,12 +200,8 @@ export function SignupForm() {
         setError(json.error || "Could not create account.");
         return;
       }
-      if (json.needsEmailConfirmation) {
-        setInfo("Check your email to confirm your account, then log in.");
-        return;
-      }
       const dest = json.redirect || "/dashboard";
-      window.location.href = dest;
+      window.location.assign(dest);
     } catch {
       setError(
         "Could not reach Supabase (Failed to fetch). On Vercel: confirm NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set for Production, then Redeploy."

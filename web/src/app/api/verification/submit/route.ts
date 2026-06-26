@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
+import { refProfilePackageComplete } from "@/lib/ref-eligibility";
 
 export async function POST() {
   const supabase = await createClient();

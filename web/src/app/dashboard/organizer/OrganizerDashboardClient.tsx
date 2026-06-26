@@ -17,6 +17,8 @@ type DirectoryRef = {
   homeZip: string | null;
   availability: { start_at: string; end_at: string }[];
   maskedEmail: string;
+  ratingAverage: number | null;
+  ratingCount: number;
 };
 
 function slotCoversEvent(
@@ -113,9 +115,16 @@ type OrganizerOfferRow = {
   created_at: string;
   members: { display_name: string } | { display_name: string }[] | null;
   scheduled_events:
-    | { title: string; sport: string; starts_at: string; pay_offer: number | null }
-    | { title: string; sport: string; starts_at: string; pay_offer: number | null }[]
+    | { title: string; sport: string; starts_at: string; ends_at: string; pay_offer: number | null }
+    | { title: string; sport: string; starts_at: string; ends_at: string; pay_offer: number | null }[]
     | null;
+};
+
+type RefRatingRow = {
+  event_id: string;
+  ref_member_id: string;
+  score: number | null;
+  skipped: boolean;
 };
 
 type OrganizerSetupStep = "sport" | "pay" | "bio" | "events" | "identity";
@@ -123,6 +132,23 @@ const ORGANIZER_SETUP_ORDER: OrganizerSetupStep[] = ["sport", "pay", "bio", "eve
 
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180);
+}
+
+function ratingKey(eventId: string, refMemberId: string) {
+  return `${eventId}:${refMemberId}`;
+}
+
+function dollarsToCents(value: number | string | null | undefined) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * 100);
+}
+
+function formatCents(cents: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
 }
 
 /** Parse CSV rows: title,sport,starts_at,ends_at,city,state,zip,officials_needed,pay_offer */
@@ -218,6 +244,9 @@ export default function OrganizerDashboardClient() {
   const [canContactRefs, setCanContactRefs] = useState(true);
   const [signupRequests, setSignupRequests] = useState<SignupRequestRow[]>([]);
   const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
+  const [submittedRatings, setSubmittedRatings] = useState<RefRatingRow[]>([]);
+  const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
+  const [ratingCutoffIso, setRatingCutoffIso] = useState("");
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
   const [inviteRef, setInviteRef] = useState<DirectoryRef | null>(null);
@@ -225,12 +254,14 @@ export default function OrganizerDashboardClient() {
   const [contactSubject] = useState("Availability inquiry");
   const [contactMessage, setContactMessage] = useState("");
   const [contactSending, setContactSending] = useState(false);
+  const [checkoutEventId, setCheckoutEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    setRatingCutoffIso(new Date().toISOString());
     const meta = user.user_metadata ?? {};
     setDisplayName(
       String(meta.full_name ?? "").trim() ||
@@ -276,11 +307,17 @@ export default function OrganizerDashboardClient() {
     const { data: offers } = await supabase
       .from("assignment_offers")
       .select(
-        "id, event_id, ref_member_id, offered_pay, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, pay_offer, organizer_member_id )"
+        "id, event_id, ref_member_id, offered_pay, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
       )
       .eq("scheduled_events.organizer_member_id", user.id)
       .order("created_at", { ascending: false });
     setSentOffers((offers as unknown as OrganizerOfferRow[]) || []);
+
+    const { data: ratings } = await supabase
+      .from("ref_ratings")
+      .select("event_id, ref_member_id, score, skipped")
+      .eq("organizer_member_id", user.id);
+    setSubmittedRatings((ratings as RefRatingRow[]) || []);
 
     try {
       const dirRes = await fetch("/api/refs/directory");
@@ -311,6 +348,8 @@ export default function OrganizerDashboardClient() {
     setRatePerOfficial,
     setRefs,
     setSentOffers,
+    setSubmittedRatings,
+    setRatingCutoffIso,
     setSignupRequests,
     setSport,
   ]);
@@ -328,6 +367,19 @@ export default function OrganizerDashboardClient() {
       if (panel === "marketplace") marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [loading, searchParams]);
+
+  useEffect(() => {
+    const checkout = searchParams.get("checkout");
+    const message =
+      checkout === "success"
+        ? "Payment complete. Stripe is holding the booking funds for this event."
+        : checkout === "cancelled"
+          ? "Stripe checkout was cancelled. You can restart payment from the event card."
+          : null;
+    if (!message) return;
+    const frame = window.requestAnimationFrame(() => setMsg(message));
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams]);
 
   function isOrganizerProfileComplete() {
     return Boolean(sport.trim() && ratePerOfficial.trim() && bio.trim());
@@ -351,6 +403,14 @@ export default function OrganizerDashboardClient() {
   function openSetup(step: OrganizerSetupStep) {
     setSetupStep(step);
     setSetupModalOpen(true);
+  }
+
+  function browseRefsForEvent(eventId: string) {
+    setOfferEvent(eventId);
+    setOfferRef("");
+    window.requestAnimationFrame(() => {
+      marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function prefillEventDate(date: Date) {
@@ -608,30 +668,52 @@ export default function OrganizerDashboardClient() {
     await load();
   }
 
-  async function sendOffer() {
+  async function sendOffer(refMemberId = offerRef, eventId = offerEvent) {
     if (!requireOrganizerOnboarding()) return;
-    if (!offerEvent || !offerRef) {
-      setMsg("Pick an event and a referee (click Select next to a ref, then choose your event).");
+    if (!eventId || !refMemberId) {
+      setMsg("Pick an event and a referee before sending the request.");
       return;
     }
-    const event = events.find((e) => e.id === offerEvent);
+    const event = events.find((e) => e.id === eventId);
     const res = await fetch("/api/offers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        eventId: offerEvent,
-        refMemberId: offerRef,
+        eventId,
+        refMemberId,
         offeredPay: event?.pay_offer ?? null,
         message: "We'd love for you to ref for our upcoming event.",
       }),
     });
     const j = (await res.json()) as { error?: string };
-    setMsg(res.ok ? "Offer sent to referee." : j.error || "Could not send offer");
+    setMsg(res.ok ? "Request sent to referee. They will see it in their notification inbox." : j.error || "Could not send request.");
     if (res.ok) {
       setOfferRef("");
       setOfferEvent("");
     }
     await load();
+  }
+
+  async function startStripeCheckout(eventId: string) {
+    setMsg(null);
+    setCheckoutEventId(eventId);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId }),
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        setMsg(json.error || "Could not start Stripe checkout.");
+        return;
+      }
+      window.location.assign(json.url);
+    } catch {
+      setMsg("Could not reach Stripe checkout. Refresh and try again.");
+    } finally {
+      setCheckoutEventId(null);
+    }
   }
 
   async function sendContact(refId: string) {
@@ -662,6 +744,38 @@ export default function OrganizerDashboardClient() {
       setMsg("Could not reach the server.");
     } finally {
       setContactSending(false);
+    }
+  }
+
+  async function submitRating(offer: OrganizerOfferRow, score: number | null, skipped = false) {
+    const key = ratingKey(offer.event_id, offer.ref_member_id);
+    setRatingSubmitting(key);
+    try {
+      const res = await fetch("/api/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: offer.event_id,
+          refMemberId: offer.ref_member_id,
+          score,
+          skipped,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMsg(json.error || "Could not save rating.");
+        return;
+      }
+      setSubmittedRatings((current) => [
+        ...current.filter((rating) => ratingKey(rating.event_id, rating.ref_member_id) !== key),
+        { event_id: offer.event_id, ref_member_id: offer.ref_member_id, score, skipped },
+      ]);
+      setMsg(skipped ? "Rating skipped for this completed game." : "Rating saved. Thanks for building ref trust.");
+      await load();
+    } catch {
+      setMsg("Could not reach the server.");
+    } finally {
+      setRatingSubmitting(null);
     }
   }
 
@@ -743,6 +857,33 @@ export default function OrganizerDashboardClient() {
     if (offer.status === "accepted") acc[offer.event_id] = (acc[offer.event_id] || 0) + 1;
     return acc;
   }, {});
+  const acceptedOfferPaymentsByEvent = sentOffers.reduce<
+    Record<string, { refSubtotalCents: number; platformFeeCents: number; totalCents: number }>
+  >((acc, offer) => {
+    if (offer.status !== "accepted") return acc;
+    const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+    const refSubtotalCents = dollarsToCents(offer.offered_pay ?? event?.pay_offer);
+    const current = acc[offer.event_id] ?? { refSubtotalCents: 0, platformFeeCents: 0, totalCents: 0 };
+    const nextRefSubtotalCents = current.refSubtotalCents + refSubtotalCents;
+    const nextPlatformFeeCents = Math.round(nextRefSubtotalCents * 0.1);
+    acc[offer.event_id] = {
+      refSubtotalCents: nextRefSubtotalCents,
+      platformFeeCents: nextPlatformFeeCents,
+      totalCents: nextRefSubtotalCents + nextPlatformFeeCents,
+    };
+    return acc;
+  }, {});
+  const submittedRatingKeys = new Set(
+    submittedRatings.map((rating) => ratingKey(rating.event_id, rating.ref_member_id))
+  );
+  const completedUnratedOffers = sentOffers.filter((offer) => {
+    const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+    if (offer.status !== "accepted" || !event?.ends_at || !ratingCutoffIso) return false;
+    return (
+      event.ends_at <= ratingCutoffIso &&
+      !submittedRatingKeys.has(ratingKey(offer.event_id, offer.ref_member_id))
+    );
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -827,7 +968,7 @@ export default function OrganizerDashboardClient() {
               <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
               {organizerNotificationCount > 0 && (
                 <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
-                  ! {organizerNotificationCount}
+                  {organizerNotificationCount}!
                 </span>
               )}
             </div>
@@ -852,9 +993,9 @@ export default function OrganizerDashboardClient() {
                 onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 className="rounded-2xl border border-red-100 bg-red-50 p-4 text-left transition-all duration-200 hover:border-[var(--red)]"
               >
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New ref request</p>
+                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New ref application</p>
                 <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  {ref?.display_name ?? "A referee"} requested {ev?.title ?? "your event"}.
+                  {ref?.display_name ?? "A referee"} applied to ref {ev?.title ?? "your event"}.
                 </p>
               </button>
             );
@@ -1279,9 +1420,8 @@ export default function OrganizerDashboardClient() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (!requireOrganizerOnboarding()) return;
                                   setSelectedManageDate(day);
-                                  setOfferEvent(event.id);
+                                  browseRefsForEvent(event.id);
                                 }}
                                 className={`block w-full truncate rounded-full px-2 py-1 text-left text-[10px] font-black transition-all duration-200 ${
                                   filled
@@ -1337,6 +1477,7 @@ export default function OrganizerDashboardClient() {
                   const loc = formatEventLocation(e.city, e.state, e.zip_code);
                   const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
                   const hiredCount = acceptedOffersByEvent[e.id] || 0;
+                  const payment = acceptedOfferPaymentsByEvent[e.id];
                   const filled = hiredCount >= e.officials_needed;
                   return (
                     <article key={e.id} className="rounded-2xl border border-[var(--border)] bg-white p-4 shadow-sm">
@@ -1358,23 +1499,37 @@ export default function OrganizerDashboardClient() {
                         >
                           {hiredCount}/{e.officials_needed} Refs Hired
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (applicantCount > 0) {
-                              applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            } else {
-                              if (!requireOrganizerOnboarding()) return;
-                              setOfferEvent(e.id);
-                              setOfferRef("");
-                              marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                          }}
-                          className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
-                        >
-                          {applicantCount > 0 ? `View Applicants (${applicantCount})` : "Browse Refs"}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {payment && payment.totalCents > 0 && (
+                            <button
+                              type="button"
+                              disabled={checkoutEventId === e.id}
+                              onClick={() => void startStripeCheckout(e.id)}
+                              className="rounded-full bg-[var(--navy)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--blue)] disabled:opacity-60"
+                            >
+                              {checkoutEventId === e.id ? "Opening Stripe..." : `Pay ${formatCents(payment.totalCents)}`}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (applicantCount > 0) {
+                                applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              } else {
+                                browseRefsForEvent(e.id);
+                              }
+                            }}
+                            className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
+                          >
+                            {applicantCount > 0 ? `View Applicants (${applicantCount})` : "Browse Refs"}
+                          </button>
+                        </div>
                       </div>
+                      {payment && payment.totalCents > 0 && (
+                        <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
+                          Includes {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)} GotREFS fee.
+                        </p>
+                      )}
                     </article>
                   );
                 })}
@@ -1401,6 +1556,7 @@ export default function OrganizerDashboardClient() {
             const payLabel = formatPayOffer(e.pay_offer);
             const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
             const hiredCount = acceptedOffersByEvent[e.id] || 0;
+            const payment = acceptedOfferPaymentsByEvent[e.id];
             const filled = hiredCount >= e.officials_needed;
             return (
               <article
@@ -1435,16 +1591,33 @@ export default function OrganizerDashboardClient() {
                     >
                       {hiredCount}/{e.officials_needed} Refs Hired
                     </span>
+                    {payment && payment.totalCents > 0 && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-[var(--slate)]">
+                        <span className="block font-black text-[var(--navy)]">
+                          Payment due: {formatCents(payment.totalCents)}
+                        </span>
+                        <span>
+                          {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)} GotREFS fee
+                        </span>
+                      </div>
+                    )}
+                    {payment && payment.totalCents > 0 && (
+                      <button
+                        type="button"
+                        disabled={checkoutEventId === e.id}
+                        onClick={() => void startStripeCheckout(e.id)}
+                        className="rounded-full bg-[var(--navy)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--blue)] disabled:opacity-60"
+                      >
+                        {checkoutEventId === e.id ? "Opening Stripe..." : "Pay with Stripe"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
                         if (applicantCount > 0) {
                           applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                         } else {
-                          if (!requireOrganizerOnboarding()) return;
-                          setOfferEvent(e.id);
-                          setOfferRef("");
-                          marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          browseRefsForEvent(e.id);
                         }
                       }}
                       className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 ${
@@ -1472,11 +1645,68 @@ export default function OrganizerDashboardClient() {
         </div>
       </section>
 
+      {completedUnratedOffers.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Completed games</p>
+              <h2 className="mt-1 font-display text-xl font-bold text-[var(--navy)]">Rate your refs</h2>
+              <p className="mt-1 text-sm text-amber-900">
+                Help organizers find trusted officials. Ratings only appear after completed games.
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-800">
+              {completedUnratedOffers.length} pending
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {completedUnratedOffers.slice(0, 4).map((offer) => {
+              const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+              const key = ratingKey(offer.event_id, offer.ref_member_id);
+              return (
+                <article key={key} className="rounded-2xl border border-amber-200 bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-black text-[var(--navy)]">{event?.title ?? "Completed game"}</p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+                        Official GR-{offer.ref_member_id.slice(0, 8).toUpperCase()} ·{" "}
+                        {event?.starts_at ? formatEventDateTime(event.starts_at) : "Game complete"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={score}
+                          type="button"
+                          disabled={ratingSubmitting === key}
+                          onClick={() => void submitRating(offer, score)}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-800 transition-all duration-200 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {score} star{score === 1 ? "" : "s"}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={ratingSubmitting === key}
+                        onClick={() => void submitRating(offer, null, true)}
+                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--muted)] transition-all duration-200 hover:bg-[var(--grey-light)] disabled:opacity-50"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {signupRequests.length > 0 && (
         <section ref={applicantsRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-          <h2 className="font-display text-xl font-bold text-[var(--red)]">Ref requests on your events</h2>
+          <h2 className="font-display text-xl font-bold text-[var(--red)]">Ref applications on your events</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Referees who requested to work one of your events. Only you see these — not other organizers.
+            Referees who applied to work one of your events. Only you see these — not other organizers.
           </p>
           <ul className="mt-3 space-y-2 text-sm">
             {signupRequests.map((sr) => {
@@ -1487,7 +1717,7 @@ export default function OrganizerDashboardClient() {
                 <li key={sr.id} className="flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-3">
                   <div>
                     <p>
-                      <strong>{ref?.display_name}</strong> requested <strong>{ev?.title}</strong>
+                      <strong>{ref?.display_name}</strong> applied to ref <strong>{ev?.title}</strong>
                     </p>
                     {payLabel ? (
                       <p className="mt-1 text-sm font-semibold text-[var(--blue)]">
@@ -1565,7 +1795,12 @@ export default function OrganizerDashboardClient() {
                         </div>
                         <div>
                           <p className="font-black text-[var(--navy)]">Official {r.gotrefsId}</p>
-                          <p className="mt-1 text-xs font-semibold text-emerald-700">✓ Verified · ⭐ 4.9 (24 games)</p>
+                          <p className="mt-1 text-xs font-semibold text-emerald-700">
+                            ✓ Verified ·{" "}
+                            {r.ratingAverage != null && r.ratingCount > 0
+                              ? `⭐ ${r.ratingAverage.toFixed(1)} (${r.ratingCount} game${r.ratingCount === 1 ? "" : "s"})`
+                              : "No ratings yet"}
+                          </p>
                         </div>
                       </div>
                       <p className="text-right text-sm font-black text-[var(--navy)]">
@@ -1610,11 +1845,15 @@ export default function OrganizerDashboardClient() {
                         type="button"
                         onClick={() => {
                           if (!requireOrganizerOnboarding()) return;
+                          if (selectedOfferEvent) {
+                            void sendOffer(r.id, selectedOfferEvent.id);
+                            return;
+                          }
                           setInviteRef(r);
                         }}
                         className="flex-1 rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
                       >
-                        Invite to Game
+                        {selectedOfferEvent ? "Request this Ref" : "Invite to Game"}
                       </button>
                     </div>
                     {contactRefId === r.id && (

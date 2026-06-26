@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
 
 type Body = {
@@ -39,16 +40,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Event not found or not yours" }, { status: 403 });
   }
 
+  let admin;
+  try {
+    admin = createServiceClient();
+  } catch {
+    return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+  }
+
   const [{ data: screening }, { data: profile }, { data: submission }] = await Promise.all([
-    supabase.from("screening_checks").select("status").eq("ref_member_id", body.refMemberId).maybeSingle(),
-    supabase
+    admin.from("screening_checks").select("status").eq("ref_member_id", body.refMemberId).maybeSingle(),
+    admin
       .from("ref_profiles")
       .select(
         "verification_method, external_verification_proof_path, government_id_path, verification_doc_path, certification_document_path, bio, primary_sport, certification_level"
       )
       .eq("member_id", body.refMemberId)
       .maybeSingle(),
-    supabase
+    admin
       .from("ref_verification_submissions")
       .select("status")
       .eq("ref_member_id", body.refMemberId)
@@ -67,7 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This referee has not completed verification yet (ID, certification, profile, or screening).",
+          "This referee has not completed their profile and verification package yet.",
       },
       { status: 400 }
     );
@@ -77,12 +85,14 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("assignment_offers")
-    .insert({
+    .upsert({
       event_id: body.eventId,
       ref_member_id: body.refMemberId,
       offered_pay: offeredPay,
       message: body.message ?? null,
       status: "pending",
+    }, {
+      onConflict: "event_id,ref_member_id",
     })
     .select("id")
     .single();

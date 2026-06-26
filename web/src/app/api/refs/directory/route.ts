@@ -57,6 +57,22 @@ export async function GET() {
     availByRef.set(slot.ref_member_id, list);
   }
 
+  const { data: ratings } = await admin
+    .from("ref_ratings")
+    .select("ref_member_id, score, skipped")
+    .in("ref_member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("skipped", false)
+    .not("score", "is", null);
+
+  const ratingByRef = new Map<string, { total: number; count: number }>();
+  for (const rating of ratings ?? []) {
+    if (typeof rating.score !== "number") continue;
+    const next = ratingByRef.get(rating.ref_member_id) ?? { total: 0, count: 0 };
+    next.total += rating.score;
+    next.count += 1;
+    ratingByRef.set(rating.ref_member_id, next);
+  }
+
   const refs = [];
   for (const m of members ?? []) {
     const { data: eligible } = await admin.rpc("ref_is_offer_eligible", { ref_id: m.id });
@@ -72,6 +88,7 @@ export async function GET() {
         ? authUser.user.user_metadata.gotrefs_id
         : `GR-${m.id.slice(0, 8).toUpperCase()}`;
     const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
+    const rating = ratingByRef.get(m.id);
 
     refs.push({
       id: m.id,
@@ -83,6 +100,8 @@ export async function GET() {
       homeZip: m.home_zip,
       availability: availByRef.get(m.id) ?? [],
       maskedEmail,
+      ratingAverage: rating?.count ? Number((rating.total / rating.count).toFixed(1)) : null,
+      ratingCount: rating?.count ?? 0,
     });
   }
 

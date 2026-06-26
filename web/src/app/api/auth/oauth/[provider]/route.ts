@@ -35,5 +35,9 @@ export async function GET(
     );
   }
 
-  return NextResponse.redirect(data.url);
+  const redirect = NextResponse.redirect(data.url);
+  response.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie.name, cookie.value, cookie);
+  });
+  return redirect;
 }

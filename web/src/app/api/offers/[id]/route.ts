@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
 
 type Action = "accept" | "decline" | "cancel";
@@ -108,6 +109,29 @@ export async function PATCH(
           updated_at: new Date().toISOString(),
         })
         .eq("ref_member_id", user.id);
+    }
+
+    let admin;
+    try {
+      admin = createServiceClient();
+    } catch {
+      return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+    }
+
+    const [{ data: event }, { count: bookedCount }] = await Promise.all([
+      admin.from("scheduled_events").select("officials_needed").eq("id", offer.event_id).single(),
+      admin
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", offer.event_id)
+        .in("status", ["confirmed", "completed"]),
+    ]);
+
+    if (event && (bookedCount ?? 0) >= event.officials_needed) {
+      return NextResponse.json(
+        { error: "This event is already fully staffed. The organizer may send you another invite." },
+        { status: 400 }
+      );
     }
   }
 
