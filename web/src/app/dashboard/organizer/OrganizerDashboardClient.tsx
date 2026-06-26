@@ -14,6 +14,9 @@ type DirectoryRef = {
   primarySport: string;
   sportEmoji: string;
   ratePerGame: number | null;
+  rateType?: "exact" | "range" | null;
+  rateMin?: number | null;
+  rateMax?: number | null;
   homeZip: string | null;
   availability: { start_at: string; end_at: string }[];
   maskedEmail: string;
@@ -45,6 +48,31 @@ function formatEventDateTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatPayRange(value: {
+  pay_offer?: number | null;
+  pay_type?: "exact" | "range" | null;
+  pay_min?: number | null;
+  pay_max?: number | null;
+}) {
+  if (value.pay_type === "range") {
+    const min = value.pay_min ?? value.pay_offer;
+    const max = value.pay_max;
+    if (min != null && max != null) return `$${Number(min).toFixed(0)}-$${Number(max).toFixed(0)}`;
+    if (min != null) return `$${Number(min).toFixed(0)}+`;
+  }
+  return formatPayOffer(value.pay_offer ?? null);
+}
+
+function formatRefRate(ref: DirectoryRef) {
+  if (ref.rateType === "range") {
+    const min = ref.rateMin ?? ref.ratePerGame;
+    const max = ref.rateMax;
+    if (min != null && max != null) return `$${Number(min).toFixed(0)}-$${Number(max).toFixed(0)}`;
+    if (min != null) return `$${Number(min).toFixed(0)}+`;
+  }
+  return ref.ratePerGame != null ? `$${Number(ref.ratePerGame).toFixed(0)}` : "Rate TBD";
 }
 
 function dayKey(date: Date) {
@@ -92,6 +120,9 @@ type EventRow = {
   zip_code: string;
   officials_needed: number;
   pay_offer: number | null;
+  pay_type?: "exact" | "range" | null;
+  pay_min?: number | null;
+  pay_max?: number | null;
 };
 
 type SignupRequestRow = {
@@ -217,6 +248,9 @@ export default function OrganizerDashboardClient() {
   const [sport, setSport] = useState("");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [ratePerOfficial, setRatePerOfficial] = useState("");
+  const [rateType, setRateType] = useState<"exact" | "range">("exact");
+  const [rateMin, setRateMin] = useState("");
+  const [rateMax, setRateMax] = useState("");
   const [idDocPath, setIdDocPath] = useState<string | null>(null);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [eventsListPath, setEventsListPath] = useState<string | null>(null);
@@ -230,6 +264,9 @@ export default function OrganizerDashboardClient() {
   const [zip, setZip] = useState("");
   const [needed, setNeeded] = useState(1);
   const [pay, setPay] = useState("");
+  const [payType, setPayType] = useState<"exact" | "range">("exact");
+  const [payMin, setPayMin] = useState("");
+  const [payMax, setPayMax] = useState("");
   const [notes, setNotes] = useState("");
 
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -272,27 +309,50 @@ export default function OrganizerDashboardClient() {
     setOrganizationName(String(meta.organization_name ?? "").trim() || "Organization");
     setAccountEmail(user.email ?? "");
 
-    const { data: op } = await supabase
+    const organizerProfileResult = await supabase
       .from("organizer_profiles")
-      .select("bio, primary_sport, additional_sports, rate_per_official, id_document_path, logo_path, events_list_path")
+      .select("bio, primary_sport, additional_sports, rate_per_official, rate_type, rate_min, rate_max, id_document_path, logo_path, events_list_path")
       .eq("member_id", user.id)
       .maybeSingle();
+    let op = organizerProfileResult.data;
+    const opErr = organizerProfileResult.error;
+    if (opErr?.message.includes("rate_type")) {
+      const fallback = await supabase
+        .from("organizer_profiles")
+        .select("bio, primary_sport, additional_sports, rate_per_official, id_document_path, logo_path, events_list_path")
+        .eq("member_id", user.id)
+        .maybeSingle();
+      op = fallback.data as typeof op;
+    }
 
     if (op) {
       setBio(op.bio || "");
       setSport(op.primary_sport || "");
       setAdditionalSports(Array.isArray(op.additional_sports) ? op.additional_sports : []);
       setRatePerOfficial(op.rate_per_official != null ? String(op.rate_per_official) : "");
+      setRateType(op.rate_type === "range" ? "range" : "exact");
+      setRateMin(op.rate_min != null ? String(op.rate_min) : "");
+      setRateMax(op.rate_max != null ? String(op.rate_max) : "");
       setIdDocPath(op.id_document_path);
       setLogoPath(op.logo_path);
       setEventsListPath(op.events_list_path);
     }
 
-    const { data: ev } = await supabase
+    const eventResult = await supabase
       .from("scheduled_events")
-      .select("id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer")
+      .select("id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, pay_type, pay_min, pay_max")
       .eq("organizer_member_id", user.id)
       .order("starts_at", { ascending: true });
+    let ev = eventResult.data;
+    const evErr = eventResult.error;
+    if (evErr?.message.includes("pay_type")) {
+      const fallback = await supabase
+        .from("scheduled_events")
+        .select("id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer")
+        .eq("organizer_member_id", user.id)
+        .order("starts_at", { ascending: true });
+      ev = fallback.data as typeof ev;
+    }
     setEvents((ev as EventRow[]) || []);
 
     const { data: sr } = await supabase
@@ -381,14 +441,27 @@ export default function OrganizerDashboardClient() {
     return () => window.cancelAnimationFrame(frame);
   }, [searchParams]);
 
+  function hasOrganizerPay() {
+    return rateType === "range" ? Boolean(rateMin.trim()) : Boolean(ratePerOfficial.trim());
+  }
+
+  function organizerPayLabel() {
+    if (rateType === "range") {
+      if (rateMin.trim() && rateMax.trim()) return `${rateMin}-${rateMax}`;
+      if (rateMin.trim()) return `${rateMin}+`;
+    }
+    return ratePerOfficial;
+  }
+
   function isOrganizerProfileComplete() {
-    return Boolean(sport.trim() && ratePerOfficial.trim() && bio.trim());
+    return Boolean(sport.trim() && hasOrganizerPay() && bio.trim());
   }
 
   function firstIncompleteOrganizerSetupStep(): OrganizerSetupStep {
     if (!sport.trim()) return "sport";
-    if (!ratePerOfficial.trim()) return "pay";
+    if (!hasOrganizerPay()) return "pay";
     if (!bio.trim()) return "bio";
+    if (!idDocPath) return "identity";
     return "events";
   }
 
@@ -445,6 +518,8 @@ export default function OrganizerDashboardClient() {
     setSavingProfile(true);
     try {
       const rateNum = ratePerOfficial === "" ? null : Number(ratePerOfficial);
+      const minNum = rateMin === "" ? null : Number(rateMin);
+      const maxNum = rateMax === "" ? null : Number(rateMax);
       const res = await fetch("/api/organizer/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -452,7 +527,15 @@ export default function OrganizerDashboardClient() {
           bio,
           primary_sport: sport,
           additional_sports: additionalSports,
-          rate_per_official: Number.isFinite(rateNum as number) ? rateNum : null,
+          rate_per_official:
+            rateType === "range" && Number.isFinite(minNum as number)
+              ? minNum
+              : Number.isFinite(rateNum as number)
+                ? rateNum
+                : null,
+          rate_type: rateType,
+          rate_min: rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
+          rate_max: rateType === "range" && Number.isFinite(maxNum as number) ? maxNum : null,
         }),
       });
       const json = (await res.json()) as { error?: string; ok?: boolean };
@@ -461,7 +544,12 @@ export default function OrganizerDashboardClient() {
       setMsg(text);
       if (res.ok) {
         await load();
-        goToNextSetupStep(current);
+        const nextMissing = firstIncompleteOrganizerSetupStep();
+        if (nextMissing !== current) {
+          setSetupStep(nextMissing);
+        } else {
+          goToNextSetupStep(current);
+        }
       }
     } catch {
       const text = "Could not reach the server. Refresh and try again.";
@@ -600,6 +688,8 @@ export default function OrganizerDashboardClient() {
     try {
       await fetch("/api/auth/sync-member", { method: "POST" });
       const payNum = pay === "" ? null : Number(pay);
+      const payMinNum = payMin === "" ? null : Number(payMin);
+      const payMaxNum = payMax === "" ? null : Number(payMax);
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -612,7 +702,15 @@ export default function OrganizerDashboardClient() {
           state: state.trim() || null,
           zip_code: zipVal,
           officials_needed: needed,
-          pay_offer: Number.isFinite(payNum as number) ? payNum : null,
+          pay_offer:
+            payType === "range" && Number.isFinite(payMinNum as number)
+              ? payMinNum
+              : Number.isFinite(payNum as number)
+                ? payNum
+                : null,
+          pay_type: payType,
+          pay_min: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : null,
+          pay_max: payType === "range" && Number.isFinite(payMaxNum as number) ? payMaxNum : null,
           notes: notes || null,
         }),
       });
@@ -630,6 +728,10 @@ export default function OrganizerDashboardClient() {
       setCity("");
       setState("");
       setZip("");
+      setPay("");
+      setPayType("exact");
+      setPayMin("");
+      setPayMax("");
       const text = "Event published.";
       setEventMsg(text);
       setMsg(text);
@@ -797,7 +899,7 @@ export default function OrganizerDashboardClient() {
 
   const setupActions: { step: OrganizerSetupStep; label: string; done: boolean }[] = [
     { step: "sport", label: "Primary sport", done: Boolean(sport.trim()) },
-    { step: "pay", label: "Typical pay per official", done: Boolean(ratePerOfficial.trim()) },
+    { step: "pay", label: "Typical pay per official", done: hasOrganizerPay() },
     { step: "bio", label: "About your org", done: Boolean(bio.trim()) },
     { step: "events", label: "Add upcoming events", done: events.length > 0 || Boolean(eventsListPath) },
     { step: "identity", label: "Organization ID & logo", done: Boolean(idDocPath && logoPath) },
@@ -919,7 +1021,7 @@ export default function OrganizerDashboardClient() {
           email={accountEmail}
           primarySport={sport}
           additionalSports={additionalSports}
-          typicalPay={ratePerOfficial}
+          typicalPay={organizerPayLabel()}
           bio={bio}
           eventsCount={events.length}
           idUploaded={Boolean(idDocPath)}
@@ -1108,14 +1210,55 @@ export default function OrganizerDashboardClient() {
         {setupStep === "pay" && (
           <div className="mt-5">
             <label className="flex flex-col gap-1 text-sm">
-              Typical pay per official ($)
-              <input
-                type="number"
-                min={0}
-                className="rounded border border-[var(--border)] px-3 py-2"
-                value={ratePerOfficial}
-                onChange={(e) => setRatePerOfficial(e.target.value)}
-              />
+              Typical pay per official
+              <div className="rounded-xl border border-[var(--border)] p-3">
+                <div className="mb-3 flex gap-2 text-xs font-bold">
+                  {(["exact", "range"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRateType(type)}
+                      className={`rounded-full px-3 py-1 capitalize ${
+                        rateType === type ? "bg-[var(--navy)] text-white" : "bg-slate-100 text-[var(--muted)]"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                {rateType === "exact" ? (
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full rounded border border-[var(--border)] px-3 py-2"
+                    value={ratePerOfficial}
+                    onChange={(e) => setRatePerOfficial(e.target.value)}
+                    placeholder="e.g. 45"
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded border border-[var(--border)] px-3 py-2"
+                      value={rateMin}
+                      onChange={(e) => setRateMin(e.target.value)}
+                      placeholder="Min"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded border border-[var(--border)] px-3 py-2"
+                      value={rateMax}
+                      onChange={(e) => setRateMax(e.target.value)}
+                      placeholder="Max"
+                    />
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Use a range when you are flexible so more refs can match your criteria.
+                </p>
+              </div>
             </label>
             <button
               type="button"
@@ -1240,8 +1383,55 @@ export default function OrganizerDashboardClient() {
             <input type="number" min={1} className="rounded border px-2 py-1" value={needed} onChange={(e) => { setNeeded(Number(e.target.value)); clearEventFeedback(); }} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Pay offer ($)
-            <input className="rounded border px-2 py-1" value={pay} onChange={(e) => { setPay(e.target.value); clearEventFeedback(); }} />
+            Pay offer
+            <div className="rounded-xl border border-slate-200 p-2">
+              <div className="mb-2 flex gap-2 text-xs font-bold">
+                {(["exact", "range"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setPayType(type);
+                      clearEventFeedback();
+                    }}
+                    className={`rounded-full px-3 py-1 capitalize ${
+                      payType === type ? "bg-[var(--navy)] text-white" : "bg-slate-100 text-[var(--muted)]"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              {payType === "exact" ? (
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full rounded border px-2 py-1"
+                  value={pay}
+                  onChange={(e) => { setPay(e.target.value); clearEventFeedback(); }}
+                  placeholder="e.g. 45"
+                />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded border px-2 py-1"
+                    value={payMin}
+                    onChange={(e) => { setPayMin(e.target.value); clearEventFeedback(); }}
+                    placeholder="Min"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    className="rounded border px-2 py-1"
+                    value={payMax}
+                    onChange={(e) => { setPayMax(e.target.value); clearEventFeedback(); }}
+                    placeholder="Max"
+                  />
+                </div>
+              )}
+            </div>
           </label>
         </div>
         <label className="mt-3 flex flex-col gap-1 text-sm">
@@ -1553,7 +1743,7 @@ export default function OrganizerDashboardClient() {
         <div className={`mt-5 grid gap-4 transition-opacity duration-200 ${manageViewMode === "calendar" ? "hidden" : ""}`}>
           {visibleManageEvents.map((e) => {
             const loc = formatEventLocation(e.city, e.state, e.zip_code);
-            const payLabel = formatPayOffer(e.pay_offer);
+            const payLabel = formatPayRange(e);
             const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
             const hiredCount = acceptedOffersByEvent[e.id] || 0;
             const payment = acceptedOfferPaymentsByEvent[e.id];
@@ -1712,7 +1902,7 @@ export default function OrganizerDashboardClient() {
             {signupRequests.map((sr) => {
               const ref = Array.isArray(sr.members) ? sr.members[0] : sr.members;
               const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
-              const payLabel = formatPayOffer(ev?.pay_offer);
+              const payLabel = ev ? formatPayRange(ev) : formatPayOffer(null);
               return (
                 <li key={sr.id} className="flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-3">
                   <div>
@@ -1804,7 +1994,7 @@ export default function OrganizerDashboardClient() {
                         </div>
                       </div>
                       <p className="text-right text-sm font-black text-[var(--navy)]">
-                        {r.ratePerGame != null ? `$${Number(r.ratePerGame).toFixed(0)}` : "Rate TBD"}
+                        {formatRefRate(r)}
                         <span className="block text-xs font-medium text-[var(--muted)]">/ game</span>
                       </p>
                     </div>

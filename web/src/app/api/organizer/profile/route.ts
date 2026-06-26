@@ -8,6 +8,9 @@ type ProfileBody = {
   primary_sport?: string;
   additional_sports?: string[];
   rate_per_official?: number | null;
+  rate_type?: "exact" | "range";
+  rate_min?: number | null;
+  rate_max?: number | null;
 };
 
 export async function POST(request: Request) {
@@ -30,6 +33,11 @@ export async function POST(request: Request) {
   const rateNum =
     rateRaw == null || rateRaw === ("" as unknown as number) ? null : Number(rateRaw);
   const ratePerOfficial = rateNum != null && Number.isFinite(rateNum) ? rateNum : null;
+  const rateType = body.rate_type === "range" ? "range" : "exact";
+  const minRaw = body.rate_min;
+  const maxRaw = body.rate_max;
+  const rateMinNum = minRaw == null || minRaw === ("" as unknown as number) ? null : Number(minRaw);
+  const rateMaxNum = maxRaw == null || maxRaw === ("" as unknown as number) ? null : Number(maxRaw);
 
   const additionalSports = Array.isArray(body.additional_sports)
     ? body.additional_sports.map((s) => String(s).trim()).filter(Boolean)
@@ -41,6 +49,9 @@ export async function POST(request: Request) {
     primary_sport: (body.primary_sport ?? "").trim() || "Basketball",
     additional_sports: additionalSports,
     rate_per_official: ratePerOfficial,
+    rate_type: rateType,
+    rate_min: rateType === "range" && Number.isFinite(rateMinNum as number) ? rateMinNum : null,
+    rate_max: rateType === "range" && Number.isFinite(rateMaxNum as number) ? rateMaxNum : null,
     updated_at: new Date().toISOString(),
   };
 
@@ -53,14 +64,30 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    const { error } = await admin.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
+    let { error } = await admin.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
+    if (error?.message.includes("rate_type")) {
+      const legacyRow: Record<string, unknown> = { ...row };
+      delete legacyRow.rate_type;
+      delete legacyRow.rate_min;
+      delete legacyRow.rate_max;
+      const retry = await admin.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
+      error = retry.error;
+    }
     if (error) {
       console.error("[api/organizer/profile]", error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({ ok: true });
   } catch {
-    const { error } = await supabase.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
+    let { error } = await supabase.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
+    if (error?.message.includes("rate_type")) {
+      const legacyRow: Record<string, unknown> = { ...row };
+      delete legacyRow.rate_type;
+      delete legacyRow.rate_min;
+      delete legacyRow.rate_max;
+      const retry = await supabase.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
+      error = retry.error;
+    }
     if (error) {
       console.error("[api/organizer/profile] client upsert:", error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });

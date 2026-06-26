@@ -31,7 +31,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("assignor_roster_entries")
     .select(
-      "id, display_name, primary_sport, additional_sports, certification_level, rate_per_game, availability, notes, created_at"
+      "id, display_name, contact_email, primary_sport, additional_sports, certification_level, rate_per_game, availability, notes, created_at"
     )
     .eq("assignor_member_id", user.id)
     .order("created_at", { ascending: false });
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     .from("assignor_roster_entries")
     .insert(row)
     .select(
-      "id, display_name, primary_sport, additional_sports, certification_level, rate_per_game, availability, notes, created_at"
+      "id, display_name, contact_email, primary_sport, additional_sports, certification_level, rate_per_game, availability, notes, created_at"
     )
     .single();
 

@@ -237,7 +237,9 @@ export function AuthFlow() {
         setError(json.error || "Could not create your account.");
         return;
       }
-      window.location.assign(json.redirect || "/dashboard");
+      const next = searchParams.get("next");
+      const destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
+      window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
     } finally {

@@ -97,6 +97,9 @@ export default function RefereeDashboardClient() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [rate, setRate] = useState("");
+  const [rateType, setRateType] = useState<"exact" | "range">("exact");
+  const [rateMin, setRateMin] = useState("");
+  const [rateMax, setRateMax] = useState("");
   const [sport, setSport] = useState("Basketball");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [cert, setCert] = useState("Youth / Recreational");
@@ -167,15 +170,30 @@ export default function RefereeDashboardClient() {
       .order("start_at", { ascending: true });
     setSlots(av || []);
 
-    const { data: rp } = await supabase
+    const profileResult = await supabase
       .from("ref_profiles")
       .select(
-        "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
       )
       .eq("member_id", user.id)
       .maybeSingle();
+    let rp = profileResult.data;
+    const rpErr = profileResult.error;
+    if (rpErr?.message.includes("rate_type")) {
+      const fallback = await supabase
+        .from("ref_profiles")
+        .select(
+          "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+        )
+        .eq("member_id", user.id)
+        .maybeSingle();
+      rp = fallback.data as typeof rp;
+    }
     if (rp) {
       setRate(rp.rate_per_game != null ? String(rp.rate_per_game) : "");
+      setRateType(rp.rate_type === "range" ? "range" : "exact");
+      setRateMin(rp.rate_min != null ? String(rp.rate_min) : "");
+      setRateMax(rp.rate_max != null ? String(rp.rate_max) : "");
       setSport(rp.primary_sport || "Basketball");
       setAdditionalSports(Array.isArray(rp.additional_sports) ? rp.additional_sports : []);
       setIsAssignor(Boolean(rp.is_assignor));
@@ -248,18 +266,50 @@ export default function RefereeDashboardClient() {
     } = await supabase.auth.getUser();
     if (!user) return;
     const rateNum = rate === "" ? null : Number(rate);
-    const { error } = await supabase
+    const minNum = rateMin === "" ? null : Number(rateMin);
+    const maxNum = rateMax === "" ? null : Number(rateMax);
+    const update = {
+      rate_per_game: rateType === "range" && Number.isFinite(minNum as number) ? minNum : rateNum,
+      rate_type: rateType,
+      rate_min: rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
+      rate_max: rateType === "range" && Number.isFinite(maxNum as number) ? maxNum : null,
+      primary_sport: sport,
+      additional_sports: additionalSports,
+      certification_level: cert,
+      bio,
+      updated_at: new Date().toISOString(),
+    };
+    let { error } = await supabase
       .from("ref_profiles")
-      .update({
-        rate_per_game: rateNum,
-        primary_sport: sport,
-        additional_sports: additionalSports,
-        certification_level: cert,
-        bio,
-        updated_at: new Date().toISOString(),
-      })
+      .update(update)
       .eq("member_id", user.id);
-    setMsg(error ? error.message : "Profile saved.");
+    if (error?.message.includes("rate_type")) {
+      const legacyUpdate: Record<string, unknown> = { ...update };
+      delete legacyUpdate.rate_type;
+      delete legacyUpdate.rate_min;
+      delete legacyUpdate.rate_max;
+      const retry = await supabase.from("ref_profiles").update(legacyUpdate).eq("member_id", user.id);
+      error = retry.error;
+    }
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+    setMsg("Profile saved. Moving you to the next missing verification step.");
+    await load();
+    if (!govIdPath) {
+      openEditor("verification", "id");
+      return;
+    }
+    if (!certDocPath) {
+      openEditor("verification", "certification");
+      return;
+    }
+    if (!(screening?.status === "clear" || verificationSubmitted)) {
+      openEditor("verification", "screening");
+      return;
+    }
+    setActiveEditor(null);
   }
 
   async function saveCardMetadata() {
@@ -307,6 +357,7 @@ export default function RefereeDashboardClient() {
 
   async function addRosterRef(payload: {
     display_name: string;
+    contact_email?: string | null;
     primary_sport: string;
     additional_sports: string[];
     certification_level: string;
@@ -322,6 +373,7 @@ export default function RefereeDashboardClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           display_name: payload.display_name,
+          contact_email: payload.contact_email,
           primary_sport: payload.primary_sport,
           additional_sports: payload.additional_sports,
           certification_level: payload.certification_level,
@@ -406,6 +458,14 @@ export default function RefereeDashboardClient() {
       return;
     }
     setMsg("Availability removed. Your ref ID card is updated.");
+  }
+
+  function rateLabel() {
+    if (rateType === "range") {
+      if (rateMin.trim() && rateMax.trim()) return `${rateMin}-${rateMax}`;
+      if (rateMin.trim()) return `${rateMin}+`;
+    }
+    return rate;
   }
 
   async function startScreening() {
@@ -667,7 +727,7 @@ export default function RefereeDashboardClient() {
           additionalSports={additionalSports}
           certificationLevel={cert}
           certifiedBy={cardMeta.certifiedBy}
-          rate={rate}
+          rate={rateLabel()}
           avatarLabel={avatarLabel}
           baseCity={cardMeta.baseCity}
           workRegions={cardMeta.workRegions}
@@ -799,14 +859,52 @@ export default function RefereeDashboardClient() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
-                  Rate per game ($)
-                  <input
-                    type="number"
-                    min={0}
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={rate}
-                    onChange={(e) => setRate(e.target.value)}
-                  />
+                  Rate per game
+                  <div className="rounded border border-[var(--border)] p-2">
+                    <div className="mb-2 flex gap-2 text-xs font-bold">
+                      {(["exact", "range"] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setRateType(type)}
+                          className={`rounded-full px-3 py-1 capitalize ${
+                            rateType === type ? "bg-[var(--navy)] text-white" : "bg-slate-100 text-[var(--muted)]"
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                    {rateType === "exact" ? (
+                      <input
+                        type="number"
+                        min={0}
+                        className="w-full rounded border border-[var(--border)] px-2 py-1"
+                        value={rate}
+                        onChange={(e) => setRate(e.target.value)}
+                        placeholder="e.g. 45"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          className="rounded border border-[var(--border)] px-2 py-1"
+                          value={rateMin}
+                          onChange={(e) => setRateMin(e.target.value)}
+                          placeholder="Min"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          className="rounded border border-[var(--border)] px-2 py-1"
+                          value={rateMax}
+                          onChange={(e) => setRateMax(e.target.value)}
+                          placeholder="Max"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </label>
               </div>
               <label className="mt-4 flex flex-col gap-1 text-sm">

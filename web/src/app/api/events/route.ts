@@ -13,6 +13,9 @@ type EventBody = {
   zip_code?: string;
   officials_needed?: number;
   pay_offer?: number | null;
+  pay_type?: "exact" | "range";
+  pay_min?: number | null;
+  pay_max?: number | null;
   notes?: string | null;
 };
 
@@ -58,6 +61,11 @@ export async function POST(request: Request) {
   const payRaw = body.pay_offer;
   const payNum = payRaw == null || payRaw === ("" as unknown as number) ? null : Number(payRaw);
   const payOffer = payNum != null && Number.isFinite(payNum) ? payNum : null;
+  const payType = body.pay_type === "range" ? "range" : "exact";
+  const payMinRaw = body.pay_min;
+  const payMaxRaw = body.pay_max;
+  const payMinNum = payMinRaw == null || payMinRaw === ("" as unknown as number) ? null : Number(payMinRaw);
+  const payMaxNum = payMaxRaw == null || payMaxRaw === ("" as unknown as number) ? null : Number(payMaxRaw);
 
   const row = {
     organizer_member_id: user.id,
@@ -69,7 +77,10 @@ export async function POST(request: Request) {
     state: body.state?.trim() || null,
     zip_code: zip,
     officials_needed: needed,
-    pay_offer: payOffer,
+    pay_offer: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : payOffer,
+    pay_type: payType,
+    pay_min: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : null,
+    pay_max: payType === "range" && Number.isFinite(payMaxNum as number) ? payMaxNum : null,
     notes: body.notes?.trim() || null,
     status: "published" as const,
   };
@@ -84,22 +95,40 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    const { data, error } = await admin.from("scheduled_events").insert(row).select("id").single();
-    if (error) {
-      console.error("[api/events]", error.message);
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    let { data, error } = await admin.from("scheduled_events").insert(row).select("id").single();
+    if (error?.message.includes("pay_type")) {
+      const legacyRow: Record<string, unknown> = { ...row };
+      delete legacyRow.pay_type;
+      delete legacyRow.pay_min;
+      delete legacyRow.pay_max;
+      const retry = await admin.from("scheduled_events").insert(legacyRow).select("id").single();
+      data = retry.data;
+      error = retry.error;
+    }
+    if (error || !data) {
+      console.error("[api/events]", error?.message ?? "No event id returned.");
+      return NextResponse.json({ error: error?.message ?? "Could not create event." }, { status: 400 });
     }
     return NextResponse.json({ ok: true, id: data.id });
   } catch {
-    const { data, error } = await supabase.from("scheduled_events").insert(row).select("id").single();
-    if (error) {
-      console.error("[api/events] client insert:", error.message);
+    let { data, error } = await supabase.from("scheduled_events").insert(row).select("id").single();
+    if (error?.message.includes("pay_type")) {
+      const legacyRow: Record<string, unknown> = { ...row };
+      delete legacyRow.pay_type;
+      delete legacyRow.pay_min;
+      delete legacyRow.pay_max;
+      const retry = await supabase.from("scheduled_events").insert(legacyRow).select("id").single();
+      data = retry.data;
+      error = retry.error;
+    }
+    if (error || !data) {
+      console.error("[api/events] client insert:", error?.message ?? "No event id returned.");
       return NextResponse.json(
         {
           error:
-            error.message.includes("row-level security") || error.code === "42501"
+            error?.message.includes("row-level security") || error?.code === "42501"
               ? "Permission denied. Your account may not be set up as an organizer — log out and sign in again as an event organizer."
-              : error.message,
+              : error?.message ?? "Could not create event.",
         },
         { status: 400 }
       );

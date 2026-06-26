@@ -32,10 +32,40 @@ export async function GET() {
     return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
   }
 
-  const { data: members, error: memErr } = await admin
+  const membersResult = await admin
     .from("members")
-    .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game )")
+    .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game, rate_type, rate_min, rate_max )")
     .eq("role", "ref");
+  let members: Array<{
+    id: string;
+    display_name: string;
+    home_zip: string | null;
+    ref_profiles:
+      | Array<{
+          primary_sport?: string | null;
+          rate_per_game?: number | null;
+          rate_type?: string | null;
+          rate_min?: number | null;
+          rate_max?: number | null;
+        }>
+      | {
+          primary_sport?: string | null;
+          rate_per_game?: number | null;
+          rate_type?: string | null;
+          rate_min?: number | null;
+          rate_max?: number | null;
+        }
+      | null;
+  }> | null = membersResult.data;
+  let memErr = membersResult.error;
+  if (memErr?.message.includes("rate_type")) {
+    const fallback = await admin
+      .from("members")
+      .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game )")
+      .eq("role", "ref");
+    members = fallback.data;
+    memErr = fallback.error;
+  }
 
   if (memErr) {
     console.error("[api/refs/directory]", memErr.message);
@@ -97,6 +127,9 @@ export async function GET() {
       primarySport,
       sportEmoji: sportEmoji(primarySport),
       ratePerGame: rp?.rate_per_game ?? null,
+      rateType: rp?.rate_type === "range" ? "range" : "exact",
+      rateMin: rp?.rate_min ?? null,
+      rateMax: rp?.rate_max ?? null,
       homeZip: m.home_zip,
       availability: availByRef.get(m.id) ?? [],
       maskedEmail,

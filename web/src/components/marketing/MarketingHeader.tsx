@@ -17,7 +17,7 @@ export function MarketingHeader() {
           <Link href="/auth/signup?role=organizer" className="hover:text-white">
             For Organizers
           </Link>
-          <Link href="/auth/signup?role=assignor" className="hover:text-white">
+          <Link href="/assignors" className="hover:text-white">
             For Assignors
           </Link>
           <Link href="#faq" className="hover:text-white">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import siteData from "@/data/site-data.json";
 import { ApartSection } from "@/components/marketing/ApartSection";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
@@ -9,7 +10,24 @@ import { VerifiedRefCardSection } from "@/components/marketing/VerifiedRefCardSe
 
 type SD = typeof siteData;
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) ?? {};
+  const code = typeof params.code === "string" ? params.code : null;
+  const tokenHash = typeof params.token_hash === "string" ? params.token_hash : null;
+  const type = typeof params.type === "string" ? params.type : null;
+  if (code || (tokenHash && type)) {
+    const callbackParams = new URLSearchParams();
+    if (code) callbackParams.set("code", code);
+    if (tokenHash) callbackParams.set("token_hash", tokenHash);
+    if (type) callbackParams.set("type", type);
+    callbackParams.set("next", "/dashboard");
+    redirect(`/auth/callback?${callbackParams.toString()}`);
+  }
+
   const d = siteData as SD;
   const hero = d.hero;
   const apart = d.apart;

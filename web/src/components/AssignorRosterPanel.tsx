@@ -9,6 +9,7 @@ import { formatPayOffer } from "@/data/sports";
 export type AssignorRosterEntry = {
   id: string;
   display_name: string;
+  contact_email?: string | null;
   primary_sport: string;
   additional_sports: string[];
   certification_level: string | null;
@@ -26,6 +27,7 @@ type AssignorRosterPanelProps = {
   onToggleAssignor: (enabled: boolean) => void;
   onAddRef: (payload: {
     display_name: string;
+    contact_email?: string | null;
     primary_sport: string;
     additional_sports: string[];
     certification_level: string;
@@ -34,6 +36,7 @@ type AssignorRosterPanelProps = {
     notes: string;
   }) => Promise<void>;
   onRemoveRef: (id: string) => void;
+  showModeToggle?: boolean;
 };
 
 export function AssignorRosterPanel({
@@ -44,9 +47,11 @@ export function AssignorRosterPanel({
   onToggleAssignor,
   onAddRef,
   onRemoveRef,
+  showModeToggle = true,
 }: AssignorRosterPanelProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [primarySport, setPrimarySport] = useState("Basketball");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [certLevel, setCertLevel] = useState("Youth / Recreational");
@@ -65,6 +70,7 @@ export function AssignorRosterPanel({
 
   function resetForm() {
     setName("");
+    setEmail("");
     setPrimarySport("Basketball");
     setAdditionalSports([]);
     setCertLevel("Youth / Recreational");
@@ -80,6 +86,7 @@ export function AssignorRosterPanel({
     const rateNum = rate === "" ? null : Number(rate);
     await onAddRef({
       display_name: name.trim(),
+      contact_email: email.trim() || null,
       primary_sport: primarySport,
       additional_sports: additionalSports,
       certification_level: certLevel.trim(),
@@ -99,20 +106,22 @@ export function AssignorRosterPanel({
         certification, availability).
       </p>
 
-      <label className="mt-4 flex items-center gap-2 text-sm font-medium">
-        <input
-          type="checkbox"
-          checked={isAssignor}
-          disabled={assignorSaving}
-          onChange={(e) => {
-            const on = e.target.checked;
-            onToggleAssignor(on);
-            if (on) setFormOpen(true);
-            else setFormOpen(false);
-          }}
-        />
-        I am an assignor and manage my own ref roster
-      </label>
+      {showModeToggle && (
+        <label className="mt-4 flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={isAssignor}
+            disabled={assignorSaving}
+            onChange={(e) => {
+              const on = e.target.checked;
+              onToggleAssignor(on);
+              if (on) setFormOpen(true);
+              else setFormOpen(false);
+            }}
+          />
+          I am an assignor and manage my own ref roster
+        </label>
+      )}
 
       {isAssignor && (
         <div className="mt-4">
@@ -145,6 +154,16 @@ export function AssignorRosterPanel({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Full name"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                  Email for profile invite
+                  <input
+                    type="email"
+                    className="rounded border border-[var(--border)] px-2 py-1.5"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ref@example.com"
                   />
                 </label>
                 <SportsFields
@@ -260,6 +279,9 @@ export function AssignorRosterPanel({
                         {entry.certification_level ? ` · ${entry.certification_level}` : ""}
                         {pay ? ` · ${pay}/game` : ""}
                       </p>
+                      {entry.contact_email && (
+                        <p className="mt-1 text-xs font-semibold text-[var(--muted)]">{entry.contact_email}</p>
+                      )}
                       {entry.additional_sports?.length > 0 && (
                         <p className="mt-1 text-xs text-[var(--muted)]">
                           Also: {entry.additional_sports.join(", ")}

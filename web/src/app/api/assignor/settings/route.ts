@@ -40,14 +40,28 @@ export async function POST(request: Request) {
     const admin = createServiceClient();
     const { error } = await admin
       .from("ref_profiles")
-      .update({ is_assignor: isAssignor, updated_at: new Date().toISOString() })
-      .eq("member_id", user.id);
+      .upsert(
+        {
+          member_id: user.id,
+          is_assignor: isAssignor,
+          primary_sport: "Basketball",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "member_id" }
+      );
     if (error) throw error;
   } catch {
     const { error } = await supabase
       .from("ref_profiles")
-      .update({ is_assignor: isAssignor, updated_at: new Date().toISOString() })
-      .eq("member_id", user.id);
+      .upsert(
+        {
+          member_id: user.id,
+          is_assignor: isAssignor,
+          primary_sport: "Basketball",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "member_id" }
+      );
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
