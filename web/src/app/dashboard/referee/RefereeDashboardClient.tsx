@@ -51,7 +51,7 @@ type OfferRow = {
 };
 
 type AvailabilitySlot = { id: string; start_at: string; end_at: string };
-type VerificationStep = "id" | "certification" | "screening" | "external" | "submit";
+type VerificationStep = "id" | "certification" | "external" | "submit";
 
 function isMissingRateRangeColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
@@ -113,7 +113,6 @@ export default function RefereeDashboardClient() {
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const [screeningLoading, setScreeningLoading] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<"checkr" | "external">("checkr");
   const [externalCompany, setExternalCompany] = useState("");
   const [externalProofPath, setExternalProofPath] = useState<string | null>(null);
@@ -522,8 +521,8 @@ export default function RefereeDashboardClient() {
       return;
     }
     if (!nextBackgroundReady) {
-      setMsg("Certification saved. Next, complete background review or submit your package.");
-      openEditor("verification", "screening");
+      setMsg("Certification saved. Next, submit your verification package.");
+      openEditor("verification", "submit");
       return;
     }
 
@@ -532,40 +531,6 @@ export default function RefereeDashboardClient() {
     window.requestAnimationFrame(() => {
       gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }
-
-  async function startScreening() {
-    setMsg(null);
-    setScreeningLoading(true);
-    try {
-      const res = await fetch("/api/screening/start", { method: "POST" });
-      let j: { error?: string; mode?: string; message?: string } = {};
-      try {
-        j = (await res.json()) as typeof j;
-      } catch {
-        setMsg("Server error — restart npm run dev and try again.");
-        return;
-      }
-      if (!res.ok) {
-        setMsg(j.error || "Could not start screening");
-        return;
-      }
-      setMsg(
-        j.mode === "dev_bypass"
-          ? "Screening marked clear (development bypass). You can accept offers now."
-          : j.mode === "checkr"
-            ? "Checkr screening started."
-            : j.message || "Screening updated — configure Checkr for live results."
-      );
-      await load();
-      guideToNextMissingStep({
-        screeningStatus: j.mode === "dev_bypass" ? "clear" : screening?.status,
-      });
-    } catch {
-      setMsg("Network error — could not reach the server.");
-    } finally {
-      setScreeningLoading(false);
-    }
   }
 
   async function uploadVerificationFile(
@@ -691,11 +656,11 @@ export default function RefereeDashboardClient() {
     primary_sport: sport,
     certification_level: cert,
   });
-  const verificationSubmitted = ["submitted", "under_review", "approved"].includes(verificationStatus);
   const canAcceptOffers = isVerified;
   const profileReady = Boolean(bio.trim() && sport.trim() && cert.trim());
   const idReady = Boolean(govIdPath);
   const certificationReady = Boolean(certDocPath);
+  const verificationSubmitted = ["submitted", "under_review", "approved"].includes(verificationStatus);
   const backgroundReady = screening?.status === "clear" || verificationSubmitted;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
   const refNotificationCount = pendingOffers.length + inquiries.length;
@@ -723,10 +688,10 @@ export default function RefereeDashboardClient() {
       step: "certification" as const,
     },
     !backgroundReady && {
-      label: "Background / review",
-      description: "Start screening, add outside proof, or submit the package.",
+      label: "Submit for review",
+      description: "Submit your verification package or upload proof if you were verified elsewhere.",
       field: "verification" as const,
-      step: "screening" as const,
+      step: "submit" as const,
     },
   ].filter(Boolean) as {
     label: string;
@@ -1114,8 +1079,7 @@ export default function RefereeDashboardClient() {
                 <p className="font-bold text-[var(--navy)]">How a pending ref becomes verified</p>
                 <p className="mt-2">
                   Upload a government ID, upload a certification/license document, complete your profile, then submit
-                  the verification package. You can also start Checkr screening or upload proof if you were verified
-                  elsewhere.
+                  the verification package. You can also upload proof if you were verified elsewhere.
                 </p>
               </div>
 
@@ -1123,7 +1087,6 @@ export default function RefereeDashboardClient() {
                 {[
                   ["id", "Government ID"],
                   ["certification", "Certification"],
-                  ["screening", "Background"],
                   ["external", "Verified elsewhere"],
                   ["submit", "Submit"],
                 ].map(([key, label]) => (
@@ -1162,48 +1125,28 @@ export default function RefereeDashboardClient() {
                 />
               )}
 
-              {verificationStep === "screening" && (
-                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
-                  <p className="font-display text-lg font-bold text-[var(--navy)]">Background screening</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Start or refresh the background screening connected to your referee profile.
-                  </p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  Current status: <strong>{screening?.status || "unknown"}</strong>
-                </p>
-                <button
-                  type="button"
-                  disabled={screeningLoading}
-                  onClick={() => void startScreening()}
-                  className="mt-3 rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {screeningLoading ? "Updating…" : "Start / refresh screening"}
-                </button>
-              </div>
-              )}
-
               {verificationStep === "external" && (
                 <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
                   <p className="font-display text-lg font-bold text-[var(--navy)]">Already verified elsewhere?</p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  Upload a receipt or screenshot from another company/association.
-                </p>
-                <label className="mt-3 flex flex-col gap-1 text-sm">
-                  Verifying company / organization
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Upload a receipt or screenshot from another company/association.
+                  </p>
+                  <label className="mt-3 flex flex-col gap-1 text-sm">
+                    Verifying company / organization
+                    <input
+                      className="rounded border border-[var(--border)] px-2 py-1"
+                      value={externalCompany}
+                      onChange={(e) => setExternalCompany(e.target.value)}
+                      placeholder="e.g. NFHS, local assignor, prior platform"
+                    />
+                  </label>
                   <input
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={externalCompany}
-                    onChange={(e) => setExternalCompany(e.target.value)}
-                    placeholder="e.g. NFHS, local assignor, prior platform"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    className="mt-3 text-sm"
+                    onChange={(e) => void saveExternalVerification(e)}
                   />
-                </label>
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.pdf"
-                  className="mt-3 text-sm"
-                  onChange={(e) => void saveExternalVerification(e)}
-                />
-              </div>
+                </div>
               )}
 
               {verificationStep === "submit" && (
@@ -1212,29 +1155,29 @@ export default function RefereeDashboardClient() {
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     Submit after your government ID, certification, and profile information are complete.
                   </p>
-                <p className="text-sm">
-                  Verification package status:{" "}
-                  <span className="font-semibold capitalize text-[var(--blue)]">
-                    {verificationStatus.replace(/_/g, " ")}
-                  </span>
-                </p>
-                <button
-                  type="button"
-                  disabled={
-                    submittingVerification ||
-                    verificationStatus === "submitted" ||
-                    verificationStatus === "under_review"
-                  }
-                  onClick={() => void submitVerificationPackage()}
-                  className="mt-3 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {submittingVerification
-                    ? "Submitting…"
-                    : verificationStatus === "submitted" || verificationStatus === "under_review"
-                      ? "Submitted — awaiting review"
-                      : "Submit verification package"}
-                </button>
-              </div>
+                  <p className="text-sm">
+                    Verification package status:{" "}
+                    <span className="font-semibold capitalize text-[var(--blue)]">
+                      {verificationStatus.replace(/_/g, " ")}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    disabled={
+                      submittingVerification ||
+                      verificationStatus === "submitted" ||
+                      verificationStatus === "under_review"
+                    }
+                    onClick={() => void submitVerificationPackage()}
+                    className="mt-3 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {submittingVerification
+                      ? "Submitting..."
+                      : verificationStatus === "submitted" || verificationStatus === "under_review"
+                        ? "Submitted - awaiting review"
+                        : "Submit verification package"}
+                  </button>
+                </div>
               )}
 
               <div className="flex items-center justify-between gap-3">
@@ -1242,7 +1185,7 @@ export default function RefereeDashboardClient() {
                   type="button"
                   disabled={verificationStep === "id"}
                   onClick={() => {
-                    const steps: VerificationStep[] = ["id", "certification", "screening", "external", "submit"];
+                    const steps: VerificationStep[] = ["id", "certification", "external", "submit"];
                     const index = steps.indexOf(verificationStep);
                     setVerificationStep(steps[Math.max(0, index - 1)]);
                   }}
@@ -1254,7 +1197,7 @@ export default function RefereeDashboardClient() {
                   type="button"
                   disabled={verificationStep === "submit"}
                   onClick={() => {
-                    const steps: VerificationStep[] = ["id", "certification", "screening", "external", "submit"];
+                    const steps: VerificationStep[] = ["id", "certification", "external", "submit"];
                     const index = steps.indexOf(verificationStep);
                     setVerificationStep(steps[Math.min(steps.length - 1, index + 1)]);
                   }}
