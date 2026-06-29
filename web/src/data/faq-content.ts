@@ -123,6 +123,14 @@ export const FAQ_SECTIONS: FaqSection[] = [
         q: "Can organizers hire only verified officials?",
         a: "Yes. Organizers can choose to work exclusively with verified officials, or include officials who are not yet verified.",
       },
+      {
+        q: "Where can I read the background check and verification policy?",
+        a: "The full GotREFS Background Check & Verification Policy is available at /policies/background-check-verification. It explains credential requirements, NSID or equivalent screening, SafeSport certification, verification badges, renewals, appeals, and privacy of verification information.",
+      },
+      {
+        q: "What happens if an official submits false credentials?",
+        a: "Officials certify that all credential information is truthful, complete, and accurate. False, altered, or misleading credential submissions may result in suspension of verification status or permanent removal from the GotREFS platform.",
+      },
     ],
   },
   {
@@ -144,6 +152,10 @@ export const FAQ_SECTIONS: FaqSection[] = [
         q: "Is customer support available?",
         a: "Yes. GotREFS provides support for both organizers and officials.",
       },
+      {
+        q: "Where can I read the community standards?",
+        a: "The full GotREFS Community Standards & Code of Conduct is available at /policies/community-standards. It covers expectations for organizers, officials, coaches, players, parents, spectators, online conduct, reporting misconduct, investigations, enforcement, appeals, and no retaliation.",
+      },
     ],
   },
   {
@@ -156,6 +168,10 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         q: "Is GotREFS free for event organizers?",
         a: "Event organizers can create accounts, post events, and access the platform. If they want to connect and hire GotREFS personnel, a small service fee applies to each hire.",
+      },
+      {
+        q: "Where can I read the Payment & Fee Policy?",
+        a: "The full GotREFS Payment & Fee Policy is available at /policies/payment-fee-policy. It covers platform fees, payment processing, refunds, chargebacks, taxes, invoices, late payments, disputes, and fraud prevention.",
       },
       {
         q: "How does GotREFS make money?",
@@ -183,6 +199,14 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         q: "What is the mission of GotREFS?",
         a: "To make it easier for sports organizers to find qualified officials and easier for referees to find games — creating a trusted marketplace that helps grow officiating across every sport and every community.",
+      },
+      {
+        q: "What is the GotREFS Verified Program?",
+        a: "The GotREFS Verified Program is the platform's trust and credential verification program. It includes verification levels and badges for identity, certifications, SafeSport, background screening, and elite recognition. The full program details are available at /policies/verified-program.",
+      },
+      {
+        q: "Where are the privacy policy and terms?",
+        a: "The Privacy Policy is available at /policies/privacy-policy. Event Organizer Terms are available at /policies/event-organizer-terms, and Referee & Official Terms are available at /policies/referee-official-terms. Users must accept the applicable terms during signup.",
       },
     ],
   },

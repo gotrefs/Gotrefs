@@ -1,5 +1,6 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
+import { PolicyFooterLinks } from "./PolicyFooterLinks";
 
 const footer = siteData.footer as {
   copyright: string;
@@ -12,7 +13,7 @@ export function MarketingFooter() {
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--blue)] text-white">
       <div className="mx-auto max-w-6xl px-4 py-12">
-        <div className="grid gap-10 md:grid-cols-4">
+        <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-1">
             <p className="text-lg font-bold">GotREFS</p>
             <p className="mt-2 text-sm text-white/70">{footer.tagline}</p>
@@ -31,10 +32,16 @@ export function MarketingFooter() {
               </ul>
             </div>
           ))}
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wide text-white/90">Policies</p>
+            <div className="mt-3">
+              <PolicyFooterLinks />
+            </div>
+          </div>
         </div>
-        <div className="mt-10 flex flex-col justify-between gap-2 border-t border-white/15 pt-6 text-sm text-white/60 sm:flex-row">
-          <p>{footer.copyright}</p>
-          <p>{footer.legalLine}</p>
+        <div className="mt-10 flex flex-col justify-between gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-start">
+          <p className="text-sm text-white/60">{footer.copyright}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-white/45 sm:text-right">{footer.legalLine}</p>
         </div>
       </div>
     </footer>

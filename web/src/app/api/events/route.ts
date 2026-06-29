@@ -31,6 +31,11 @@ function parseEventTimes(starts: string, ends: string): { starts_at: string; end
   return { starts_at: startDate.toISOString(), ends_at: endDate.toISOString() };
 }
 
+function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -96,7 +101,7 @@ export async function POST(request: Request) {
       );
     }
     let { data, error } = await admin.from("scheduled_events").insert(row).select("id").single();
-    if (error?.message.includes("pay_type")) {
+    if (isMissingPayRangeColumn(error)) {
       const legacyRow: Record<string, unknown> = { ...row };
       delete legacyRow.pay_type;
       delete legacyRow.pay_min;
@@ -112,7 +117,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, id: data.id });
   } catch {
     let { data, error } = await supabase.from("scheduled_events").insert(row).select("id").single();
-    if (error?.message.includes("pay_type")) {
+    if (isMissingPayRangeColumn(error)) {
       const legacyRow: Record<string, unknown> = { ...row };
       delete legacyRow.pay_type;
       delete legacyRow.pay_min;

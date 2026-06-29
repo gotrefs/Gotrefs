@@ -16,6 +16,9 @@ export type CalendarEvent = {
   zip_code: string;
   officials_needed: number;
   pay_offer: number | null;
+  pay_type?: "exact" | "range" | null;
+  pay_min?: number | null;
+  pay_max?: number | null;
   notes: string | null;
   organizer_member_id?: string;
 };
@@ -48,6 +51,21 @@ function searchableText(...values: Array<string | number | null | undefined>) {
     .filter((value) => value != null)
     .map((value) => String(value).toLowerCase())
     .join(" ");
+}
+
+function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
+}
+
+function formatEventPay(event: CalendarEvent, decimals = 2) {
+  if (event.pay_type === "range") {
+    const min = event.pay_min ?? event.pay_offer;
+    const max = event.pay_max;
+    if (min != null && max != null) return `$${Number(min).toFixed(decimals)}-$${Number(max).toFixed(decimals)}`;
+    if (min != null) return `$${Number(min).toFixed(decimals)}+`;
+  }
+  return event.pay_offer != null ? `$${Number(event.pay_offer).toFixed(decimals)}` : "Pay TBD";
 }
 
 export function RefEventCalendar({
@@ -84,15 +102,28 @@ export function RefEventCalendar({
     const start = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59);
 
-    const { data: ev, error: evErr } = await supabase
+    let { data: ev, error: evErr } = await supabase
       .from("scheduled_events")
       .select(
-        "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes, organizer_member_id"
+        "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, pay_type, pay_min, pay_max, notes, organizer_member_id"
       )
       .eq("status", "published")
       .gte("starts_at", start.toISOString())
       .lte("starts_at", end.toISOString())
       .order("starts_at", { ascending: true });
+    if (isMissingPayRangeColumn(evErr)) {
+      const fallback = await supabase
+        .from("scheduled_events")
+        .select(
+          "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes, organizer_member_id"
+        )
+        .eq("status", "published")
+        .gte("starts_at", start.toISOString())
+        .lte("starts_at", end.toISOString())
+        .order("starts_at", { ascending: true });
+      ev = fallback.data as typeof ev;
+      evErr = fallback.error;
+    }
 
     if (evErr) {
       setMsg(evErr.message);
@@ -126,7 +157,7 @@ export function RefEventCalendar({
         event.city,
         event.state,
         event.zip_code,
-        event.pay_offer != null ? `$${event.pay_offer}` : "",
+        formatEventPay(event, 0),
         formatOpportunityDate(event.starts_at),
         event.notes
       );
@@ -318,7 +349,7 @@ export function RefEventCalendar({
                       <h3 className="mt-3 font-black text-[var(--navy)]">{event.title}</h3>
                     </div>
                     <p className="text-right text-sm font-black text-emerald-700">
-                      {event.pay_offer != null ? `$${Number(event.pay_offer).toFixed(2)}` : "Pay TBD"}
+                      {formatEventPay(event)}
                     </p>
                   </div>
                   <div className="mt-4 grid gap-2 text-sm text-[var(--slate)]">
@@ -398,7 +429,7 @@ export function RefEventCalendar({
                       }`}
                     >
                       {requestStatus(ev.id) === "accepted" ? "Booked" : "Available Gig"} ·{" "}
-                      {ev.pay_offer != null ? `$${Number(ev.pay_offer).toFixed(0)}` : "Pay TBD"} {ev.sport}
+                      {formatEventPay(ev, 0)} {ev.sport}
                     </button>
                   ))}
                   {dayEvents.length > 2 && (
@@ -442,7 +473,7 @@ export function RefEventCalendar({
               {formatEventLocation(selected.city, selected.state, selected.zip_code)}
             </p>
             <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
-              {selected.pay_offer != null ? `$${Number(selected.pay_offer).toFixed(2)} per official` : "Pay TBD"}
+              {formatEventPay(selected)} per official
             </p>
             <p className="mt-3 text-sm">
               Officials needed: {selected.officials_needed}

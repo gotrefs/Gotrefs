@@ -70,6 +70,31 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
       }
     } else {
+      try {
+        const admin = createServiceClient();
+        const authUser = await findUserByEmail(admin, email);
+        if (!authUser) {
+          return NextResponse.json(
+            { error: "No GotREFS account exists for that email. Click Sign up to create one." },
+            { status: 404 }
+          );
+        }
+        const providers = Array.isArray(authUser.app_metadata?.providers)
+          ? authUser.app_metadata.providers.filter((provider): provider is string => typeof provider === "string")
+          : [];
+        const identityProviders =
+          authUser.identities
+            ?.map((identity) => identity.provider)
+            .filter((provider): provider is string => typeof provider === "string") ?? [];
+        if ([...providers, ...identityProviders].includes("google")) {
+          return NextResponse.json(
+            { error: "This account is connected to Google. Use Continue with Google instead of a password." },
+            { status: 401 }
+          );
+        }
+      } catch {
+        // Fall back to the generic message if admin lookup is unavailable.
+      }
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
   }

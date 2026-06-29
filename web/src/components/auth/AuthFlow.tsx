@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { BRAND_NAME } from "@/lib/brand";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
-import { ALL_SPORTS } from "@/data/sports";
+import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
 
 type AuthStep = "email" | "password" | "role" | "onboarding";
 type AudienceRole = "ref" | "organizer" | "assignor";
@@ -65,6 +65,7 @@ export function AuthFlow() {
   const [organizationName, setOrganizationName] = useState("");
   const [phone, setPhone] = useState("");
   const [primarySport, setPrimarySport] = useState("Basketball");
+  const [customPrimarySport, setCustomPrimarySport] = useState("");
   const [selectedSports, setSelectedSports] = useState<string[]>(["Basketball"]);
   const [certificationLevel, setCertificationLevel] = useState("");
   const [certifiedBy, setCertifiedBy] = useState("");
@@ -73,6 +74,7 @@ export function AuthFlow() {
   const [workRegions, setWorkRegions] = useState<string[]>(["Local city"]);
   const [governingBodies, setGoverningBodies] = useState("");
   const [crewInvite, setCrewInvite] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(() => {
     const authError = searchParams.get("error");
     const reason = searchParams.get("reason");
@@ -88,6 +90,7 @@ export function AuthFlow() {
   const roleCard = ROLE_CARDS.find((item) => item.role === role) ?? ROLE_CARDS[0];
   const progress = role === "ref" ? ["Profile", "Sports", "Location"] : role === "organizer" ? ["Organization", "Payments", "Account"] : ["Authority", "Crew", "Account"];
   const googleOAuthHref = `/api/auth/oauth/google?next=${encodeURIComponent(searchParams.get("next") || "/dashboard")}`;
+  const resolvedPrimarySport = sportPickerToStored(primarySport, customPrimarySport);
 
   function toggleSport(sport: string) {
     setSelectedSports((current) => {
@@ -138,6 +141,16 @@ export function AuthFlow() {
     }
   }
 
+  function startSignup() {
+    setError(null);
+    setNotice(null);
+    const normalized = email.trim().toLowerCase();
+    if (normalized) setEmail(normalized);
+    setExistingProviders([]);
+    setWizardStep(0);
+    setStep(requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref" ? "onboarding" : "role");
+  }
+
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -180,6 +193,10 @@ export function AuthFlow() {
       setError("Enter your organization or club name.");
       return;
     }
+    if (role === "organizer" && wizardStep === 0 && primarySport === OTHER_SPORT_VALUE && !customPrimarySport.trim()) {
+      setError("Enter your sport or league type.");
+      return;
+    }
     if (role === "assignor" && wizardStep === 0 && !governingBodies.trim()) {
       setError("Enter at least one league, association, or governing body.");
       return;
@@ -203,6 +220,10 @@ export function AuthFlow() {
       setError("Enter your first and last name.");
       return;
     }
+    if (!termsAccepted) {
+      setError("Please confirm that you accept the GotREFS terms and policies to create your account.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -219,7 +240,7 @@ export function AuthFlow() {
           isAssignor: role === "assignor",
           organizationName: isOrganizer ? organizationName.trim() : undefined,
           phone: isOrganizer ? phone.trim() : undefined,
-          primarySport,
+          primarySport: resolvedPrimarySport,
           additionalSports: selectedSports.filter((sport) => sport !== primarySport),
           certificationLevel: certificationLevel.trim() || undefined,
           certifiedBy: certifiedBy.trim() || undefined,
@@ -230,6 +251,8 @@ export function AuthFlow() {
           governingBodies: governingBodies.trim() || undefined,
           crewInvite: crewInvite.trim() || undefined,
           verificationSkipped: true,
+          termsAccepted,
+          acceptedTermsSlug: role === "organizer" ? "event-organizer-terms" : "referee-official-terms",
         }),
       });
       const json = (await res.json()) as { error?: string; redirect?: string };
@@ -278,6 +301,13 @@ export function AuthFlow() {
               className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:opacity-95 disabled:opacity-60"
             >
               {loading ? "Checking..." : "Continue"}
+            </button>
+            <button
+              type="button"
+              onClick={startSignup}
+              className="mx-auto block text-xs font-bold text-[var(--muted)] underline-offset-4 hover:text-[var(--navy)] hover:underline"
+            >
+              Sign up
             </button>
             <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
@@ -358,7 +388,10 @@ export function AuthFlow() {
                 <button
                   key={card.role}
                   type="button"
-                  onClick={() => setRole(card.role)}
+                  onClick={() => {
+                    setRole(card.role);
+                    setTermsAccepted(false);
+                  }}
                   className={`rounded-2xl border p-4 text-left transition ${
                     role === card.role ? "border-[var(--navy)] bg-slate-50 shadow-sm" : "border-slate-200 hover:border-[var(--navy)]"
                   }`}
@@ -436,10 +469,12 @@ export function AuthFlow() {
 
             {role === "ref" && wizardStep === 2 && (
               <LocationAndAccount
+                email={email}
                 baseCity={baseCity}
                 travelRadius={travelRadius}
                 workRegions={workRegions}
                 password={password}
+                onEmail={setEmail}
                 onBaseCity={setBaseCity}
                 onTravelRadius={setTravelRadius}
                 onToggleRegion={toggleRegion}
@@ -461,8 +496,20 @@ export function AuthFlow() {
                   Primary sport or league type
                   <select value={primarySport} onChange={(event) => setPrimarySport(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3">
                     {ALL_SPORTS.map((sport) => <option key={sport} value={sport}>{sport}</option>)}
+                    <option value={OTHER_SPORT_VALUE}>Other</option>
                   </select>
                 </label>
+                {primarySport === OTHER_SPORT_VALUE && (
+                  <label className="block text-sm font-bold text-[var(--navy)]">
+                    Type your sport or league
+                    <input
+                      value={customPrimarySport}
+                      onChange={(event) => setCustomPrimarySport(event.target.value)}
+                      placeholder="e.g. Dodgeball, Boxing, Local league"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                    />
+                  </label>
+                )}
               </div>
             )}
 
@@ -476,7 +523,7 @@ export function AuthFlow() {
             )}
 
             {role === "organizer" && wizardStep === 2 && (
-              <AccountFields fullName={fullName} phone={phone} password={password} onFullName={setFullName} onPhone={setPhone} onPassword={setPassword} />
+              <AccountFields fullName={fullName} email={email} phone={phone} password={password} onFullName={setFullName} onEmail={setEmail} onPhone={setPhone} onPassword={setPassword} />
             )}
 
             {role === "assignor" && wizardStep === 0 && (
@@ -500,7 +547,7 @@ export function AuthFlow() {
             )}
 
             {role === "assignor" && wizardStep === 2 && (
-              <AccountFields fullName={fullName} phone={phone} password={password} onFullName={setFullName} onPhone={setPhone} onPassword={setPassword} />
+              <AccountFields fullName={fullName} email={email} phone={phone} password={password} onFullName={setFullName} onEmail={setEmail} onPhone={setPhone} onPassword={setPassword} />
             )}
 
             {wizardStep < progress.length - 1 ? (
@@ -508,9 +555,44 @@ export function AuthFlow() {
                 Continue
               </button>
             ) : (
-              <button type="submit" disabled={loading} className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">
-                {loading ? "Creating account..." : "Create account"}
-              </button>
+              <>
+                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-[var(--muted)]">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                    className="mt-1"
+                    required
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <a
+                      href={role === "organizer" ? "/policies/event-organizer-terms" : "/policies/referee-official-terms"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold text-[var(--navy)] underline"
+                    >
+                      {role === "organizer" ? "Event Organizer Terms & Conditions" : "Referee & Official Terms & Conditions"}
+                    </a>
+                    ,{" "}
+                    <a href="/policies/privacy-policy" target="_blank" rel="noreferrer" className="font-bold text-[var(--navy)] underline">
+                      Privacy Policy
+                    </a>
+                    ,{" "}
+                    <a href="/policies/payment-fee-policy" target="_blank" rel="noreferrer" className="font-bold text-[var(--navy)] underline">
+                      Payment & Fee Policy
+                    </a>
+                    , and{" "}
+                    <a href="/policies/community-standards" target="_blank" rel="noreferrer" className="font-bold text-[var(--navy)] underline">
+                      Community Standards
+                    </a>
+                    .
+                  </span>
+                </label>
+                <button type="submit" disabled={loading || !termsAccepted} className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+                  {loading ? "Creating account..." : "Create account"}
+                </button>
+              </>
             )}
           </form>
         )}
@@ -579,19 +661,23 @@ function SportsAndCerts({
 }
 
 function LocationAndAccount({
+  email,
   baseCity,
   travelRadius,
   workRegions,
   password,
+  onEmail,
   onBaseCity,
   onTravelRadius,
   onToggleRegion,
   onPassword,
 }: {
+  email: string;
   baseCity: string;
   travelRadius: string;
   workRegions: string[];
   password: string;
+  onEmail: (value: string) => void;
   onBaseCity: (value: string) => void;
   onTravelRadius: (value: string) => void;
   onToggleRegion: (value: string) => void;
@@ -599,6 +685,10 @@ function LocationAndAccount({
 }) {
   return (
     <div className="space-y-4">
+      <label className="block text-sm font-bold text-[var(--navy)]">
+        Email
+        <input type="email" required value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+      </label>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Base city
         <input value={baseCity} onChange={(event) => onBaseCity(event.target.value)} placeholder="Phoenix, AZ" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
@@ -634,16 +724,20 @@ function LocationAndAccount({
 
 function AccountFields({
   fullName,
+  email,
   phone,
   password,
   onFullName,
+  onEmail,
   onPhone,
   onPassword,
 }: {
   fullName: string;
+  email: string;
   phone: string;
   password: string;
   onFullName: (value: string) => void;
+  onEmail: (value: string) => void;
   onPhone: (value: string) => void;
   onPassword: (value: string) => void;
 }) {
@@ -652,6 +746,10 @@ function AccountFields({
       <label className="block text-sm font-bold text-[var(--navy)]">
         Legal name
         <input value={fullName} onChange={(event) => onFullName(event.target.value)} placeholder="First and last name" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+      </label>
+      <label className="block text-sm font-bold text-[var(--navy)]">
+        Email
+        <input type="email" required value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
       </label>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Phone number

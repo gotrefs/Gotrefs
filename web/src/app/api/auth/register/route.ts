@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { confirmUserEmail } from "@/lib/auth/admin-users";
+import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
@@ -28,6 +28,8 @@ type RegisterBody = {
   governingBodies?: string;
   crewInvite?: string;
   verificationSkipped?: boolean;
+  termsAccepted?: boolean;
+  acceptedTermsSlug?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -72,6 +74,8 @@ export async function POST(request: NextRequest) {
   const governingBodies = (body.governingBodies ?? "").trim();
   const crewInvite = (body.crewInvite ?? "").trim();
   const verificationSkipped = body.verificationSkipped === true;
+  const requiredTermsSlug = role === "organizer" ? "event-organizer-terms" : "referee-official-terms";
+  const termsAccepted = body.termsAccepted === true && body.acceptedTermsSlug === requiredTermsSlug;
 
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
@@ -84,6 +88,13 @@ export async function POST(request: NextRequest) {
 
   const pwErr = validatePasswordStrength(password);
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
+
+  if (!termsAccepted) {
+    return NextResponse.json(
+      { error: "You must accept the applicable GotREFS terms and policies before creating an account." },
+      { status: 400 }
+    );
+  }
 
   const userMetadata = {
     first_name: firstName,
@@ -104,10 +115,40 @@ export async function POST(request: NextRequest) {
     governing_bodies: isAssignor ? governingBodies || null : null,
     crew_invite_seed: isAssignor ? crewInvite || null : null,
     verification_skipped: role === "ref" ? verificationSkipped : false,
+    accepted_terms_slug: requiredTermsSlug,
+    accepted_terms_at: new Date().toISOString(),
+    accepted_privacy_policy: true,
+    accepted_payment_fee_policy: true,
+    accepted_community_standards: true,
   };
 
   const sessionResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, sessionResponse);
+
+  try {
+    const admin = createServiceClient();
+    const existingUser = await findUserByEmail(admin, email);
+    if (existingUser) {
+      const providers = Array.isArray(existingUser.app_metadata?.providers)
+        ? existingUser.app_metadata.providers.filter((provider): provider is string => typeof provider === "string")
+        : [];
+      const identityProviders =
+        existingUser.identities
+          ?.map((identity) => identity.provider)
+          .filter((provider): provider is string => typeof provider === "string") ?? [];
+      const allProviders = Array.from(new Set([...providers, ...identityProviders]));
+      return NextResponse.json(
+        {
+          error: allProviders.includes("google")
+            ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
+            : "That email already has a GotREFS account. Log in instead, or use a different email.",
+        },
+        { status: 409 }
+      );
+    }
+  } catch {
+    // If service-role lookup is unavailable, continue and let Supabase handle signup.
+  }
 
   const siteUrl = serverEnv.siteUrl();
   const { data, error } = await supabase.auth.signUp({
@@ -148,7 +189,15 @@ export async function POST(request: NextRequest) {
     : await supabase.auth.signInWithPassword({ email, password });
 
   if (signInError) {
-    return NextResponse.json({ error: signInError.message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          signInError.message.toLowerCase().includes("invalid login credentials")
+            ? "That email may already have a GotREFS account, or the account could not be created. Try logging in, using Continue with Google, or use a different email."
+            : signInError.message,
+      },
+      { status: 400 }
+    );
   }
 
   if (isAssignor && userId) {

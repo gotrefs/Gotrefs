@@ -1,6 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { parseOAuthProvider } from "@/lib/auth/oauth";
-import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: {
+    path?: string;
+    maxAge?: number;
+    domain?: string;
+    sameSite?: boolean | "lax" | "strict" | "none";
+    secure?: boolean;
+    httpOnly?: boolean;
+    expires?: Date;
+  };
+};
 
 export async function GET(
   request: NextRequest,
@@ -10,8 +24,26 @@ export async function GET(
   const requestUrl = new URL(request.url);
   const provider = parseOAuthProvider(rawProvider);
   const next = requestUrl.searchParams.get("next") || "/dashboard";
-  const response = NextResponse.next();
-  const supabase = createRouteHandlerClient(request, response);
+  const cookiesToSet: CookieToSet[] = [];
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.redirect(
+      new URL("/auth/login?error=oauth_start_failed&reason=missing_supabase_env", requestUrl.origin)
+    );
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(nextCookies) {
+        cookiesToSet.push(...nextCookies);
+      },
+    },
+  });
 
   const redirectTo = new URL(`/api/auth/callback/${provider}`, requestUrl.origin);
   redirectTo.searchParams.set("next", next.startsWith("/") ? next : "/dashboard");
@@ -36,8 +68,8 @@ export async function GET(
   }
 
   const redirect = NextResponse.redirect(data.url);
-  response.cookies.getAll().forEach((cookie) => {
-    redirect.cookies.set(cookie.name, cookie.value, cookie);
+  cookiesToSet.forEach(({ name, value, options }) => {
+    redirect.cookies.set(name, value, { ...options, path: options?.path ?? "/" });
   });
   return redirect;
 }

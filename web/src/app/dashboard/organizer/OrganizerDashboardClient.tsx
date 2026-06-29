@@ -75,6 +75,11 @@ function formatRefRate(ref: DirectoryRef) {
   return ref.ratePerGame != null ? `$${Number(ref.ratePerGame).toFixed(0)}` : "Rate TBD";
 }
 
+function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
+}
+
 function dayKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
@@ -345,7 +350,7 @@ export default function OrganizerDashboardClient() {
       .order("starts_at", { ascending: true });
     let ev = eventResult.data;
     const evErr = eventResult.error;
-    if (evErr?.message.includes("pay_type")) {
+    if (isMissingPayRangeColumn(evErr)) {
       const fallback = await supabase
         .from("scheduled_events")
         .select("id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer")
