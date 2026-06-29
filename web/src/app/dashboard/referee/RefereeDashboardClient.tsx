@@ -53,6 +53,11 @@ type OfferRow = {
 type AvailabilitySlot = { id: string; start_at: string; end_at: string };
 type VerificationStep = "id" | "certification" | "screening" | "external" | "submit";
 
+function isMissingRateRangeColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
+}
+
 function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
   if (slots.length === 0) return "Add availability";
   const next = [...slots].sort(
@@ -79,6 +84,7 @@ export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   const editorRef = useRef<HTMLElement | null>(null);
+  const gamesRef = useRef<HTMLElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -235,7 +241,32 @@ export default function RefereeDashboardClient() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, [
+    supabase,
+    setAdditionalSports,
+    setBio,
+    setCardMeta,
+    setCert,
+    setCertDocPath,
+    setDisplayName,
+    setExternalCompany,
+    setExternalProofPath,
+    setGovIdPath,
+    setInquiries,
+    setIsAssignor,
+    setLoading,
+    setOffers,
+    setRate,
+    setRateMax,
+    setRateMin,
+    setRateType,
+    setRosterEntries,
+    setScreening,
+    setSlots,
+    setSport,
+    setVerificationMethod,
+    setVerificationStatus,
+  ]);
 
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -269,6 +300,7 @@ export default function RefereeDashboardClient() {
     const minNum = rateMin === "" ? null : Number(rateMin);
     const maxNum = rateMax === "" ? null : Number(rateMax);
     const update = {
+      member_id: user.id,
       rate_per_game: rateType === "range" && Number.isFinite(minNum as number) ? minNum : rateNum,
       rate_type: rateType,
       rate_min: rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
@@ -281,35 +313,21 @@ export default function RefereeDashboardClient() {
     };
     let { error } = await supabase
       .from("ref_profiles")
-      .update(update)
-      .eq("member_id", user.id);
-    if (error?.message.includes("rate_type")) {
+      .upsert(update, { onConflict: "member_id" });
+    if (isMissingRateRangeColumn(error)) {
       const legacyUpdate: Record<string, unknown> = { ...update };
       delete legacyUpdate.rate_type;
       delete legacyUpdate.rate_min;
       delete legacyUpdate.rate_max;
-      const retry = await supabase.from("ref_profiles").update(legacyUpdate).eq("member_id", user.id);
+      const retry = await supabase.from("ref_profiles").upsert(legacyUpdate, { onConflict: "member_id" });
       error = retry.error;
     }
     if (error) {
       setMsg(error.message);
       return;
     }
-    setMsg("Profile saved. Moving you to the next missing verification step.");
     await load();
-    if (!govIdPath) {
-      openEditor("verification", "id");
-      return;
-    }
-    if (!certDocPath) {
-      openEditor("verification", "certification");
-      return;
-    }
-    if (!(screening?.status === "clear" || verificationSubmitted)) {
-      openEditor("verification", "screening");
-      return;
-    }
-    setActiveEditor(null);
+    guideToNextMissingStep({ bio, sport, cert });
   }
 
   async function saveCardMetadata() {
@@ -468,6 +486,54 @@ export default function RefereeDashboardClient() {
     return rate;
   }
 
+  function guideToNextMissingStep(overrides: {
+    govIdPath?: string | null;
+    certDocPath?: string | null;
+    screeningStatus?: string | null;
+    verificationStatus?: string | null;
+    bio?: string;
+    sport?: string;
+    cert?: string;
+  } = {}) {
+    const nextGovIdPath = overrides.govIdPath ?? govIdPath;
+    const nextCertDocPath = overrides.certDocPath ?? certDocPath;
+    const nextScreeningStatus = overrides.screeningStatus ?? screening?.status ?? null;
+    const nextVerificationStatus = overrides.verificationStatus ?? verificationStatus;
+    const nextBio = overrides.bio ?? bio;
+    const nextSport = overrides.sport ?? sport;
+    const nextCert = overrides.cert ?? cert;
+    const nextProfileReady = Boolean(nextBio.trim() && nextSport.trim() && nextCert.trim());
+    const nextBackgroundReady =
+      nextScreeningStatus === "clear" || ["submitted", "under_review", "approved"].includes(nextVerificationStatus);
+
+    if (!nextProfileReady) {
+      setMsg("Profile saved. Finish your profile details next.");
+      openEditor("profile");
+      return;
+    }
+    if (!nextGovIdPath) {
+      setMsg("Profile saved. Next, upload your government ID.");
+      openEditor("verification", "id");
+      return;
+    }
+    if (!nextCertDocPath) {
+      setMsg("Government ID saved. Next, upload your certification.");
+      openEditor("verification", "certification");
+      return;
+    }
+    if (!nextBackgroundReady) {
+      setMsg("Certification saved. Next, complete background review or submit your package.");
+      openEditor("verification", "screening");
+      return;
+    }
+
+    setMsg("Success, Find Games Now!");
+    setActiveEditor(null);
+    window.requestAnimationFrame(() => {
+      gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   async function startScreening() {
     setMsg(null);
     setScreeningLoading(true);
@@ -492,6 +558,9 @@ export default function RefereeDashboardClient() {
             : j.message || "Screening updated — configure Checkr for live results."
       );
       await load();
+      guideToNextMissingStep({
+        screeningStatus: j.mode === "dev_bypass" ? "clear" : screening?.status,
+      });
     } catch {
       setMsg("Network error — could not reach the server.");
     } finally {
@@ -526,7 +595,11 @@ export default function RefereeDashboardClient() {
     await supabase.from("ref_profiles").update(update).eq("member_id", user.id);
     if (field === "government_id_path") setGovIdPath(path);
     else setCertDocPath(path);
-    setMsg(field === "government_id_path" ? "Government ID uploaded." : "Certification document uploaded.");
+    await load();
+    guideToNextMissingStep({
+      govIdPath: field === "government_id_path" ? path : govIdPath,
+      certDocPath: field === "certification_document_path" ? path : certDocPath,
+    });
   }
 
   async function submitVerificationPackage() {
@@ -540,8 +613,8 @@ export default function RefereeDashboardClient() {
         return;
       }
       setVerificationStatus(j.status || "submitted");
-      setMsg("Verification package submitted for review.");
       await load();
+      guideToNextMissingStep({ verificationStatus: j.status || "submitted" });
     } catch {
       setMsg("Network error — could not submit verification.");
     } finally {
@@ -592,8 +665,8 @@ export default function RefereeDashboardClient() {
       .eq("ref_member_id", user.id);
     setExternalProofPath(path);
     setVerificationMethod("external");
-    setMsg("External verification saved. You can request events and accept offers.");
     await load();
+    guideToNextMissingStep({ screeningStatus: "clear" });
   }
 
   const isVerified = refOfferEligible({
@@ -745,7 +818,15 @@ export default function RefereeDashboardClient() {
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
-      <RefEventCalendar />
+      <section ref={gamesRef}>
+        <RefEventCalendar
+          canApplyToEvents={missingActions.length === 0}
+          onRequireProfile={() => {
+            const next = missingActions[0];
+            if (next) openEditor(next.field, next.step);
+          }}
+        />
+      </section>
 
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
