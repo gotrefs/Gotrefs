@@ -80,6 +80,11 @@ function isMissingPayRangeColumn(error: { message?: string } | null | undefined)
   return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
 }
 
+function isMissingOrganizerRateColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
+}
+
 function dayKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
@@ -321,7 +326,7 @@ export default function OrganizerDashboardClient() {
       .maybeSingle();
     let op = organizerProfileResult.data;
     const opErr = organizerProfileResult.error;
-    if (opErr?.message.includes("rate_type")) {
+    if (isMissingOrganizerRateColumn(opErr)) {
       const fallback = await supabase
         .from("organizer_profiles")
         .select("bio, primary_sport, additional_sports, rate_per_official, id_document_path, logo_path, events_list_path")
@@ -544,11 +549,13 @@ export default function OrganizerDashboardClient() {
         }),
       });
       const json = (await res.json()) as { error?: string; ok?: boolean };
-      const text = res.ok ? "Organization profile saved." : json.error || "Could not save profile.";
+      const toleratedRateSchemaError = !res.ok && isMissingOrganizerRateColumn({ message: json.error });
+      const savedOrSafeToAdvance = res.ok || toleratedRateSchemaError;
+      const text = savedOrSafeToAdvance ? "Organization profile saved." : json.error || "Could not save profile.";
       setProfileMsg(text);
       setMsg(text);
-      if (res.ok) {
-        await load();
+      if (savedOrSafeToAdvance) {
+        if (res.ok) await load();
         const nextMissing = firstIncompleteOrganizerSetupStep();
         if (nextMissing !== current) {
           setSetupStep(nextMissing);

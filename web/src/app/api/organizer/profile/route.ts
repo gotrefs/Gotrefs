@@ -13,6 +13,11 @@ type ProfileBody = {
   rate_max?: number | null;
 };
 
+function isMissingOrganizerRateColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
     let { error } = await admin.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
-    if (error?.message.includes("rate_type")) {
+    if (isMissingOrganizerRateColumn(error)) {
       const legacyRow: Record<string, unknown> = { ...row };
       delete legacyRow.rate_type;
       delete legacyRow.rate_min;
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch {
     let { error } = await supabase.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
-    if (error?.message.includes("rate_type")) {
+    if (isMissingOrganizerRateColumn(error)) {
       const legacyRow: Record<string, unknown> = { ...row };
       delete legacyRow.rate_type;
       delete legacyRow.rate_min;
