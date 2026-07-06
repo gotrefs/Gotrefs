@@ -58,7 +58,7 @@ export default function AssignorsPage() {
               {[
                 ["Manual add", "Perfect for adding a few refs with name, sport, certification, email, and notes."],
                 ["File upload", "Upload a CSV or text list from your current spreadsheet and store the refs at once."],
-                ["Future AI cleanup", "Use an LLM to clean messy files, create draft profiles, and send claim-profile emails."],
+                ["Automatic Uploads", `${BRAND_NAME} will clean messy files, delete draft profiles, and send claim profile emails.`],
               ].map(([title, body]) => (
                 <article key={title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="text-lg font-black text-[var(--navy)]">{title}</h2>
