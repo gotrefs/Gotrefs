@@ -1,5 +1,6 @@
 import Link from "next/link";
 import siteData from "@/data/site-data.json";
+import { BRAND_NAME } from "@/lib/brand";
 import { PolicyFooterLinks } from "./PolicyFooterLinks";
 
 const footer = siteData.footer as {
@@ -15,7 +16,7 @@ export function MarketingFooter() {
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-1">
-            <p className="text-lg font-bold">GotREFS</p>
+            <p className="text-lg font-bold">{BRAND_NAME}</p>
             <p className="mt-2 text-sm text-white/70">{footer.tagline}</p>
           </div>
           {footer.columns.map((col) => (

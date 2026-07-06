@@ -1,3 +1,5 @@
+import { normalizeBrandInText } from "@/lib/brand";
+
 type ApartItem = {
   icon: string;
   title: string;
@@ -6,11 +8,13 @@ type ApartItem = {
 
 /** Screen 3 — what sets GotREFS apart (one viewport). */
 export function ApartSection({ title, items }: { title: string; items: ApartItem[] }) {
+  const displayTitle = normalizeBrandInText(title);
+
   return (
     <section className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4">
       <div className="mx-auto w-full max-w-6xl">
-        <h2 className="mb-6 text-center text-xl font-bold uppercase tracking-wide text-[#1b2132] md:mb-8 md:text-2xl lg:text-3xl">
-          {title}
+        <h2 className="mb-6 text-center text-xl font-bold tracking-wide text-[#1b2132] md:mb-8 md:text-2xl lg:text-3xl">
+          {displayTitle}
         </h2>
         <div className="grid gap-6 md:grid-cols-3 md:gap-8">
           {items.map((item) => (

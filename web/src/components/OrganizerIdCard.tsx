@@ -41,7 +41,7 @@ export function OrganizerIdCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <div className="rounded-xl bg-white/95 px-3 py-2 shadow-lg">
-            <Image src="/gotrefs-logo.png" alt="GotREFS" width={150} height={56} className="h-8 w-auto" />
+            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-8 w-auto" />
           </div>
           {idUploaded && (
             <span className="rounded-full border border-emerald-200 bg-emerald-300/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-50">

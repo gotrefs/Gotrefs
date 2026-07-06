@@ -9,7 +9,7 @@ export type FaqSection = {
   items: FaqItem[];
 };
 
-export const FAQ_PAGE_TITLE = "GotREFS Frequently Asked Questions";
+export const FAQ_PAGE_TITLE = "GotQUESTIONS?";
 
 export const FAQ_SECTIONS: FaqSection[] = [
   {
@@ -38,6 +38,40 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         q: "Is GotREFS available nationwide?",
         a: "Yes. GotREFS supports organizers and officials in all 50 states.",
+      },
+      {
+        q: "What makes GotREFS different?",
+        bullets: [
+          "Nationwide referee marketplace",
+          "Verified and background-checked officials",
+          "Officials are rated by event organizers from previous events",
+          "Multi-sport platform",
+          "50-state coverage",
+          "Faster staffing and hiring",
+          "Secure payments",
+          "Real-time availability and event management",
+          "Built specifically for youth, amateur, and scholastic sports",
+        ],
+      },
+      {
+        q: "What is the mission of GotREFS?",
+        a: "To make it easier for sports organizers to find qualified officials and easier for referees to find games — creating a trusted marketplace that helps grow officiating across every sport and every community.",
+      },
+      {
+        q: "Is GotREFS free for referees?",
+        a: "Yes. Referees can create an account and participate in the marketplace at no cost.",
+      },
+      {
+        q: "Is GotREFS free for event organizers?",
+        a: "Event organizers can create accounts, post events, and access the platform. If they want to connect and hire GotREFS personnel, a small service fee applies to each hire.",
+      },
+      {
+        q: "Are officials background checked?",
+        a: "Verified officials complete background screening requirements as part of the verification process, and we also use a national verification partner for officials who need to complete screening. Some officials might not have verification yet — that will show on their profile. Event organizers can choose whether they want verified or non-verified officials when posting an event.",
+      },
+      {
+        q: "How does GotREFS help me find officials?",
+        a: "Post your event, specify your sport and staffing needs, and receive requests from qualified, verified, and rated officials. You can review credentials and send offers directly through the platform.",
       },
     ],
   },
@@ -78,10 +112,6 @@ export const FAQ_SECTIONS: FaqSection[] = [
     title: "For Event Organizers",
     items: [
       {
-        q: "How does GotREFS help me find officials?",
-        a: "Post your event, specify your sport and staffing needs, and receive requests from qualified, verified, and rated officials. You can review credentials and send offers directly through the platform.",
-      },
-      {
         q: "Why use GotREFS instead of social media or group texts?",
         bullets: [
           "Verified officials",
@@ -111,10 +141,6 @@ export const FAQ_SECTIONS: FaqSection[] = [
   {
     title: "Verification & Safety",
     items: [
-      {
-        q: "Are officials background checked?",
-        a: "Verified officials complete background screening requirements as part of the verification process, and we also use a national verification partner for officials who need to complete screening. Some officials might not have verification yet — that will show on their profile. Event organizers can choose whether they want verified or non-verified officials when posting an event.",
-      },
       {
         q: "What does the Verified Badge mean?",
         a: "The badge indicates that an official has completed identity verification and submitted the required documentation for review.",
@@ -162,14 +188,6 @@ export const FAQ_SECTIONS: FaqSection[] = [
     title: "Pricing",
     items: [
       {
-        q: "Is GotREFS free for referees?",
-        a: "Yes. Referees can create an account and participate in the marketplace at no cost.",
-      },
-      {
-        q: "Is GotREFS free for event organizers?",
-        a: "Event organizers can create accounts, post events, and access the platform. If they want to connect and hire GotREFS personnel, a small service fee applies to each hire.",
-      },
-      {
         q: "Where can I read the Payment & Fee Policy?",
         a: "The full GotREFS Payment & Fee Policy is available at /policies/payment-fee-policy. It covers platform fees, payment processing, refunds, chargebacks, taxes, invoices, late payments, disputes, and fraud prevention.",
       },
@@ -182,24 +200,6 @@ export const FAQ_SECTIONS: FaqSection[] = [
   {
     title: "Why GotREFS?",
     items: [
-      {
-        q: "What makes GotREFS different?",
-        bullets: [
-          "Nationwide referee marketplace",
-          "Verified and background-checked officials",
-          "Officials are rated by event organizers from previous events",
-          "Multi-sport platform",
-          "50-state coverage",
-          "Faster staffing and hiring",
-          "Secure payments",
-          "Real-time availability and event management",
-          "Built specifically for youth, amateur, and scholastic sports",
-        ],
-      },
-      {
-        q: "What is the mission of GotREFS?",
-        a: "To make it easier for sports organizers to find qualified officials and easier for referees to find games — creating a trusted marketplace that helps grow officiating across every sport and every community.",
-      },
       {
         q: "What is the GotREFS Verified Program?",
         a: "The GotREFS Verified Program is the platform's trust and credential verification program. It includes verification levels and badges for identity, certifications, SafeSport, background screening, and elite recognition. The full program details are available at /policies/verified-program.",

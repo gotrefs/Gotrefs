@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BRAND_NAME } from "@/lib/brand";
 
 type BrandLogoProps = {
   href?: string;
@@ -19,7 +20,7 @@ export function BrandLogo({
   const img = (
     <Image
       src={src}
-      alt="GotREFS"
+      alt={BRAND_NAME}
       width={320}
       height={120}
       className={imageClassName}

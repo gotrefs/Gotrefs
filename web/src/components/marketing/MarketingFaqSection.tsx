@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   FAQ_PAGE_TITLE,
   FAQ_SECTIONS,
@@ -42,7 +43,7 @@ function tabIndexForChip(chip: string): number {
     return FAQ_SECTIONS.findIndex((s) => s.title === "Verification & Safety");
   }
   if (chip.includes("different")) {
-    return FAQ_SECTIONS.findIndex((s) => s.title === "Why GotREFS?");
+    return FAQ_SECTIONS.findIndex((s) => s.title === "General Questions");
   }
   if (chip.includes("verified")) {
     return FAQ_SECTIONS.findIndex((s) => s.title === "For Referees");
@@ -68,7 +69,7 @@ export function MarketingFaqSection() {
     {
       role: "assistant",
       content:
-        "Hi — I'm the GotREFS FAQ helper. Pick a topic, tap a popular question, or type anything below.",
+        `Hi — I'm the ${BRAND_NAME} FAQ helper. Pick a topic, tap a popular question, or type anything below.`,
     },
   ]);
   const [asking, setAsking] = useState(false);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
-
+import { BRAND_NAME } from "@/lib/brand";
 const next = encodeURIComponent("/dashboard/assignor");
 
 export default function AssignorsPage() {
@@ -14,10 +14,10 @@ export default function AssignorsPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--red)]">For Assignors</p>
               <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-6xl">
-                Bring your ref list into GotREFS in minutes.
+                Bring your ref list into {BRAND_NAME} in minutes.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 sm:text-lg">
-                Add refs one at a time or upload your current crew list. GotREFS keeps the roster organized so
+                Add refs one at a time or upload your current crew list. {BRAND_NAME} keeps the roster organized so
                 future games can be staffed faster.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -36,7 +36,7 @@ export default function AssignorsPage() {
                 <div className="mt-5 grid gap-3">
                   {[
                     ["1", "Choose manual entry or upload a file"],
-                    ["2", "GotREFS stores each ref in your Supabase roster"],
+                    ["2", `${BRAND_NAME} stores each ref in your Supabase roster`],
                     ["3", "Refs can later claim and complete their profiles"],
                   ].map(([number, text]) => (
                     <div key={number} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">

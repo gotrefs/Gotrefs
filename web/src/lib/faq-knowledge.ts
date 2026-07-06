@@ -98,4 +98,4 @@ export const FAQ_TAB_SHORT: Record<string, string> = {
   "Why GotREFS?": "Why GotREFS",
 };
 
-export const FAQ_VISIBLE_PER_TAB = 4;
+export const FAQ_VISIBLE_PER_TAB = 10;

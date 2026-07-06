@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BrandName } from "@/components/BrandName";
 import siteData from "@/data/site-data.json";
+import { normalizeBrandInText } from "@/lib/brand";
 import { ApartSection } from "@/components/marketing/ApartSection";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
 import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { OrganizerBenefitsSection } from "@/components/marketing/OrganizerBenefitsSection";
+import { PolicySection } from "@/components/marketing/PolicySection";
 import { VerifiedRefCardSection } from "@/components/marketing/VerifiedRefCardSection";
 
 type SD = typeof siteData;
@@ -42,7 +46,7 @@ export default async function HomePage({
         <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-6 px-4 sm:gap-8 lg:grid-cols-2 lg:gap-12">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-sm sm:tracking-[0.22em]">
-              GotREFS Marketplace
+              <BrandName /> Marketplace
             </p>
             <h1 className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-tight sm:mt-4 sm:text-5xl md:text-6xl">
               The Referee Marketplace For Every Sport
@@ -65,20 +69,29 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* Screen 2 — Verified ref digital player card */}
+      {/* Screen 2 — For referees */}
       <VerifiedRefCardSection />
 
-      {/* Screen 3 — What sets us apart */}
+      {/* Screen 3 — For organizers */}
+      <OrganizerBenefitsSection />
+
+      {/* Screen 4 — What sets us apart */}
+      <div id="features" className="scroll-mt-[4.25rem]" aria-hidden="true" />
       <ApartSection title={apart.title} items={apart.items} />
 
-      {/* Screen 4 — FAQ */}
+      {/* Policies */}
+      <PolicySection />
+
+      {/* FAQ */}
       <MarketingFaqSection />
 
       {/* Screen 5 — CTA */}
       <section className="hero-arbiter-bg viewport-screen flex flex-col items-center justify-center px-4 text-center text-white">
         <div className="mx-auto max-w-2xl">
           <h2 className="text-2xl font-bold md:text-3xl">{cta.title}</h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-[var(--grey-light)] md:text-base">{cta.subtext}</p>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-[var(--grey-light)] md:text-base">
+            {normalizeBrandInText(cta.subtext)}
+          </p>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
               {cta.primaryButton}

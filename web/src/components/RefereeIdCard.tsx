@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { BrandName } from "@/components/BrandName";
 import { BRAND_NAME } from "@/lib/brand";
 
 export type EditableRefCardField =
@@ -172,12 +173,14 @@ export function RefereeIdCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-3 sm:gap-4">
           <div className="rounded-xl bg-white/95 px-2.5 py-2 shadow-lg sm:px-3">
-            <Image src="/gotrefs-logo.png" alt="GotREFS" width={150} height={56} className="h-6 w-auto sm:h-8" />
+            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-6 w-auto sm:h-8" />
           </div>
           <div className="text-right">
             {id && (
               <>
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/45">GotREFS ID</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/45">
+                  <BrandName /> ID
+                </p>
                 <p className="mt-1 rounded-full border border-cyan-200/50 bg-cyan-300/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-50 shadow-[0_0_20px_rgba(103,232,249,0.35)]">
                   {id}
                 </p>

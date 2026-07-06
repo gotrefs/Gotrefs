@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { BrandName } from "@/components/BrandName";
+import { BRAND_NAME } from "@/lib/brand";
 
 type DemoRequestButtonProps = {
   className?: string;
@@ -28,7 +30,7 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
       `Demo scheduler: ${DEMO_SCHEDULER_URL}`,
     ].join("\n");
     window.location.href = `mailto:hello@gotrefs.org?subject=${encodeURIComponent(
-      "GotREFS Demo Request"
+      `${BRAND_NAME} Demo Request`
     )}&body=${encodeURIComponent(body)}`;
   }
 
@@ -53,7 +55,9 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">GotREFS Demo</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">
+                  <BrandName /> Demo
+                </p>
                 <h2 id="demo-request-title" className="mt-1 text-2xl font-black">
                   Book a demo
                 </h2>

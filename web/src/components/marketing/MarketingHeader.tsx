@@ -14,11 +14,14 @@ export function MarketingHeader() {
           <Link href="#ref-verification" className="hover:text-white">
             For Referees
           </Link>
-          <Link href="/auth/signup?role=organizer" className="hover:text-white">
+          <Link href="#for-organizers" className="hover:text-white">
             For Organizers
           </Link>
           <Link href="/assignors" className="hover:text-white">
             For Assignors
+          </Link>
+          <Link href="#policies" className="hover:text-white">
+            Policies
           </Link>
           <Link href="#faq" className="hover:text-white">
             FAQ
