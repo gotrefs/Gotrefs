@@ -34,17 +34,17 @@ export function PolicyLinksPanel({ variant = "section" }: PolicyLinksPanelProps)
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {MARKETING_POLICIES.map((policy) => (
           <button
             key={policy.slug}
             type="button"
             onClick={() => setActivePolicy(policy)}
-            className="rounded-2xl border border-[var(--border)] bg-white p-4 text-left shadow-sm transition hover:border-[var(--blue)] hover:shadow-md"
+            className="rounded-xl border border-[var(--border)] bg-white p-3 text-left shadow-sm transition hover:border-[var(--blue)] hover:shadow-md"
           >
             <p className="text-sm font-bold text-[var(--navy)]">{policyShortLabel(policy)}</p>
-            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--muted)]">{policy.summary}</p>
-            <span className="mt-3 inline-block text-xs font-bold text-[var(--blue)]">Read document →</span>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[var(--muted)]">{policy.summary}</p>
+            <span className="mt-2 inline-block text-[11px] font-bold text-[var(--blue)]">Read document →</span>
           </button>
         ))}
       </div>

@@ -9,7 +9,8 @@ import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection"
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { OrganizerBenefitsSection } from "@/components/marketing/OrganizerBenefitsSection";
-import { PolicySection } from "@/components/marketing/PolicySection";
+import { OrganizerProfileShowcaseSection } from "@/components/marketing/OrganizerProfileShowcaseSection";
+import { RefereeDigitalCardSection } from "@/components/marketing/RefereeDigitalCardSection";
 import { VerifiedRefCardSection } from "@/components/marketing/VerifiedRefCardSection";
 
 type SD = typeof siteData;
@@ -69,18 +70,13 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* Screen 2 — For referees */}
       <VerifiedRefCardSection />
-
-      {/* Screen 3 — For organizers */}
+      <RefereeDigitalCardSection />
       <OrganizerBenefitsSection />
+      <OrganizerProfileShowcaseSection />
 
-      {/* Screen 4 — What sets us apart */}
       <div id="features" className="scroll-mt-[4.25rem]" aria-hidden="true" />
       <ApartSection title={apart.title} items={apart.items} />
-
-      {/* Policies */}
-      <PolicySection />
 
       {/* FAQ */}
       <MarketingFaqSection />

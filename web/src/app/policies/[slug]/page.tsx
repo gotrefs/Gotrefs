@@ -34,8 +34,8 @@ export default async function PolicyPage({ params }: PolicyPageProps) {
       <main className="bg-slate-50">
         <section className="hero-arbiter-bg px-4 py-16 text-white">
           <div className="mx-auto max-w-4xl">
-            <Link href="/#safety-standards" className="text-sm font-bold text-white/75 hover:text-white">
-              Back to Safety & Standards
+            <Link href="/policies" className="text-sm font-bold text-white/75 hover:text-white">
+              Back to all policies
             </Link>
             <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] text-[var(--red)]">
               <BrandName /> Policy

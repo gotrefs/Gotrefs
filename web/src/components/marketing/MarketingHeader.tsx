@@ -20,7 +20,7 @@ export function MarketingHeader() {
           <Link href="/assignors" className="hover:text-white">
             For Assignors
           </Link>
-          <Link href="#policies" className="hover:text-white">
+          <Link href="/policies" className="hover:text-white">
             Policies
           </Link>
           <Link href="#faq" className="hover:text-white">

@@ -126,18 +126,13 @@ body {
 /* One full screen below the sticky header */
 .hero-fullscreen,
 .viewport-screen {
-  min-height: auto;
-  height: auto;
+  min-height: calc(100svh - 4.25rem);
   overflow: visible;
 }
 
-.hero-fullscreen {
-  min-height: calc(100svh - 4.25rem);
-}
-
 .viewport-screen {
-  padding-top: 3rem;
-  padding-bottom: 3rem;
+  padding-top: 2.5rem;
+  padding-bottom: 2.5rem;
 }
 
 .section-padding {
