@@ -66,15 +66,8 @@ export async function PATCH(
   }
 
   if (action === "accept" && isRef) {
-    const [{ data: screening }, { data: profile }, { data: submission }] = await Promise.all([
-      supabase.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
-      supabase
-        .from("ref_profiles")
-        .select(
-          "verification_method, external_verification_proof_path, government_id_path, verification_doc_path, certification_document_path, bio, primary_sport, certification_level"
-        )
-        .eq("member_id", user.id)
-        .maybeSingle(),
+    const [{ data: screening }, { data: submission }] = await Promise.all([
+      supabase.from("screening_checks").select("status, provider").eq("ref_member_id", user.id).maybeSingle(),
       supabase
         .from("ref_verification_submissions")
         .select("status")
@@ -85,30 +78,17 @@ export async function PATCH(
     if (
       !refOfferEligible({
         screeningStatus: screening?.status,
-        verificationMethod: profile?.verification_method,
-        externalProofPath: profile?.external_verification_proof_path,
+        screeningProvider: screening?.provider,
         verificationSubmissionStatus: submission?.status,
-        profile,
       })
     ) {
       return NextResponse.json(
         {
           error:
-            "Complete verification first: upload ID and certification, fill out your profile, and submit your verification package.",
+            "Verification must be approved before you can accept assignments. Submit your documents and wait for admin review.",
         },
         { status: 400 }
       );
-    }
-
-    if (screening?.status !== "clear") {
-      await supabase
-        .from("screening_checks")
-        .update({
-          status: "clear",
-          summary: "Eligible via completed verification package",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("ref_member_id", user.id);
     }
 
     let admin;

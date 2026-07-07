@@ -201,7 +201,7 @@ export function RefEventCalendar({
   async function requestSignup(event: CalendarEvent) {
     setMsg(null);
     if (!canApplyToEvents) {
-      setMsg("Finish your referee profile first so organizers know who is applying.");
+      setMsg("Verification must be approved before you can apply. Complete your documents and submit for admin review.");
       onRequireProfile?.();
       return;
     }

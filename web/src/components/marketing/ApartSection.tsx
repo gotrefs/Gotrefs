@@ -11,7 +11,10 @@ export function ApartSection({ title, items }: { title: string; items: ApartItem
   const displayTitle = normalizeBrandInText(title);
 
   return (
-    <section className="viewport-screen flex flex-col items-center justify-center border-t border-[var(--border)] bg-white px-4">
+    <section
+      id="features"
+      className="viewport-screen scroll-mt-[4.25rem] flex flex-col items-center justify-center border-t border-[var(--border)] bg-white px-4"
+    >
       <div className="mx-auto w-full max-w-6xl">
         <h2 className="text-center text-2xl font-bold tracking-wide text-[#1b2132] md:text-3xl">
           {displayTitle}

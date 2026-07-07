@@ -222,8 +222,8 @@ export function SignupForm() {
             Build your ref ID as you sign up.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
-            Start browsing games right away in pending verification. Finish your ID, certification, and background
-            badges when you are ready to accept assignments.
+            Start browsing games right away while verification is pending. Upload your ID and certification, submit for
+            admin review, then apply to games after approval.
           </p>
         </div>
         <p className="text-sm text-[var(--muted)]">
@@ -690,8 +690,8 @@ export function SignupForm() {
                   ))}
                 </div>
                 <p className="mt-5 rounded-2xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4 text-sm text-[var(--slate)]">
-                  After signup, refs can browse games immediately in pending status. They will finish uploads and
-                  background screening before accepting paid assignments.
+                  After signup, refs can browse games while awaiting admin review. Applying to games unlocks after your
+                  documents are approved.
                 </p>
               </div>
             )}

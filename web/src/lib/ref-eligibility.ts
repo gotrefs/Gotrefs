@@ -1,4 +1,4 @@
-/** Shared rules for when a ref can receive or accept assignment offers. */
+/** Shared rules for when a ref can receive or accept assignment offers and apply to events. */
 
 export type RefProfileForEligibility = {
   government_id_path?: string | null;
@@ -7,8 +7,6 @@ export type RefProfileForEligibility = {
   bio?: string | null;
   primary_sport?: string | null;
   certification_level?: string | null;
-  verification_method?: string | null;
-  external_verification_proof_path?: string | null;
 } | null;
 
 export function refProfilePackageComplete(profile: RefProfileForEligibility): boolean {
@@ -21,19 +19,26 @@ export function refProfilePackageComplete(profile: RefProfileForEligibility): bo
   return hasId && hasCert && hasProfile;
 }
 
+const TRUSTED_SCREENING_PROVIDERS = new Set(["checkr", "nsid"]);
+
 export function refOfferEligible(args: {
   screeningStatus?: string | null;
-  verificationMethod?: string | null;
-  externalProofPath?: string | null;
+  screeningProvider?: string | null;
   verificationSubmissionStatus?: string | null;
-  profile?: RefProfileForEligibility;
 }): boolean {
-  if (args.screeningStatus === "clear") return true;
+  if (args.verificationSubmissionStatus === "approved") return true;
 
-  if (args.verificationMethod === "external" && args.externalProofPath) return true;
+  if (
+    args.screeningStatus === "clear" &&
+    args.screeningProvider &&
+    TRUSTED_SCREENING_PROVIDERS.has(args.screeningProvider)
+  ) {
+    return true;
+  }
 
-  const submission = args.verificationSubmissionStatus ?? "";
-  if (["submitted", "under_review", "approved"].includes(submission)) return true;
+  return false;
+}
 
-  return refProfilePackageComplete(args.profile ?? null);
+export function refCanApplyToEvents(verificationSubmissionStatus?: string | null): boolean {
+  return verificationSubmissionStatus === "approved";
 }
