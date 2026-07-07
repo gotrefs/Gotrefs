@@ -9,7 +9,7 @@ import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeId
 import { SportsFields } from "@/components/SportsFields";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { BRAND_NAME } from "@/lib/brand";
-import { refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
+import { refCanApplyToEvents, refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
 
 type InquiryRow = {
   id: string;
@@ -23,6 +23,7 @@ type InquiryRow = {
 type Screening = {
   status: string;
   summary: string | null;
+  provider?: string | null;
 };
 
 type OfferRow = {
@@ -119,6 +120,7 @@ export default function RefereeDashboardClient() {
   const [govIdPath, setGovIdPath] = useState<string | null>(null);
   const [certDocPath, setCertDocPath] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [isAssignor, setIsAssignor] = useState(false);
   const [assignorSaving, setAssignorSaving] = useState(false);
@@ -154,7 +156,7 @@ export default function RefereeDashboardClient() {
 
     const { data: sc } = await supabase
       .from("screening_checks")
-      .select("status, summary")
+      .select("status, summary, provider")
       .eq("ref_member_id", user.id)
       .maybeSingle();
     setScreening(sc);
@@ -215,10 +217,11 @@ export default function RefereeDashboardClient() {
 
     const { data: vs } = await supabase
       .from("ref_verification_submissions")
-      .select("status")
+      .select("status, rejection_reason")
       .eq("ref_member_id", user.id)
       .maybeSingle();
     setVerificationStatus(vs?.status || "draft");
+    setRejectionReason(vs?.rejection_reason ?? null);
 
     const { data: inq } = await supabase
       .from("ref_inquiries")
@@ -265,6 +268,7 @@ export default function RefereeDashboardClient() {
     setSport,
     setVerificationMethod,
     setVerificationStatus,
+    setRejectionReason,
   ]);
 
   useEffect(() => {
@@ -502,8 +506,7 @@ export default function RefereeDashboardClient() {
     const nextSport = overrides.sport ?? sport;
     const nextCert = overrides.cert ?? cert;
     const nextProfileReady = Boolean(nextBio.trim() && nextSport.trim() && nextCert.trim());
-    const nextBackgroundReady =
-      nextScreeningStatus === "clear" || ["submitted", "under_review", "approved"].includes(nextVerificationStatus);
+    const nextBackgroundReady = nextVerificationStatus === "approved";
 
     if (!nextProfileReady) {
       setMsg("Profile saved. Finish your profile details next.");
@@ -521,12 +524,12 @@ export default function RefereeDashboardClient() {
       return;
     }
     if (!nextBackgroundReady) {
-      setMsg("Certification saved. Next, submit your verification package.");
+      setMsg("Certification saved. Next, submit your verification package for admin review.");
       openEditor("verification", "submit");
       return;
     }
 
-    setMsg("Success, Find Games Now!");
+    setMsg("You're approved — find games below!");
     setActiveEditor(null);
     window.requestAnimationFrame(() => {
       gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -620,34 +623,20 @@ export default function RefereeDashboardClient() {
       setMsg(profErr.message);
       return;
     }
-    await supabase
-      .from("screening_checks")
-      .update({
-        status: "clear",
-        summary: `External verification on file (${externalCompany.trim()})`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("ref_member_id", user.id);
     setExternalProofPath(path);
     setVerificationMethod("external");
     await load();
-    guideToNextMissingStep({ screeningStatus: "clear" });
+    setMsg("External proof saved. Submit your verification package for admin review.");
+    openEditor("verification", "submit");
   }
 
   const isVerified = refOfferEligible({
     screeningStatus: screening?.status,
-    verificationMethod,
-    externalProofPath,
+    screeningProvider: screening?.provider,
     verificationSubmissionStatus: verificationStatus,
-    profile: {
-      government_id_path: govIdPath,
-      verification_doc_path: govIdPath,
-      certification_document_path: certDocPath,
-      bio,
-      primary_sport: sport,
-      certification_level: cert,
-    },
   });
+  const canApplyToEvents = refCanApplyToEvents(verificationStatus);
+  const canAcceptOffers = isVerified;
   const profileComplete = refProfilePackageComplete({
     government_id_path: govIdPath,
     verification_doc_path: govIdPath,
@@ -656,12 +645,13 @@ export default function RefereeDashboardClient() {
     primary_sport: sport,
     certification_level: cert,
   });
-  const canAcceptOffers = isVerified;
   const profileReady = Boolean(bio.trim() && sport.trim() && cert.trim());
   const idReady = Boolean(govIdPath);
   const certificationReady = Boolean(certDocPath);
-  const verificationSubmitted = ["submitted", "under_review", "approved"].includes(verificationStatus);
-  const backgroundReady = screening?.status === "clear" || verificationSubmitted;
+  const verificationApproved = verificationStatus === "approved";
+  const verificationUnderReview = ["submitted", "under_review"].includes(verificationStatus);
+  const verificationRejected = verificationStatus === "rejected";
+  const packageReadyForSubmit = profileComplete;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
   const refNotificationCount = pendingOffers.length + inquiries.length;
   const missingActions: {
@@ -687,12 +677,16 @@ export default function RefereeDashboardClient() {
       field: "verification" as const,
       step: "certification" as const,
     },
-    !backgroundReady && {
-      label: "Submit for review",
-      description: "Submit your verification package or upload proof if you were verified elsewhere.",
-      field: "verification" as const,
-      step: "submit" as const,
-    },
+    packageReadyForSubmit &&
+      !verificationApproved &&
+      !verificationUnderReview && {
+        label: verificationRejected ? "Resubmit for review" : "Submit for review",
+        description: verificationRejected
+          ? "Fix the issues noted below, update your documents if needed, then resubmit."
+          : "Submit your ID and certification package for admin review before applying to games.",
+        field: "verification" as const,
+        step: "submit" as const,
+      },
   ].filter(Boolean) as {
     label: string;
     description: string;
@@ -724,15 +718,40 @@ export default function RefereeDashboardClient() {
       <div className="grid gap-6 rounded-[2rem] border border-[var(--red)]/20 bg-gradient-to-br from-[var(--red)]/10 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">
-            {canAcceptOffers ? "Verified profile" : "Pending verification"}
+            {verificationApproved ? "Verified profile" : verificationUnderReview ? "Under review" : "Pending verification"}
           </p>
           <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
-            Browse games now. Finish badges to accept.
+            {verificationApproved
+              ? "You're approved — apply to games below."
+              : verificationUnderReview
+                ? "Your documents are being reviewed."
+                : "Complete verification to apply to games."}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
-            Your profile is live as a pending ref, so you can see available games in your area immediately.
-            Complete the ID, certification, and background badges when you are ready to accept paid assignments.
+            {verificationApproved
+              ? "You can browse and apply to posted events. Organizers will reach you through GotREFS when they need refs."
+              : verificationUnderReview
+                ? "We typically review submissions within a few business days. You can browse games now, but applying unlocks after approval."
+                : "Upload your government ID and certification, complete your profile, then submit for admin review. Documents are stored securely and never shared publicly."}
           </p>
+          {verificationRejected && rejectionReason && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <p className="font-bold">Verification denied</p>
+              <p className="mt-1">{rejectionReason}</p>
+              <button
+                type="button"
+                onClick={() => openEditor("verification", "submit")}
+                className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white"
+              >
+                Fix and resubmit
+              </button>
+            </div>
+          )}
+          {verificationUnderReview && (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Under review — we will notify you here when your verification is approved or if changes are needed.
+            </div>
+          )}
           <div className="mt-5 rounded-2xl border border-[var(--border)] bg-white/80 p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)]">
               Missing info
@@ -751,10 +770,16 @@ export default function RefereeDashboardClient() {
                   </button>
                 ))}
               </div>
-            ) : (
+            ) : verificationApproved ? (
               <p className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-                All profile badges are complete.
+                Verification approved — you can apply to games.
               </p>
+            ) : verificationUnderReview ? (
+              <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                Package submitted — awaiting admin review.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-[var(--muted)]">Complete the steps above to submit for review.</p>
             )}
           </div>
         </div>
@@ -774,6 +799,7 @@ export default function RefereeDashboardClient() {
           govIdUploaded={Boolean(govIdPath)}
           certUploaded={Boolean(certDocPath)}
           backgroundStatus={screening?.status}
+          screeningProvider={screening?.provider}
           verificationStatus={verificationStatus}
           verificationSkipped={cardMeta.verificationSkipped}
           profileComplete={profileComplete}
@@ -785,7 +811,7 @@ export default function RefereeDashboardClient() {
 
       <section ref={gamesRef}>
         <RefEventCalendar
-          canApplyToEvents={missingActions.length === 0}
+          canApplyToEvents={canApplyToEvents}
           onRequireProfile={() => {
             const next = missingActions[0];
             if (next) openEditor(next.field, next.step);
@@ -1076,10 +1102,10 @@ export default function RefereeDashboardClient() {
           {activeEditor === "verification" && (
             <div className="mt-5 grid gap-5">
               <div className="rounded-xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4 text-sm text-[var(--slate)]">
-                <p className="font-bold text-[var(--navy)]">How a pending ref becomes verified</p>
+                <p className="font-bold text-[var(--navy)]">How verification works</p>
                 <p className="mt-2">
-                  Upload a government ID, upload a certification/license document, complete your profile, then submit
-                  the verification package. You can also upload proof if you were verified elsewhere.
+                  Upload a government ID and certification, complete your profile, then submit for admin review.
+                  Documents are stored securely. After approval you can apply to posted games.
                 </p>
               </div>
 
@@ -1153,8 +1179,14 @@ export default function RefereeDashboardClient() {
                 <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
                   <p className="font-display text-lg font-bold text-[var(--navy)]">Submit verification package</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Submit after your government ID, certification, and profile information are complete.
+                    Submit after your government ID, certification, and profile are complete. An admin will review your
+                    documents before you can apply to games.
                   </p>
+                  {verificationRejected && rejectionReason && (
+                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                      <span className="font-semibold">Previous denial:</span> {rejectionReason}
+                    </p>
+                  )}
                   <p className="text-sm">
                     Verification package status:{" "}
                     <span className="font-semibold capitalize text-[var(--blue)]">
@@ -1165,17 +1197,21 @@ export default function RefereeDashboardClient() {
                     type="button"
                     disabled={
                       submittingVerification ||
-                      verificationStatus === "submitted" ||
-                      verificationStatus === "under_review"
+                      verificationUnderReview ||
+                      (verificationApproved && !verificationRejected)
                     }
                     onClick={() => void submitVerificationPackage()}
                     className="mt-3 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
                     {submittingVerification
                       ? "Submitting..."
-                      : verificationStatus === "submitted" || verificationStatus === "under_review"
-                        ? "Submitted - awaiting review"
-                        : "Submit verification package"}
+                      : verificationUnderReview
+                        ? "Submitted — awaiting review"
+                        : verificationApproved
+                          ? "Approved"
+                          : verificationRejected
+                            ? "Resubmit verification package"
+                            : "Submit verification package"}
                   </button>
                 </div>
               )}

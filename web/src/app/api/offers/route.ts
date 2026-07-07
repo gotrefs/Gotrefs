@@ -47,15 +47,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
   }
 
-  const [{ data: screening }, { data: profile }, { data: submission }] = await Promise.all([
-    admin.from("screening_checks").select("status").eq("ref_member_id", body.refMemberId).maybeSingle(),
-    admin
-      .from("ref_profiles")
-      .select(
-        "verification_method, external_verification_proof_path, government_id_path, verification_doc_path, certification_document_path, bio, primary_sport, certification_level"
-      )
-      .eq("member_id", body.refMemberId)
-      .maybeSingle(),
+  const [{ data: screening }, { data: submission }] = await Promise.all([
+    admin.from("screening_checks").select("status, provider").eq("ref_member_id", body.refMemberId).maybeSingle(),
     admin
       .from("ref_verification_submissions")
       .select("status")
@@ -65,17 +58,15 @@ export async function POST(request: Request) {
 
   const eligible = refOfferEligible({
     screeningStatus: screening?.status,
-    verificationMethod: profile?.verification_method,
-    externalProofPath: profile?.external_verification_proof_path,
+    screeningProvider: screening?.provider,
     verificationSubmissionStatus: submission?.status,
-    profile,
   });
 
   if (!eligible) {
     return NextResponse.json(
       {
         error:
-          "This referee has not completed their profile and verification package yet.",
+          "This referee has not been approved yet. They must complete verification and receive admin approval.",
       },
       { status: 400 }
     );

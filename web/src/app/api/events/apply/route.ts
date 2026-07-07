@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { refCanApplyToEvents } from "@/lib/ref-eligibility";
 
 type ApplyBody = {
   eventId?: string;
@@ -38,6 +39,22 @@ export async function POST(request: Request) {
   const sync = await syncMemberAccount(admin, user);
   if (sync.role !== "ref") {
     return NextResponse.json({ error: "Only referees can apply to work events." }, { status: 403 });
+  }
+
+  const { data: submission } = await admin
+    .from("ref_verification_submissions")
+    .select("status, rejection_reason")
+    .eq("ref_member_id", user.id)
+    .maybeSingle();
+
+  if (!refCanApplyToEvents(submission?.status)) {
+    const message =
+      submission?.status === "rejected" && submission.rejection_reason
+        ? `Verification was denied: ${submission.rejection_reason} Update your documents and resubmit for review.`
+        : submission?.status === "submitted" || submission?.status === "under_review"
+          ? "Your verification is under review. You can apply to events after approval."
+          : "Complete and submit your verification package before applying to events.";
+    return NextResponse.json({ error: message }, { status: 403 });
   }
 
   const { data: event, error: eventError } = await admin

@@ -30,6 +30,7 @@ type RefereeIdCardProps = {
   govIdUploaded?: boolean;
   certUploaded?: boolean;
   backgroundStatus?: string | null;
+  screeningProvider?: string | null;
   verificationStatus?: string | null;
   verificationSkipped?: boolean;
   emptyPlaceholders?: boolean;
@@ -114,6 +115,7 @@ export function RefereeIdCard({
   govIdUploaded,
   certUploaded,
   backgroundStatus,
+  screeningProvider,
   verificationStatus,
   verificationSkipped,
   emptyPlaceholders,
@@ -140,16 +142,21 @@ export function RefereeIdCard({
   const radius = travelRadius?.trim();
   const willingToTravel = Boolean(radius && Number(radius) > 0);
   const availability = availabilitySummary?.trim() || (emptyPlaceholders ? "" : "Add availability");
-  const screeningClear = backgroundStatus === "clear";
-  const submitted = ["submitted", "under_review", "approved"].includes(verificationStatus ?? "");
-  const showRedUnverified = Boolean(verificationSkipped && !screeningClear && !submitted);
+  const screeningClear =
+    backgroundStatus === "clear" &&
+    Boolean(screeningProvider && ["checkr", "nsid"].includes(screeningProvider));
+  const approved = verificationStatus === "approved";
+  const underReview = ["submitted", "under_review"].includes(verificationStatus ?? "");
+  const rejected = verificationStatus === "rejected";
+  const backgroundReady = approved || screeningClear;
+  const showRedUnverified = Boolean(verificationSkipped && !backgroundReady && !underReview);
   const sports = [primarySport, ...additionalSports].filter((item): item is string => Boolean(item?.trim()));
   const hasLocation = Boolean(regionText || city || radius);
   const hasCertification = Boolean(cert || certOrg);
   const hasVerificationState = Boolean(
-    profileComplete || primarySport || govIdUploaded || certUploaded || screeningClear || submitted || showRedUnverified
+    profileComplete || primarySport || govIdUploaded || certUploaded || backgroundReady || underReview || showRedUnverified
   );
-  const hasStatus = Boolean(screeningClear || showRedUnverified || verificationStatus);
+  const hasStatus = Boolean(backgroundReady || showRedUnverified || verificationStatus || underReview || rejected);
   const completionItems = [
     Boolean(fullName?.trim()),
     Boolean(primarySport?.trim()),
@@ -157,7 +164,7 @@ export function RefereeIdCard({
     Boolean(baseCity?.trim() || workRegions.length || travelRadius?.trim()),
     Boolean(govIdUploaded),
     Boolean(certUploaded),
-    screeningClear || submitted,
+    backgroundReady || underReview,
   ];
   const showProgress = !emptyPlaceholders || completionItems.some(Boolean);
   const percent = Math.round((completionItems.filter(Boolean).length / completionItems.length) * 100);
@@ -334,7 +341,7 @@ export function RefereeIdCard({
             <CardBadge active={Boolean(profileComplete || primarySport)} label="Profile Ready" pendingLabel={emptyPlaceholders ? "" : "Profile Pending"} />
             <CardBadge active={Boolean(govIdUploaded)} skipped={showRedUnverified} label="Identity Verified" pendingLabel={emptyPlaceholders ? "" : "Identity Processing"} />
             <CardBadge active={Boolean(certUploaded)} skipped={showRedUnverified} label="Certified Official" pendingLabel={emptyPlaceholders ? "" : "Cert Processing"} />
-            <CardBadge active={screeningClear || submitted} skipped={showRedUnverified} label="Background Checked" pendingLabel={emptyPlaceholders ? "" : "Background Processing"} />
+            <CardBadge active={backgroundReady} skipped={showRedUnverified} label="Background Checked" pendingLabel={emptyPlaceholders ? "" : underReview ? "Under Review" : "Background Processing"} />
           </button>
         )}
 
@@ -356,8 +363,12 @@ export function RefereeIdCard({
           >
             {hasStatus && <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">Status</p>}
             <p className="mt-1 font-bold capitalize">
-              {screeningClear ? (
+              {backgroundReady ? (
                 "Verified"
+              ) : rejected ? (
+                "Denied"
+              ) : underReview ? (
+                "Under review"
               ) : showRedUnverified ? (
                 "Unverified"
               ) : emptyPlaceholders && !verificationStatus ? (

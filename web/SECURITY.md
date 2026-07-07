@@ -26,7 +26,8 @@ Copy `web/.env.example` → `web/.env.local`. **Never commit** `.env` or `.env.l
 | Auth | `auth.users` | Email + bcrypt password (Supabase) |
 | Profile | `public.members` | `id` = `auth.users.id`, role, name |
 | Ref details | `public.ref_profiles` | Sport, rate, document paths |
-| Verification workflow | `public.ref_verification_submissions` | `draft` → `submitted` → review |
+| Verification workflow | `public.ref_verification_submissions` | `draft` → `submitted` → admin `approved` / `rejected` |
+| Platform admins | `public.platform_admins` | Manual verification review queue access |
 
 Sample standalone `users (id, email, password_hash)` schema: `database/schema-users.sql`.
 
@@ -35,7 +36,10 @@ Sample standalone `users (id, email, password_hash)` schema: `database/schema-us
 - `POST /api/auth/register` — validated signup, sets httpOnly session cookie via Supabase SSR
 - `POST /api/auth/login` — validated login
 - `GET /auth/callback` — email confirmation code exchange
-- `POST /api/verification/submit` — authenticated ref submits ID + cert package
+- `POST /api/verification/submit` — authenticated ref submits ID + cert package for admin review
+- `GET /api/verification/status` — ref reads own verification status and rejection reason
+- `GET/PATCH /api/admin/verifications/*` — platform admin review queue (requires `platform_admins` or `PLATFORM_ADMIN_USER_IDS`)
+- `POST /api/webhooks/nsid` — stub for future NSID approve/deny webhooks
 - Middleware — redirects unauthenticated users away from `/dashboard/*`
 
 ## Document uploads
