@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { parseOAuthProvider } from "@/lib/auth/oauth";
+import { getSupabasePublicKey, getSupabaseUrl } from "@/lib/supabase/config";
 
 type CookieToSet = {
   name: string;
@@ -25,8 +26,8 @@ export async function GET(
   const provider = parseOAuthProvider(rawProvider);
   const next = requestUrl.searchParams.get("next") || "/dashboard";
   const cookiesToSet: CookieToSet[] = [];
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabasePublicKey();
 
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.redirect(
