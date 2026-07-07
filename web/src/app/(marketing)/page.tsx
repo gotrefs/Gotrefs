@@ -75,7 +75,6 @@ export default async function HomePage({
       <OrganizerBenefitsSection />
       <OrganizerProfileShowcaseSection />
 
-      <div id="features" className="scroll-mt-[4.25rem]" aria-hidden="true" />
       <ApartSection title={apart.title} items={apart.items} />
 
       {/* FAQ */}

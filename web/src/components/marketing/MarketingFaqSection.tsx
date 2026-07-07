@@ -135,7 +135,7 @@ export function MarketingFaqSection() {
   }
 
   return (
-    <section className="viewport-screen flex flex-col bg-white px-4 py-5 md:py-6" id="faq">
+    <section className="viewport-screen scroll-mt-[4.25rem] flex flex-col bg-white px-4 py-5 md:py-6" id="faq">
       <div className="mx-auto flex w-full max-w-4xl flex-col lg:h-full lg:min-h-0">
         <h2 className="shrink-0 text-center text-xl font-bold text-[#1b2132] md:text-2xl">
           {FAQ_PAGE_TITLE}
