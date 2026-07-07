@@ -12,7 +12,7 @@ export function MarketingHashScroll() {
     if (pathname !== "/") return;
 
     const scrollToTarget = () => {
-      const sectionId = readPendingHomeSectionId();
+      const sectionId = getPendingHomeSectionId();
       if (sectionId) scrollToHomeSectionWhenReady(sectionId);
     };
 
