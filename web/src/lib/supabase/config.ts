@@ -1,15 +1,16 @@
 /** Client-safe Supabase URL + publishable/anon API key (supports legacy JWT and sb_publishable_* keys). */
 
-function readEnv(name: string): string {
-  return process.env[name]?.trim() ?? "";
-}
+// Must use static process.env.NEXT_PUBLIC_* access so Next.js inlines values in client bundles.
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
 
 export function getSupabasePublicKey(): string {
-  return readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") || readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  return SUPABASE_PUBLISHABLE_KEY || SUPABASE_ANON_KEY;
 }
 
 export function getSupabaseUrl(): string {
-  return readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  return SUPABASE_URL;
 }
 
 /** True when real Supabase URL + publishable/anon key are set (not placeholders). */
