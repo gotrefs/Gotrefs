@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  queueHomeSectionScroll,
+  scrollToHomeSectionWhenReady,
+} from "@/lib/marketing-scroll";
 
 type MarketingNavLinkProps = {
   href: string;
@@ -13,24 +17,35 @@ type MarketingNavLinkProps = {
 /** Home section anchors use /#id so they work from any page; smooth-scroll when already on /. */
 export function MarketingNavLink({ href, children, className }: MarketingNavLinkProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const isHomeAnchor = href.startsWith("#");
   const targetId = isHomeAnchor ? href.slice(1) : null;
-  const linkHref = isHomeAnchor ? `/${href}` : href;
 
-  function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (!targetId || pathname !== "/") return;
-
-    const target = document.getElementById(targetId);
-    if (!target) return;
-
-    event.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.history.pushState(null, "", `#${targetId}`);
+  if (!isHomeAnchor || !targetId) {
+    return (
+      <Link href={href} className={className}>
+        {children}
+      </Link>
+    );
   }
 
   return (
-    <Link href={linkHref} className={className} onClick={handleClick} scroll={!isHomeAnchor}>
+    <a
+      href={`/#${targetId}`}
+      className={className}
+      onClick={(event) => {
+        event.preventDefault();
+
+        if (pathname === "/") {
+          scrollToHomeSectionWhenReady(targetId);
+          return;
+        }
+
+        queueHomeSectionScroll(targetId);
+        router.push(`/#${targetId}`);
+      }}
+    >
       {children}
-    </Link>
+    </a>
   );
 }
