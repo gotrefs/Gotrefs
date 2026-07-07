@@ -9,7 +9,7 @@ import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeId
 import { SportsFields } from "@/components/SportsFields";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { BRAND_NAME } from "@/lib/brand";
-import { refCanApplyToEvents, refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
+import { refCanApplyToEvents, refProfilePackageComplete } from "@/lib/ref-eligibility";
 
 type InquiryRow = {
   id: string;
@@ -114,9 +114,9 @@ export default function RefereeDashboardClient() {
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const [verificationMethod, setVerificationMethod] = useState<"checkr" | "external">("checkr");
+  const [, setVerificationMethod] = useState<"checkr" | "external">("checkr");
   const [externalCompany, setExternalCompany] = useState("");
-  const [externalProofPath, setExternalProofPath] = useState<string | null>(null);
+  const [, setExternalProofPath] = useState<string | null>(null);
   const [govIdPath, setGovIdPath] = useState<string | null>(null);
   const [certDocPath, setCertDocPath] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
@@ -500,7 +500,6 @@ export default function RefereeDashboardClient() {
   } = {}) {
     const nextGovIdPath = overrides.govIdPath ?? govIdPath;
     const nextCertDocPath = overrides.certDocPath ?? certDocPath;
-    const nextScreeningStatus = overrides.screeningStatus ?? screening?.status ?? null;
     const nextVerificationStatus = overrides.verificationStatus ?? verificationStatus;
     const nextBio = overrides.bio ?? bio;
     const nextSport = overrides.sport ?? sport;
@@ -630,13 +629,7 @@ export default function RefereeDashboardClient() {
     openEditor("verification", "submit");
   }
 
-  const isVerified = refOfferEligible({
-    screeningStatus: screening?.status,
-    screeningProvider: screening?.provider,
-    verificationSubmissionStatus: verificationStatus,
-  });
   const canApplyToEvents = refCanApplyToEvents(verificationStatus);
-  const canAcceptOffers = isVerified;
   const profileComplete = refProfilePackageComplete({
     government_id_path: govIdPath,
     verification_doc_path: govIdPath,

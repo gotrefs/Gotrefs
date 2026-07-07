@@ -84,15 +84,15 @@ export default function AdminVerificationsClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectPreset, setRejectPreset] = useState<string>(REJECTION_PRESETS[0]);
   const [rejectCustom, setRejectCustom] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const detailLoading = Boolean(selectedId && detail?.refMemberId !== selectedId);
+
   const loadQueue = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/admin/verifications");
       const json = (await res.json()) as { items?: QueueItem[]; error?: string };
@@ -102,43 +102,71 @@ export default function AdminVerificationsClient() {
         return;
       }
       setItems(json.items ?? []);
-      if ((json.items ?? []).length > 0 && !selectedId) {
-        setSelectedId(json.items![0].refMemberId);
-      }
+      setSelectedId((current) => current ?? json.items?.[0]?.refMemberId ?? null);
     } catch {
       setMsg("Network error loading verification queue.");
     } finally {
       setLoading(false);
     }
-  }, [selectedId]);
-
-  const loadDetail = useCallback(async (refId: string) => {
-    setDetailLoading(true);
-    setMsg(null);
-    try {
-      const res = await fetch(`/api/admin/verifications/${refId}`);
-      const json = (await res.json()) as DetailResponse & { error?: string };
-      if (!res.ok) {
-        setMsg(json.error ?? "Could not load verification detail.");
-        setDetail(null);
-        return;
-      }
-      setDetail(json);
-    } catch {
-      setMsg("Network error loading verification detail.");
-      setDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
   }, []);
 
   useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+    let cancelled = false;
+
+    async function fetchQueue() {
+      try {
+        const res = await fetch("/api/admin/verifications");
+        const json = (await res.json()) as { items?: QueueItem[]; error?: string };
+        if (cancelled) return;
+        if (!res.ok) {
+          setMsg(json.error ?? "Could not load verification queue.");
+          setItems([]);
+          return;
+        }
+        setItems(json.items ?? []);
+        setSelectedId((current) => current ?? json.items?.[0]?.refMemberId ?? null);
+      } catch {
+        if (!cancelled) setMsg("Network error loading verification queue.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void fetchQueue();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
-    if (selectedId) void loadDetail(selectedId);
-  }, [selectedId, loadDetail]);
+    if (!selectedId) return;
+
+    let cancelled = false;
+
+    async function fetchDetail() {
+      try {
+        const res = await fetch(`/api/admin/verifications/${selectedId}`);
+        const json = (await res.json()) as DetailResponse & { error?: string };
+        if (cancelled) return;
+        if (!res.ok) {
+          setMsg(json.error ?? "Could not load verification detail.");
+          setDetail(null);
+          return;
+        }
+        setDetail(json);
+      } catch {
+        if (!cancelled) {
+          setMsg("Network error loading verification detail.");
+          setDetail(null);
+        }
+      }
+    }
+
+    void fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   async function review(action: "approve" | "reject", reason?: string) {
     if (!selectedId) return;
