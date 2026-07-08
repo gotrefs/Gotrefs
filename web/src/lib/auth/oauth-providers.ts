@@ -12,7 +12,26 @@ export function oauthScopes(provider: OAuthProvider) {
 }
 
 export function oauthCallbackUrl(origin: string, provider: OAuthProvider, next: string) {
-  const url = new URL(`/api/auth/callback/${provider}`, origin);
+  const url = new URL("/auth/callback", origin);
   url.searchParams.set("next", next.startsWith("/") ? next : "/dashboard");
+  url.searchParams.set("provider", provider);
   return url.toString();
+}
+
+export function oauthSignInOptions(provider: OAuthProvider, redirectTo: string) {
+  const options: {
+    redirectTo: string;
+    scopes: string;
+    queryParams?: Record<string, string>;
+  } = {
+    redirectTo,
+    scopes: oauthScopes(provider),
+  };
+
+  if (provider === "google") {
+    // Always show Google's account picker instead of auto-signing into the last account.
+    options.queryParams = { prompt: "select_account" };
+  }
+
+  return options;
 }

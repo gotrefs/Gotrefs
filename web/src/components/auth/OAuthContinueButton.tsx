@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
+import { signInWithOAuthAction } from "@/lib/auth/oauth-actions";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
-import { startOAuthSignIn } from "@/lib/auth/start-oauth";
 
 type OAuthContinueButtonProps = {
   provider: OAuthProvider;
@@ -19,21 +19,22 @@ export function OAuthContinueButton({
   disabled = false,
 }: OAuthContinueButtonProps) {
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function handleClick() {
+  function handleClick() {
     setError(null);
-    setLoading(true);
-
-    try {
-      const next = searchParams.get("next") || "/dashboard";
-      await startOAuthSignIn(provider, next);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "OAuth sign-in failed.";
-      setError(message);
-      setLoading(false);
-    }
+    startTransition(async () => {
+      try {
+        const next = searchParams.get("next") || "/dashboard";
+        await signInWithOAuthAction(provider, next);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "OAuth sign-in failed.";
+        if (!message.includes("NEXT_REDIRECT")) {
+          setError(message);
+        }
+      }
+    });
   }
 
   return (
@@ -41,10 +42,10 @@ export function OAuthContinueButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={disabled || loading}
+        disabled={disabled || pending}
         className={className}
       >
-        {loading ? "Redirecting…" : children}
+        {pending ? "Redirecting…" : children}
       </button>
       {error ? <p className="text-center text-xs font-semibold text-red-600">{error}</p> : null}
     </div>

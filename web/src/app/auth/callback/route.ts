@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { upsertOAuthMember } from "@/lib/auth/oauth";
+import { parseOAuthProvider, type OAuthProvider } from "@/lib/auth/oauth-providers";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { dashboardPathForRole } from "@/lib/member-role";
 import { createRouteHandlerClient, safeRedirectPath } from "@/lib/supabase/route-handler";
@@ -13,35 +15,46 @@ function redirectWithCookies(from: NextResponse, url: URL): NextResponse {
   return redirect;
 }
 
-/** Exchange email confirmation / magic-link codes for a session cookie. */
+function oauthProviderFromRequest(requestUrl: URL, userProvider?: string | null): OAuthProvider | null {
+  const raw = requestUrl.searchParams.get("provider") ?? userProvider;
+  if (!raw) return null;
+  try {
+    return parseOAuthProvider(raw);
+  } catch {
+    return null;
+  }
+}
+
+function authErrorRedirect(origin: string, oauthFlow: boolean, reason: string) {
+  const errorCode = oauthFlow ? "oauth_failed" : "confirmation_failed";
+  return NextResponse.redirect(
+    new URL(`/auth/login?error=${errorCode}&reason=${encodeURIComponent(reason)}`, origin)
+  );
+}
+
+/** Exchange auth codes for a session (email links + Google/Apple/Facebook OAuth). */
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
-
-  const response = NextResponse.redirect(new URL(next, requestUrl.origin));
+  const oauthFlow = Boolean(requestUrl.searchParams.get("provider"));
 
   if (!code && !(tokenHash && type)) {
-    return NextResponse.redirect(
-      new URL("/auth/login?error=confirmation_failed&reason=missing_code", requestUrl.origin)
-    );
+    return authErrorRedirect(requestUrl.origin, oauthFlow, "missing_code");
   }
 
+  const sessionResponse = NextResponse.redirect(new URL(next, requestUrl.origin));
+
   try {
-    const supabase = createRouteHandlerClient(request, response);
+    const supabase = createRouteHandlerClient(request, sessionResponse);
 
     if (code) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) {
         console.error("[auth/callback] exchangeCodeForSession:", error.message);
-        return NextResponse.redirect(
-          new URL(
-            `/auth/login?error=confirmation_failed&reason=${encodeURIComponent(error.message)}`,
-            requestUrl.origin
-          )
-        );
+        return authErrorRedirect(requestUrl.origin, oauthFlow, error.message);
       }
     } else {
       const { error } = await supabase.auth.verifyOtp({
@@ -50,12 +63,7 @@ export async function GET(request: NextRequest) {
       });
       if (error) {
         console.error("[auth/callback] verifyOtp:", error.message);
-        return NextResponse.redirect(
-          new URL(
-            `/auth/login?error=confirmation_failed&reason=${encodeURIComponent(error.message)}`,
-            requestUrl.origin
-          )
-        );
+        return authErrorRedirect(requestUrl.origin, false, error.message);
       }
     }
 
@@ -63,28 +71,54 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (!user) {
+      return authErrorRedirect(requestUrl.origin, oauthFlow, "missing_user");
+    }
+
     let redirectPath = next;
-    if (user && redirectPath === "/dashboard") {
+
+    const provider =
+      oauthProviderFromRequest(requestUrl, user.app_metadata?.provider as string | undefined) ??
+      (user.identities?.[0]?.provider
+        ? oauthProviderFromRequest(requestUrl, user.identities[0].provider)
+        : null);
+
+    if (provider) {
+      try {
+        const admin = createServiceClient();
+        const member = await upsertOAuthMember(admin, user, provider);
+        redirectPath =
+          next === "/dashboard" && (member.role === "ref" || member.role === "organizer")
+            ? dashboardPathForRole(member.role)
+            : next;
+        const destination = new URL(redirectPath, requestUrl.origin);
+        destination.searchParams.set("isOnboarded", String(member.isOnboarded));
+        return redirectWithCookies(sessionResponse, destination);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "oauth_callback_failed";
+        console.error("[auth/callback] oauth member sync:", reason);
+        return authErrorRedirect(requestUrl.origin, true, reason);
+      }
+    }
+
+    if (redirectPath === "/dashboard") {
       try {
         const admin = createServiceClient();
         const sync = await syncMemberAccount(admin, user);
         redirectPath = dashboardPathForRole(sync.role);
       } catch {
         redirectPath =
-          user.user_metadata?.role === "organizer"
-            ? "/dashboard/organizer"
-            : "/dashboard/referee";
+          user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
       }
     }
 
     if (redirectPath !== next) {
-      return redirectWithCookies(response, new URL(redirectPath, requestUrl.origin));
+      return redirectWithCookies(sessionResponse, new URL(redirectPath, requestUrl.origin));
     }
-    return response;
+
+    return sessionResponse;
   } catch (err) {
     console.error("[auth/callback] unexpected:", err);
-    return NextResponse.redirect(
-      new URL("/auth/login?error=confirmation_failed&reason=server_error", requestUrl.origin)
-    );
+    return authErrorRedirect(requestUrl.origin, oauthFlow, "server_error");
   }
 }

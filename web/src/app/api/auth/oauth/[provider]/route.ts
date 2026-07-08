@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { oauthCallbackUrl, oauthSignInOptions, parseOAuthProvider } from "@/lib/auth/oauth-providers";
 import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
-import { oauthCallbackUrl, oauthScopes, parseOAuthProvider } from "@/lib/auth/oauth-providers";
 
 export async function GET(
   request: NextRequest,
@@ -17,10 +17,7 @@ export async function GET(
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo: oauthCallbackUrl(requestUrl.origin, provider, next),
-        scopes: oauthScopes(provider),
-      },
+      options: oauthSignInOptions(provider, oauthCallbackUrl(requestUrl.origin, provider, next)),
     });
 
     if (error || !data.url) {
