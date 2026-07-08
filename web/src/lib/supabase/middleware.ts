@@ -4,8 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Auth links can land on the Site URL or auth pages — forward once to callback.
+  // Do not refresh sessions during OAuth handshakes — it can clear PKCE cookies.
+  if (pathname.startsWith("/api/auth/oauth") || pathname.startsWith("/api/auth/callback")) {
+    return NextResponse.next({ request });
+  }
+
   const code = request.nextUrl.searchParams.get("code");
+  if (pathname === "/auth/callback" && code) {
+    return NextResponse.next({ request });
+  }
+
+  // Auth links can land on the Site URL or auth pages — forward once to callback.
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
   const canForwardAuthCode = pathname === "/" || pathname === "/auth/login" || pathname === "/auth/signup";

@@ -6,6 +6,7 @@ import { validatePasswordStrength } from "@/lib/auth/password";
 import { BRAND_NAME } from "@/lib/brand";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
+import { OAuthContinueButton } from "@/components/auth/OAuthContinueButton";
 
 type AuthStep = "email" | "password" | "role" | "onboarding";
 type AudienceRole = "ref" | "organizer" | "assignor";
@@ -79,8 +80,8 @@ export function AuthFlow() {
     const authError = searchParams.get("error");
     const reason = searchParams.get("reason");
     if (!authError) return null;
-    if (reason) return `Google sign-in failed: ${decodeURIComponent(reason)}.`;
-    return "Google sign-in failed. Please try again.";
+    if (reason) return `Sign-in failed: ${decodeURIComponent(reason)}.`;
+    return "Sign-in failed. Please try again.";
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [existingProviders, setExistingProviders] = useState<string[]>([]);
@@ -89,7 +90,6 @@ export function AuthFlow() {
   const gotrefsId = useMemo(() => buildGotrefsId(email || fullName), [email, fullName]);
   const roleCard = ROLE_CARDS.find((item) => item.role === role) ?? ROLE_CARDS[0];
   const progress = role === "ref" ? ["Profile", "Sports", "Location"] : role === "organizer" ? ["Organization", "Payments", "Account"] : ["Authority", "Crew", "Account"];
-  const googleOAuthHref = `/api/auth/oauth/google?next=${encodeURIComponent(searchParams.get("next") || "/dashboard")}`;
   const resolvedPrimarySport = sportPickerToStored(primarySport, customPrimarySport);
 
   function toggleSport(sport: string) {
@@ -315,15 +315,18 @@ export function AuthFlow() {
               <span className="h-px flex-1 bg-slate-200" />
             </div>
             <div className="grid gap-2">
-              <a
-                href={googleOAuthHref}
-                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50"
+              <OAuthContinueButton
+                provider="google"
+                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
               >
                 [G] Continue with Google
-              </a>
-              <button type="button" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-[var(--navy)]" disabled>
+              </OAuthContinueButton>
+              <OAuthContinueButton
+                provider="apple"
+                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
+              >
                 [A] Continue with Apple
-              </button>
+              </OAuthContinueButton>
             </div>
           </form>
         )}
@@ -363,12 +366,12 @@ export function AuthFlow() {
                   or
                   <span className="h-px flex-1 bg-slate-200" />
                 </div>
-                <a
-                  href={googleOAuthHref}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50"
+                <OAuthContinueButton
+                  provider="google"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
                 >
                   [G] Continue with Google
-                </a>
+                </OAuthContinueButton>
               </>
             )}
           </form>

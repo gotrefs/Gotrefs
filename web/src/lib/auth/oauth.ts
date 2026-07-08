@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { dashboardPathForRole } from "@/lib/member-role";
+import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type OAuthProvider = "google" | "facebook" | "apple";
+export type { OAuthProvider } from "@/lib/auth/oauth-providers";
+export { parseOAuthProvider } from "@/lib/auth/oauth-providers";
 
 type AppleIdentity = {
   name?: {
@@ -12,18 +14,6 @@ type AppleIdentity = {
     lastName?: string | null;
   } | null;
 };
-
-function providerFromPath(value: string): OAuthProvider | null {
-  if (value === "google" || value === "facebook" || value === "apple") return value;
-  return null;
-}
-
-export function parseOAuthProvider(value: string): OAuthProvider {
-  const provider = providerFromPath(value);
-  if (!provider) throw new Error("Unsupported OAuth provider.");
-  return provider;
-}
-
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }

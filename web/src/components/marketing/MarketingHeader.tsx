@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { DemoRequestButton } from "./DemoRequestButton";
+import { MarketingNavLink } from "./MarketingNavLink";
 
 export function MarketingHeader() {
   return (
@@ -8,24 +9,24 @@ export function MarketingHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
         <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-10 w-auto sm:h-14" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
-          <Link href="#features" className="hover:text-white">
+          <MarketingNavLink href="#features" className="hover:text-white">
             How it works
-          </Link>
-          <Link href="#ref-verification" className="hover:text-white">
+          </MarketingNavLink>
+          <MarketingNavLink href="#ref-verification" className="hover:text-white">
             For Referees
-          </Link>
-          <Link href="#for-organizers" className="hover:text-white">
+          </MarketingNavLink>
+          <MarketingNavLink href="#for-organizers" className="hover:text-white">
             For Organizers
-          </Link>
+          </MarketingNavLink>
           <Link href="/assignors" className="hover:text-white">
             For Assignors
           </Link>
           <Link href="/policies" className="hover:text-white">
             Policies
           </Link>
-          <Link href="#faq" className="hover:text-white">
+          <MarketingNavLink href="#faq" className="hover:text-white">
             FAQ
-          </Link>
+          </MarketingNavLink>
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <Link href="/auth/login" className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline">
