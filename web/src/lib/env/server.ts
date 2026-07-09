@@ -27,6 +27,20 @@ export const serverEnv = {
   skipEmailConfirmation: () => process.env.AUTH_SKIP_EMAIL_CONFIRMATION === "true",
 } as const;
 
+/** Prefer configured site URL; fall back to the live request origin when env still points at localhost. */
+export function resolveSiteUrl(requestOrigin?: string | null): string {
+  const configured = optional("NEXT_PUBLIC_SITE_URL")?.replace(/\/$/, "");
+  const origin = requestOrigin?.replace(/\/$/, "") || "";
+
+  if (configured && !configured.includes("localhost")) {
+    return configured;
+  }
+  if (origin && !origin.includes("localhost")) {
+    return origin;
+  }
+  return configured || "http://localhost:3000";
+}
+
 export function assertSupabaseConfigured(): void {
   serverEnv.supabaseUrl();
   serverEnv.supabaseAnonKey();

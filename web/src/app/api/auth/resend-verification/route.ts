@@ -4,7 +4,7 @@ import {
   safeSignupRedirectPath,
 } from "@/lib/auth/email-confirmation";
 import { validateEmail } from "@/lib/auth/validation";
-import { serverEnv } from "@/lib/env/server";
+import { serverEnv, resolveSiteUrl } from "@/lib/env/server";
 import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 type ResendBody = {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
 
   const pendingRedirect = safeSignupRedirectPath(body.pendingRedirect);
-  const siteUrl = serverEnv.siteUrl();
+  const siteUrl = resolveSiteUrl(new URL(request.url).origin);
   const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
 
   const supabase = createRouteHandlerClient(request, NextResponse.next());

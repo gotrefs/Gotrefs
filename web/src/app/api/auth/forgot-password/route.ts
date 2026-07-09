@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildAuthCallbackUrl } from "@/lib/auth/email-confirmation";
 import { validateEmail } from "@/lib/auth/validation";
-import { serverEnv } from "@/lib/env/server";
+import { serverEnv, resolveSiteUrl } from "@/lib/env/server";
 import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 type ForgotPasswordBody = {
@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
 
-  const redirectTo = buildAuthCallbackUrl(serverEnv.siteUrl(), "/auth/update-password");
+  const redirectTo = buildAuthCallbackUrl(
+    resolveSiteUrl(new URL(request.url).origin),
+    "/auth/update-password"
+  );
 
   const supabase = createRouteHandlerClient(request, NextResponse.next());
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });

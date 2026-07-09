@@ -9,7 +9,7 @@ import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
-import { serverEnv } from "@/lib/env/server";
+import { serverEnv, resolveSiteUrl } from "@/lib/env/server";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     // If service-role lookup is unavailable, continue and let Supabase handle signup.
   }
 
-  const siteUrl = serverEnv.siteUrl();
+  const siteUrl = resolveSiteUrl(new URL(request.url).origin);
   const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
   const { data, error } = await supabase.auth.signUp({
     email,
