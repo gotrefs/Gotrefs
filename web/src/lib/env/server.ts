@@ -24,6 +24,7 @@ export const serverEnv = {
   databaseUrl: () => optional("DATABASE_URL"),
   authSecret: () => optional("AUTH_SECRET"),
   screeningDevBypass: () => process.env.SCREENING_DEV_BYPASS === "true",
+  skipEmailConfirmation: () => process.env.AUTH_SKIP_EMAIL_CONFIRMATION === "true",
 } as const;
 
 export function assertSupabaseConfigured(): void {

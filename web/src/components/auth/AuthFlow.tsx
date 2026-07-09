@@ -8,12 +8,13 @@ import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config
 import { createClient } from "@/lib/supabase/client";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
 import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
+import { signupDashboardLabel, type SignupDashboardPath } from "@/lib/auth/email-confirmation";
 import { formatHourlyRateRange } from "@/lib/pay-range";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
 
-type AuthStep = "email" | "password" | "role" | "onboarding";
+type AuthStep = "email" | "password" | "role" | "onboarding" | "verify-email" | "forgot-password";
 type AudienceRole = "ref" | "organizer" | "assignor";
 
 const ROLE_CARDS: Array<{
@@ -93,6 +94,8 @@ export function AuthFlow() {
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingRedirect, setPendingRedirect] = useState<SignupDashboardPath>("/dashboard/referee");
+  const [resendCooldown, setResendCooldown] = useState(false);
   const oauthMode = searchParams.get("oauth") === "1";
 
   useEffect(() => {
@@ -269,6 +272,63 @@ export function AuthFlow() {
     setWizardStep((current) => Math.min(current + 1, progress.length - 1));
   }
 
+  async function requestPasswordReset() {
+    setError(null);
+    setNotice(null);
+    const normalized = email.trim().toLowerCase();
+    if (!normalized || !normalized.includes("@")) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setEmail(normalized);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalized }),
+      });
+      const json = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not send the password reset email.");
+        return;
+      }
+      setNotice(
+        json.message ||
+          "If an account exists for that email, we sent a link to set or reset your password."
+      );
+    } catch {
+      setError("Could not reach the server. Try again in a moment.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resendVerificationEmail() {
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, pendingRedirect }),
+      });
+      const json = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not resend the verification email.");
+        return;
+      }
+      setNotice(json.message || "Verification email sent.");
+      setResendCooldown(true);
+      window.setTimeout(() => setResendCooldown(false), 60_000);
+    } catch {
+      setError("Could not reach the server. Try again in a moment.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function register(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -327,9 +387,33 @@ export function AuthFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = (await res.json()) as { error?: string; redirect?: string; userId?: string | null };
+      const json = (await res.json()) as {
+        error?: string;
+        redirect?: string;
+        userId?: string | null;
+        needsEmailConfirmation?: boolean;
+        pendingRedirect?: SignupDashboardPath;
+      };
       if (!res.ok) {
         setError(json.error || "Could not create your account.");
+        return;
+      }
+
+      if (json.needsEmailConfirmation) {
+        if (json.pendingRedirect) {
+          setPendingRedirect(json.pendingRedirect);
+        }
+        if (role === "ref" && govIdFrontFile && govIdBackFile && certDocFile) {
+          try {
+            localStorage.setItem("gotrefs_pending_ref_docs", "1");
+          } catch {
+            // Non-fatal if storage is unavailable.
+          }
+          setNotice(
+            "After you confirm your email, upload your verification documents from your referee dashboard."
+          );
+        }
+        setStep("verify-email");
         return;
       }
 
@@ -390,6 +474,67 @@ export function AuthFlow() {
           </p>
         </div>
 
+        {step === "verify-email" && (
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Almost there</p>
+              <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Confirm your email address</h2>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                We sent a verification link to{" "}
+                <span className="font-bold text-[var(--navy)]">{email}</span>. Open your inbox and click the link to
+                finish creating your account.
+              </p>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                After confirming, you&apos;ll go straight to your{" "}
+                <span className="font-semibold text-[var(--navy)]">{signupDashboardLabel(pendingRedirect)}</span>{" "}
+                dashboard.
+              </p>
+            </div>
+
+            <ul className="space-y-2 text-sm text-[var(--muted)]">
+              <li>Check your spam or promotions folder if you do not see the email within a minute.</li>
+              <li>The link expires after a while — use Resend below if needed.</li>
+            </ul>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => void resendVerificationEmail()}
+                disabled={loading || resendCooldown}
+                className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resendCooldown ? "Email sent — wait a minute" : loading ? "Sending…" : "Resend verification email"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setNotice(null);
+                  setStep("email");
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-[var(--navy)]"
+              >
+                Wrong email?
+              </button>
+            </div>
+
+            <p className="text-center text-sm text-[var(--muted)]">
+              Already confirmed?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setNotice(null);
+                  setStep("password");
+                }}
+                className="font-semibold text-[var(--red)] underline"
+              >
+                Log in
+              </button>
+            </p>
+          </div>
+        )}
+
         {step === "email" && (
           <div className="space-y-4">
             <form onSubmit={continueWithEmail} className="space-y-4">
@@ -419,6 +564,26 @@ export function AuthFlow() {
               >
                 Sign up
               </button>
+              <p className="text-center text-sm text-[var(--muted)]">
+                Already have an account but forgot your password?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setNotice(null);
+                    const normalized = email.trim().toLowerCase();
+                    if (!normalized || !normalized.includes("@")) {
+                      setError("Enter your email address first, then click Forgot password.");
+                      return;
+                    }
+                    setEmail(normalized);
+                    setStep("forgot-password");
+                  }}
+                  className="font-semibold text-[var(--red)] underline"
+                >
+                  Forgot password
+                </button>
+              </p>
             </form>
           </div>
         )}
@@ -447,7 +612,61 @@ export function AuthFlow() {
               <button type="submit" disabled={loading} className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
                 {loading ? "Signing in..." : "Log in"}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setNotice(null);
+                  setStep("forgot-password");
+                }}
+                className="w-full text-sm font-semibold text-[var(--red)] underline"
+              >
+                Forgot password?
+              </button>
             </form>
+          </div>
+        )}
+
+        {step === "forgot-password" && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setNotice(null);
+                setStep("email");
+              }}
+              className="text-sm font-bold text-[var(--muted)]"
+            >
+              Back to email
+            </button>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <h2 className="text-xl font-black text-[var(--navy)]">Forgot your password?</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                We&apos;ll email you a link to set or reset your password. This also works if your
+                account was originally created with Google.
+              </p>
+            </div>
+            <label className="block text-sm font-bold text-[var(--navy)]">
+              Email
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void requestPasswordReset()}
+              disabled={loading}
+              className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+            >
+              {loading ? "Sending…" : "Send password reset link"}
+            </button>
           </div>
         )}
 

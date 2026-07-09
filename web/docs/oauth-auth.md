@@ -34,7 +34,25 @@ After the callback succeeds, the server:
 | | `https://YOUR_DOMAIN/auth/callback` |
 | | Optional wildcards: `http://localhost:3000/**`, `https://YOUR_DOMAIN/**` |
 
+You only need **one** callback URL in Supabase — not separate URLs per role. Role-specific destinations (`/dashboard/referee`, `/dashboard/organizer`, `/dashboard/assignor`) are passed as the `next` query parameter in the verification email link at signup time.
+
 `NEXT_PUBLIC_SITE_URL` in `.env.local` must match the Site URL.
+
+### Email confirmation (Resend / SMTP)
+
+**Authentication → Providers → Email**
+
+- Enable **Confirm email**.
+- Configure custom SMTP (e.g. Resend) in Supabase.
+
+Signup flow:
+
+1. User completes the wizard and clicks **Create account**.
+2. App shows **Confirm your email address** (no dashboard yet).
+3. User clicks the link in their email → `/auth/callback?code=...&next=/dashboard/referee` (or organizer/assignor).
+4. Callback exchanges the code for a session and redirects to the role dashboard.
+
+Local dev bypass (optional): set `AUTH_SKIP_EMAIL_CONFIRMATION=true` in `web/.env.local` to skip the inbox step during testing.
 
 ### Google provider
 
@@ -93,10 +111,11 @@ Key column: `members.is_onboarded` — `false` until the signup wizard completes
 
 ## First-login flow
 
-| Path | First visit | After wizard |
-|------|-------------|--------------|
+| Path | After signup submit | After email link |
+|------|---------------------|------------------|
+| Email signup | "Confirm your email" screen | Role dashboard (`next` param in link) |
+| Dev (`AUTH_SKIP_EMAIL_CONFIRMATION`) | Instant dashboard | — |
 | Google OAuth | `/auth/signup?oauth=1&step=role` | Role dashboard |
-| Email signup | Full wizard in one session → `is_onboarded: true` | Role dashboard |
 | Email login (incomplete) | Middleware → signup wizard | Role dashboard |
 | Returning user | Role dashboard directly | — |
 

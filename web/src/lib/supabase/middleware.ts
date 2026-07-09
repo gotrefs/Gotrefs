@@ -71,7 +71,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isDashboard = pathname.startsWith("/dashboard");
-  const isAuthPage = pathname === "/auth/login" || pathname === "/auth/signup";
+  const isAuthPage = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/update-password";
   const nextPath = request.nextUrl.searchParams.get("next");
 
   if (isDashboard && !user) {
@@ -104,11 +104,12 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Logged-in users should not stay on login/signup (unless finishing OAuth onboarding).
+  // Logged-in users should not stay on login/signup (unless finishing OAuth onboarding or setting a password).
   if (user && isAuthPage && !request.nextUrl.searchParams.get("error")) {
     const finishingOAuthSignup =
       pathname === "/auth/signup" && request.nextUrl.searchParams.get("oauth") === "1";
-    if (!finishingOAuthSignup) {
+    const settingPassword = pathname === "/auth/update-password";
+    if (!finishingOAuthSignup && !settingPassword) {
       const destination = resolveAuthenticatedHomePath({
         member,
         email: user.email,

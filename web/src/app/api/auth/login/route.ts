@@ -4,6 +4,7 @@ import { gotrefsAdminDashboardPath, isGotrefsAdminEmail } from "@/lib/auth/admin
 import { resolveAuthenticatedHomePath } from "@/lib/auth/onboarding-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail } from "@/lib/auth/validation";
+import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
 import { serverEnv } from "@/lib/env/server";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
 
   const email = (body.email ?? "").trim().toLowerCase();
   const password = body.password ?? "";
+  const skipConfirmation = serverEnv.skipEmailConfirmation();
 
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
@@ -49,6 +51,17 @@ export async function POST(request: NextRequest) {
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("email not confirmed")) {
+      if (!skipConfirmation) {
+        return NextResponse.json(
+          {
+            error:
+              "Please confirm your email address first. Check your inbox for the verification link, or sign up again to resend it.",
+            needsEmailConfirmation: true,
+          },
+          { status: 403 }
+        );
+      }
+
       try {
         const admin = createServiceClient();
         const authUser = await findUserByEmail(admin, email);
@@ -88,8 +101,14 @@ export async function POST(request: NextRequest) {
             ?.map((identity) => identity.provider)
             .filter((provider): provider is string => typeof provider === "string") ?? [];
         if ([...providers, ...identityProviders].includes("google")) {
+          const googleEnabled = isOAuthProviderEnabled("google");
           return NextResponse.json(
-            { error: "This account is connected to Google. Use Continue with Google instead of a password." },
+            {
+              error: googleEnabled
+                ? "This account is connected to Google. Use Continue with Google instead of a password."
+                : "This account was created with Google and does not have a password yet. Click Forgot password on the login screen to set one.",
+              needsPasswordSetup: !googleEnabled,
+            },
             { status: 401 }
           );
         }

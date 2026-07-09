@@ -1,10 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
+import {
+  buildEmailConfirmationRedirectUrl,
+  signupDashboardPath,
+} from "@/lib/auth/email-confirmation";
+import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { serverEnv } from "@/lib/env/server";
-import { dashboardPathForRole } from "@/lib/member-role";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -35,6 +40,90 @@ type RegisterBody = {
   termsAccepted?: boolean;
   acceptedTermsSlug?: string;
 };
+
+type ProfileSetupInput = {
+  role: "ref" | "organizer";
+  isAssignor: boolean;
+  primarySport: string;
+  additionalSports: string[];
+  certificationLevel: string;
+  rateMin: number | null;
+  rateMax: number | null;
+  rateType: "exact" | "range" | null;
+  rateUnit: "hour" | "game" | null;
+  gotrefsId: string;
+};
+
+async function setupSignupProfiles(
+  admin: SupabaseClient,
+  userId: string,
+  input: ProfileSetupInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const {
+    role,
+    isAssignor,
+    primarySport,
+    additionalSports,
+    certificationLevel,
+    rateMin,
+    rateMax,
+    rateType,
+    rateUnit,
+    gotrefsId,
+  } = input;
+
+  if (isAssignor) {
+    const { error } = await admin.from("ref_profiles").upsert(
+      {
+        member_id: userId,
+        is_assignor: true,
+        primary_sport: primarySport || "Basketball",
+        additional_sports: additionalSports,
+        certification_level: certificationLevel || "Youth / Recreational",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "member_id" }
+    );
+    if (error) {
+      return { ok: false, error: "Account created, but assignor mode could not be enabled." };
+    }
+    return { ok: true };
+  }
+
+  if (role === "ref") {
+    const { error } = await admin.from("ref_profiles").upsert(
+      {
+        member_id: userId,
+        primary_sport: primarySport || "Basketball",
+        additional_sports: additionalSports,
+        certification_level: certificationLevel || "Youth / Recreational",
+        gotrefs_id: gotrefsId || null,
+        rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
+        rate_min: rateMin,
+        rate_max: rateMax,
+        rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
+        rate_unit: rateUnit ?? "hour",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "member_id" }
+    );
+    if (error) {
+      // Profile row is created by trigger; non-fatal if upsert fails.
+    }
+  }
+
+  return { ok: true };
+}
+
+async function markMemberOnboarded(admin: SupabaseClient, userId: string) {
+  await admin
+    .from("members")
+    .update({
+      is_onboarded: true,
+      last_login_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,6 +175,8 @@ export async function POST(request: NextRequest) {
   const verificationSkipped = body.verificationSkipped === true;
   const requiredTermsSlug = role === "organizer" ? "event-organizer-terms" : "referee-official-terms";
   const termsAccepted = body.termsAccepted === true && body.acceptedTermsSlug === requiredTermsSlug;
+  const skipConfirmation = serverEnv.skipEmailConfirmation();
+  const pendingRedirect = signupDashboardPath(role, isAssignor);
 
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
@@ -150,7 +241,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: allProviders.includes("google")
-            ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
+            ? isOAuthProviderEnabled("google")
+              ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
+              : "That email already has a GotREFS account connected to Google. Log in and use Forgot password to set an email password."
             : "That email already has a GotREFS account. Log in instead, or use a different email.",
         },
         { status: 409 }
@@ -161,11 +254,12 @@ export async function POST(request: NextRequest) {
   }
 
   const siteUrl = serverEnv.siteUrl();
+  const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+      emailRedirectTo,
       data: userMetadata,
     },
   });
@@ -175,14 +269,57 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = data.user?.id ?? null;
-  let redirect = dashboardPathForRole(role);
+  const profileInput: ProfileSetupInput = {
+    role,
+    isAssignor,
+    primarySport,
+    additionalSports,
+    certificationLevel,
+    rateMin,
+    rateMax,
+    rateType,
+    rateUnit,
+    gotrefsId,
+  };
 
-  if (!data.session && userId) {
+  if (!data.session && userId && !skipConfirmation) {
+    try {
+      const admin = createServiceClient();
+      await syncMemberAccount(admin, data.user!);
+      const profileResult = await setupSignupProfiles(admin, userId, profileInput);
+      if (!profileResult.ok) {
+        return NextResponse.json({ error: profileResult.error }, { status: 503 });
+      }
+      await markMemberOnboarded(admin, userId);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Account created, but profile setup failed. Add SUPABASE_SERVICE_ROLE_KEY or try again.",
+        },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      needsEmailConfirmation: true,
+      email,
+      pendingRedirect,
+      userId,
+      role,
+      message: "Check your email to confirm your account.",
+    });
+  }
+
+  let redirect = pendingRedirect;
+
+  if (!data.session && userId && skipConfirmation) {
     try {
       const admin = createServiceClient();
       await confirmUserEmail(admin, userId);
       const sync = await syncMemberAccount(admin, data.user!);
-      redirect = dashboardPathForRole(sync.role);
+      redirect = signupDashboardPath(sync.role, isAssignor);
     } catch {
       return NextResponse.json(
         {
@@ -210,67 +347,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (isAssignor && userId) {
+  if (userId) {
     try {
       const admin = createServiceClient();
-      await admin
-        .from("ref_profiles")
-        .upsert(
-          {
-            member_id: userId,
-            is_assignor: true,
-            primary_sport: primarySport || "Basketball",
-            additional_sports: additionalSports,
-            certification_level: certificationLevel || "Youth / Recreational",
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "member_id" }
-        );
+      const profileResult = await setupSignupProfiles(admin, userId, profileInput);
+      if (!profileResult.ok) {
+        return NextResponse.json({ error: profileResult.error }, { status: 503 });
+      }
+      await markMemberOnboarded(admin, userId);
     } catch {
-      return NextResponse.json(
-        { error: "Account created, but assignor mode could not be enabled." },
-        { status: 503 }
-      );
-    }
-  } else if (role === "ref" && userId) {
-    try {
-      const admin = createServiceClient();
-      await admin
-        .from("ref_profiles")
-        .upsert(
-          {
-            member_id: userId,
-            primary_sport: primarySport || "Basketball",
-            additional_sports: additionalSports,
-            certification_level: certificationLevel || "Youth / Recreational",
-            gotrefs_id: gotrefsId || null,
-            rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
-            rate_min: rateMin,
-            rate_max: rateMax,
-            rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
-            rate_unit: rateUnit ?? "hour",
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "member_id" }
-        );
-    } catch {
-      // Profile row is created by trigger; non-fatal if upsert fails.
-    }
-  }
-
-  const signedInUserId = signInData.user?.id ?? userId;
-  if (signedInUserId) {
-    try {
-      const admin = createServiceClient();
-      await admin
-        .from("members")
-        .update({
-          is_onboarded: true,
-          last_login_at: new Date().toISOString(),
-        })
-        .eq("id", signedInUserId);
-    } catch {
-      // Non-fatal if onboarding flag cannot be set.
+      // Non-fatal if profile or onboarding flag cannot be set.
     }
   }
 

@@ -120,27 +120,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (redirectPath === "/dashboard") {
+    // Email confirmation link (non-OAuth)
+    try {
+      const admin = createServiceClient();
+      await syncMemberAccount(admin, user);
+      await admin
+        .from("members")
+        .update({
+          is_onboarded: true,
+          last_login_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
       if (isGotrefsAdminUser(user)) {
         redirectPath = gotrefsAdminDashboardPath();
-      } else {
-        try {
-          const admin = createServiceClient();
-          await syncMemberAccount(admin, user);
-          const { data: member } = await admin
-            .from("members")
-            .select("is_onboarded, role")
-            .eq("id", user.id)
-            .maybeSingle();
-          redirectPath = resolveAuthenticatedHomePath({
-            member,
-            email: user.email,
-            next,
-          });
-        } catch {
-          redirectPath =
-            user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
-        }
+      } else if (redirectPath === "/dashboard") {
+        const { data: member } = await admin
+          .from("members")
+          .select("is_onboarded, role")
+          .eq("id", user.id)
+          .maybeSingle();
+        redirectPath = resolveAuthenticatedHomePath({
+          member,
+          email: user.email,
+          next,
+        });
+      }
+    } catch {
+      if (redirectPath === "/dashboard") {
+        redirectPath =
+          user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
       }
     }
 

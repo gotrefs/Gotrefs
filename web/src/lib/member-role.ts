@@ -11,6 +11,15 @@ export function dashboardPathForRole(role: MemberRole): string {
   return role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
 }
 
+/** Post-email-verification destination based on signup wizard role. */
+export function dashboardPathForSignupRole(
+  role: MemberRole,
+  isAssignor: boolean
+): string {
+  if (isAssignor) return "/dashboard/assignor";
+  return dashboardPathForRole(role);
+}
+
 /** Resolve role from a members row plus auth metadata. */
 export function roleFromMemberRow(
   member: MemberRow,
