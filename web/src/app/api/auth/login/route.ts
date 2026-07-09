@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
-import { gotrefsAdminDashboardPath, isGotrefsAdminEmail } from "@/lib/auth/admin-access";
+import { gotrefsAdminDashboardPath, isGotrefsAdminEmail, isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { resolveAuthenticatedHomePath } from "@/lib/auth/onboarding-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
@@ -122,31 +122,35 @@ export async function POST(request: NextRequest) {
 
   let role: "ref" | "organizer" = "ref";
   let member: { is_onboarded: boolean; role: string } | null = null;
+  const sessionEmail = data.user?.email?.trim().toLowerCase() ?? email;
+
   try {
     const admin = createServiceClient();
     if (data.user) {
-      if (isGotrefsAdminEmail(email)) {
+      if (isGotrefsAdminEmail(sessionEmail)) {
         await ensureAdminOAuthMember(admin, data.user);
+      } else {
+        const sync = await syncMemberAccount(admin, data.user);
+        role = sync.role;
+        const { data: memberRow } = await admin
+          .from("members")
+          .select("is_onboarded, role")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        member = memberRow;
       }
-      const sync = await syncMemberAccount(admin, data.user);
-      role = sync.role;
-      const { data: memberRow } = await admin
-        .from("members")
-        .select("is_onboarded, role")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      member = memberRow;
     }
   } catch {
     role = data.user?.user_metadata?.role === "organizer" ? "organizer" : "ref";
   }
 
-  const redirect = isGotrefsAdminEmail(email)
-    ? gotrefsAdminDashboardPath()
-    : resolveAuthenticatedHomePath({
-        member,
-        email,
-      });
+  const redirect =
+    isGotrefsAdminUser(data.user) || isGotrefsAdminEmail(sessionEmail)
+      ? gotrefsAdminDashboardPath()
+      : resolveAuthenticatedHomePath({
+          member,
+          email: sessionEmail,
+        });
 
   return jsonWithSessionCookies(sessionResponse, {
     ok: true,

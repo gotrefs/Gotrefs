@@ -13,6 +13,10 @@ export async function ensureAdminOAuthMember(admin: SupabaseClient, user: User) 
     user.email?.split("@")[0] ||
     "GotREFS Admin";
 
+  await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: { ...(user.app_metadata ?? {}), gotrefs_admin: true },
+  });
+
   await admin.from("members").upsert(
     {
       id: user.id,

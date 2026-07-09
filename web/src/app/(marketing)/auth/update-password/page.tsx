@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
 
 export default function UpdatePasswordPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +43,9 @@ export default function UpdatePasswordPage() {
         return;
       }
 
-      router.replace("/dashboard");
-      router.refresh();
+      const adminRes = await fetch("/api/auth/admin-check");
+      const adminJson = (await adminRes.json()) as { isAdmin?: boolean };
+      window.location.assign(adminJson.isAdmin ? "/dashboard/admin" : "/dashboard");
     } catch {
       setError("Could not update your password. Try requesting a new reset link.");
     } finally {

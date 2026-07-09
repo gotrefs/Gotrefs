@@ -1,22 +1,29 @@
 import type { User } from "@supabase/supabase-js";
 
+function normalizeAdminEmail(email: string): string {
+  return email.trim().toLowerCase().replace(/^["']|["']$/g, "");
+}
+
 function adminEmailAllowlist(): string[] {
   const raw = process.env.GOTREFS_ADMIN_EMAILS?.trim();
   if (!raw) return [];
   return raw
     .split(",")
-    .map((email) => email.trim().toLowerCase())
+    .map((email) => normalizeAdminEmail(email))
     .filter(Boolean);
 }
 
 export function isGotrefsAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  const normalized = email.trim().toLowerCase();
-  return adminEmailAllowlist().includes(normalized);
+  return adminEmailAllowlist().includes(normalizeAdminEmail(email));
 }
 
-export function isGotrefsAdminUser(user: Pick<User, "email"> | null | undefined): boolean {
-  return isGotrefsAdminEmail(user?.email ?? null);
+type AdminUserLike = Pick<User, "email" | "app_metadata"> | null | undefined;
+
+export function isGotrefsAdminUser(user: AdminUserLike): boolean {
+  if (!user) return false;
+  if (user.app_metadata?.gotrefs_admin === true) return true;
+  return isGotrefsAdminEmail(user.email ?? null);
 }
 
 export function gotrefsAdminDashboardPath(): string {

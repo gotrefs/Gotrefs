@@ -214,16 +214,20 @@ export function AuthFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const json = (await res.json()) as { error?: string; role?: "ref" | "organizer"; redirect?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        role?: "ref" | "organizer";
+        redirect?: string;
+      };
       if (!res.ok) {
         setError(json.error || "Invalid email or password.");
         return;
       }
       const next = searchParams.get("next");
       const destination =
-        next && next !== "/dashboard"
-          ? next
-          : json.redirect || (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
+        json.redirect ||
+        (next && next !== "/dashboard" ? next : null) ||
+        (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
       window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
