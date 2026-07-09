@@ -47,9 +47,40 @@ After the callback succeeds, the server:
 
 The app uses `prompt: "select_account"` so users can pick the correct Google account.
 
-### Facebook / Apple
+### Facebook
 
-Same pattern: enable in Supabase, set secrets, use Supabase’s `/auth/v1/callback` in the provider console.
+Same pattern as Google: enable in Supabase, set secrets, use Supabase’s `/auth/v1/callback` in the Facebook app settings. Set `NEXT_PUBLIC_OAUTH_FACEBOOK_ENABLED=true` in `.env.local` when ready.
+
+### Apple (Sign in with Apple)
+
+Apple must be enabled in **two places**: Supabase and Apple Developer.
+
+**1. Supabase Dashboard → Authentication → Providers → Apple**
+
+- Toggle **Apple** on.
+- **Client ID (Services ID)** — e.g. `com.gotrefs.web` (from Apple Developer → Identifiers → Services IDs).
+- **Secret Key** — JWT generated from your Apple `.p8` key (Team ID, Key ID, Services ID). Supabase docs include a generator, or use their Apple secret helper.
+- Save.
+
+**2. Apple Developer (developer.apple.com)**
+
+- Create an **App ID** with Sign in with Apple capability.
+- Create a **Services ID** (this is the Client ID above).
+- Configure the Services ID **Return URL** to Supabase’s callback:
+  - `https://<project-ref>.supabase.co/auth/v1/callback`
+- Create a **Sign in with Apple** key (`.p8`), note **Key ID** and **Team ID**.
+
+**3. App env**
+
+After Apple works in Supabase’s provider test, set in `web/.env.local`:
+
+```
+NEXT_PUBLIC_OAUTH_APPLE_ENABLED=true
+```
+
+Restart `npm run dev`. The **Continue with Apple** button will appear on login/signup.
+
+Until then, the button stays hidden so users do not hit `provider is not enabled`.
 
 ## Database
 

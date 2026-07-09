@@ -7,7 +7,6 @@ import { BRAND_NAME } from "@/lib/brand";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
-import { OAuthContinueButton } from "@/components/auth/OAuthContinueButton";
 import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
 import { formatHourlyRateRange } from "@/lib/pay-range";
 
@@ -93,7 +92,6 @@ export function AuthFlow() {
     return "Sign-in failed. Please try again.";
   });
   const [notice, setNotice] = useState<string | null>(null);
-  const [existingProviders, setExistingProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const oauthMode = searchParams.get("oauth") === "1";
 
@@ -186,7 +184,6 @@ export function AuthFlow() {
         return;
       }
       setEmail(normalized);
-      setExistingProviders(json.providers ?? []);
       setStep(json.exists ? "password" : "role");
     } catch {
       setError("Could not reach the server. Check your local environment and try again.");
@@ -200,7 +197,6 @@ export function AuthFlow() {
     setNotice(null);
     const normalized = email.trim().toLowerCase();
     if (normalized) setEmail(normalized);
-    setExistingProviders([]);
     setWizardStep(0);
     setStep(requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref" ? "onboarding" : "role");
   }
@@ -217,11 +213,7 @@ export function AuthFlow() {
       });
       const json = (await res.json()) as { error?: string; role?: "ref" | "organizer"; redirect?: string };
       if (!res.ok) {
-        setError(
-          existingProviders.includes("google")
-            ? "That password did not work. This email is connected to Google, so use Continue with Google below."
-            : json.error || "Invalid email or password."
-        );
+        setError(json.error || "Invalid email or password.");
         return;
       }
       const next = searchParams.get("next");
@@ -416,37 +408,18 @@ export function AuthFlow() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:opacity-95 disabled:opacity-60"
+                className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3.5 text-sm font-black uppercase tracking-wide text-white transition hover:opacity-95 disabled:opacity-60"
               >
                 {loading ? "Checking..." : "Continue"}
               </button>
               <button
                 type="button"
                 onClick={startSignup}
-                className="mx-auto block text-xs font-bold text-[var(--muted)] underline-offset-4 hover:text-[var(--navy)] hover:underline"
+                className="w-full rounded-xl border-2 border-[var(--navy)] bg-white px-5 py-4 text-base font-black uppercase tracking-wide text-[var(--navy)] transition hover:bg-slate-50"
               >
                 Sign up
               </button>
             </form>
-            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" />
-              or
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-            <div className="grid gap-2">
-              <OAuthContinueButton
-                provider="google"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
-              >
-                [G] Continue with Google
-              </OAuthContinueButton>
-              <OAuthContinueButton
-                provider="apple"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
-              >
-                [A] Continue with Apple
-              </OAuthContinueButton>
-            </div>
           </div>
         )}
 
@@ -459,11 +432,6 @@ export function AuthFlow() {
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs font-black uppercase tracking-wide text-slate-500">Existing account</p>
                 <p className="mt-1 font-bold text-[var(--navy)]">{email}</p>
-                {existingProviders.includes("google") && (
-                  <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                    This email is connected to Google. You can continue with Google or use a password if you added one.
-                  </p>
-                )}
               </div>
               <label className="block text-sm font-bold text-[var(--navy)]">
                 Password
@@ -480,21 +448,6 @@ export function AuthFlow() {
                 {loading ? "Signing in..." : "Log in"}
               </button>
             </form>
-            {existingProviders.includes("google") && (
-              <>
-                <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <span className="h-px flex-1 bg-slate-200" />
-                  or
-                  <span className="h-px flex-1 bg-slate-200" />
-                </div>
-                <OAuthContinueButton
-                  provider="google"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
-                >
-                  [G] Continue with Google
-                </OAuthContinueButton>
-              </>
-            )}
           </div>
         )}
 

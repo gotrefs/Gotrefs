@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { oauthCallbackUrl, oauthSignInOptions, parseOAuthProvider } from "@/lib/auth/oauth-providers";
+import { isOAuthProviderEnabled, oauthProviderDisabledMessage } from "@/lib/auth/oauth-provider-flags";
 import {
   applyRouteHandlerCookies,
   createRouteHandlerClientWithCookieBuffer,
@@ -15,6 +16,15 @@ export async function GET(
   const requestUrl = new URL(request.url);
   const provider = parseOAuthProvider(rawProvider);
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
+
+  if (!isOAuthProviderEnabled(provider)) {
+    return NextResponse.redirect(
+      new URL(
+        `/auth/login?error=oauth_start_failed&reason=${encodeURIComponent(oauthProviderDisabledMessage(provider))}`,
+        requestUrl.origin
+      )
+    );
+  }
 
   try {
     const cookieBuffer: RouteHandlerCookie[] = [];

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { oauthCallbackUrl, oauthSignInOptions, type OAuthProvider } from "@/lib/auth/oauth-providers";
+import { isOAuthProviderEnabled, oauthProviderDisabledMessage } from "@/lib/auth/oauth-provider-flags";
 import { createClient } from "@/lib/supabase/server";
 import { safeRedirectPath } from "@/lib/supabase/route-handler";
 
@@ -16,6 +17,12 @@ async function requestOrigin() {
 
 /** Start OAuth on the server so the PKCE verifier is written to cookies before redirecting. */
 export async function signInWithOAuthAction(provider: OAuthProvider, next?: string | null) {
+  if (!isOAuthProviderEnabled(provider)) {
+    redirect(
+      `/auth/login?error=oauth_start_failed&reason=${encodeURIComponent(oauthProviderDisabledMessage(provider))}`
+    );
+  }
+
   const supabase = await createClient();
   const origin = await requestOrigin();
   const safeNext = safeRedirectPath(next ?? null);

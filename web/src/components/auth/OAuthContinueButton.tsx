@@ -1,7 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useTransition } from "react";
+import { signInWithOAuthAction } from "@/lib/auth/oauth-actions";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 
 type OAuthContinueButtonProps = {
@@ -27,7 +28,7 @@ export function OAuthContinueButton({
 }: OAuthContinueButtonProps) {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   return (
     <button
@@ -35,9 +36,9 @@ export function OAuthContinueButton({
       disabled={disabled || pending}
       className={`${className ?? ""}${disabled || pending ? " pointer-events-none opacity-60" : ""}`}
       onClick={() => {
-        setPending(true);
-        const params = new URLSearchParams({ next });
-        window.location.assign(`/api/auth/oauth/${provider}?${params.toString()}`);
+        startTransition(() => {
+          void signInWithOAuthAction(provider, next);
+        });
       }}
     >
       {pending ? "Redirecting…" : children}

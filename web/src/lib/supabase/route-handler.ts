@@ -54,7 +54,13 @@ export function createRouteHandlerClientWithCookieBuffer(
 
 export function applyRouteHandlerCookies(response: NextResponse, cookieBuffer: RouteHandlerCookie[]) {
   cookieBuffer.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
+    response.cookies.set(name, value, {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      ...options,
+    });
   });
 }
 
