@@ -28,6 +28,17 @@ type SignupRequest = {
   status: string;
 };
 
+type OfferStatus = {
+  event_id: string;
+  status: string;
+};
+
+type BookingStatus = {
+  event_id: string;
+};
+
+type EventWorkStatus = "confirmed" | "invited" | "applied" | "open";
+
 function sameDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -71,6 +82,8 @@ export function RefEventCalendar({
   });
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [requests, setRequests] = useState<SignupRequest[]>([]);
+  const [offerStatuses, setOfferStatuses] = useState<OfferStatus[]>([]);
+  const [bookingEventIds, setBookingEventIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,6 +138,21 @@ export function RefEventCalendar({
       .eq("ref_member_id", user.id);
 
     setRequests((req as SignupRequest[]) || []);
+
+    const { data: offers } = await supabase
+      .from("assignment_offers")
+      .select("event_id, status")
+      .eq("ref_member_id", user.id);
+
+    setOfferStatuses((offers as OfferStatus[]) || []);
+
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("event_id")
+      .eq("ref_member_id", user.id)
+      .in("status", ["confirmed", "completed"]);
+
+    setBookingEventIds(new Set((bookings ?? []).map((row) => row.event_id)));
     setLoading(false);
   }, [supabase, cursor]);
 
@@ -159,8 +187,28 @@ export function RefEventCalendar({
     return rows;
   }, [cursor]);
 
-  function requestStatus(eventId: string) {
-    return requests.find((r) => r.event_id === eventId)?.status;
+  function eventWorkStatus(eventId: string): EventWorkStatus {
+    if (bookingEventIds.has(eventId)) return "confirmed";
+    const offer = offerStatuses.find((row) => row.event_id === eventId);
+    if (offer?.status === "pending") return "invited";
+    if (offer?.status === "accepted") return "confirmed";
+    const request = requests.find((row) => row.event_id === eventId);
+    if (request?.status === "pending") return "applied";
+    return "open";
+  }
+
+  function eventStatusLabel(status: EventWorkStatus) {
+    if (status === "confirmed") return "Confirmed";
+    if (status === "invited") return "Invited";
+    if (status === "applied") return "Applied";
+    return "Open";
+  }
+
+  function eventStatusClass(status: EventWorkStatus) {
+    if (status === "confirmed") return "bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+    if (status === "invited") return "bg-amber-50 text-amber-800 hover:bg-amber-100";
+    if (status === "applied") return "bg-indigo-50 text-indigo-700 hover:bg-indigo-100";
+    return "bg-slate-50 text-slate-700 hover:bg-slate-100";
   }
 
   async function requestSignup(event: CalendarEvent) {
@@ -187,9 +235,9 @@ export function RefEventCalendar({
       return;
     }
 
-    const existing = requestStatus(event.id);
-    if (existing === "pending" || existing === "accepted") {
-      setMsg("You already requested this event.");
+    const existing = eventWorkStatus(event.id);
+    if (existing === "applied" || existing === "invited" || existing === "confirmed") {
+      setMsg(`You already ${existing === "confirmed" ? "confirmed" : existing} this event.`);
       setSubmitting(false);
       return;
     }
@@ -257,12 +305,20 @@ export function RefEventCalendar({
           <div className="mt-4 rounded-2xl border border-[#F1F5F9] bg-white p-4">
             <div className="mb-3 flex flex-wrap items-center gap-3 text-xs font-bold">
               <span className="inline-flex items-center gap-1 text-[var(--muted)]">
-                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
-                Available open games
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                Confirmed
               </span>
               <span className="inline-flex items-center gap-1 text-[var(--muted)]">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                Booked / accepted games
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" aria-hidden="true" />
+                Invited
+              </span>
+              <span className="inline-flex items-center gap-1 text-[var(--muted)]">
+                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
+                Applied
+              </span>
+              <span className="inline-flex items-center gap-1 text-[var(--muted)]">
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400" aria-hidden="true" />
+                Open
               </span>
             </div>
             <div className="grid grid-cols-7 border-y border-[#F1F5F9] text-center text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -289,21 +345,18 @@ export function RefEventCalendar({
                     } ${isToday ? "ring-2 ring-inset ring-[var(--blue)]/30" : ""}`}
                   >
                     <span className="font-semibold text-[var(--navy)]">{day.getDate()}</span>
-                    {dayEvents.slice(0, 2).map((ev) => (
+                    {dayEvents.slice(0, 2).map((ev) => {
+                      const status = eventWorkStatus(ev.id);
+                      return (
                       <button
                         key={ev.id}
                         type="button"
                         onClick={() => setSelected(ev)}
-                        className={`mt-1 block w-full truncate rounded-full px-2 py-1 text-left text-[10px] font-black transition-all duration-200 ${
-                          requestStatus(ev.id) === "accepted"
-                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                        }`}
+                        className={`mt-1 block w-full truncate rounded-full px-2 py-1 text-left text-[10px] font-black transition-all duration-200 ${eventStatusClass(status)}`}
                       >
-                        {requestStatus(ev.id) === "accepted" ? "Booked" : "Available Gig"} · {formatEventPay(ev, 0)}{" "}
-                        {ev.sport}
+                        {eventStatusLabel(status)} · {formatEventPay(ev, 0)} {ev.sport}
                       </button>
-                    ))}
+                    );})}
                     {dayEvents.length > 2 && (
                       <span className="px-2 text-[10px] text-[var(--muted)]">+{dayEvents.length - 2} more</span>
                     )}
@@ -359,9 +412,9 @@ export function RefEventCalendar({
             <p className="mt-3 text-sm">Officials needed: {selected.officials_needed}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotREFS event organizer</p>
             {selected.notes && <p className="mt-2 text-sm text-[var(--slate)]">{selected.notes}</p>}
-            {requestStatus(selected.id) && (
+            {eventWorkStatus(selected.id) !== "open" && (
               <p className="mt-3 text-sm font-medium text-[var(--blue)]">
-                Your request: {requestStatus(selected.id)}
+                Status: {eventStatusLabel(eventWorkStatus(selected.id))}
               </p>
             )}
             <div className="mt-5 flex flex-wrap gap-2">
@@ -370,25 +423,26 @@ export function RefEventCalendar({
                 disabled={
                   submitting ||
                   !canApplyToEvents ||
-                  requestStatus(selected.id) === "pending" ||
-                  requestStatus(selected.id) === "accepted"
+                  eventWorkStatus(selected.id) !== "open"
                 }
                 onClick={() => void requestSignup(selected)}
                 className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
                   !canApplyToEvents && applicationPending
                     ? "bg-amber-600"
-                    : requestStatus(selected.id) === "pending"
+                    : eventWorkStatus(selected.id) === "applied"
                       ? "bg-green-600"
                       : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
                 }`}
               >
                 {!canApplyToEvents && applicationPending
                   ? "Application Pending"
-                  : requestStatus(selected.id) === "pending"
-                    ? "✓ Request success"
-                    : requestStatus(selected.id) === "accepted"
-                      ? "✓ Accepted"
-                      : "Request to Work Game"}
+                  : eventWorkStatus(selected.id) === "applied"
+                    ? "✓ Applied"
+                    : eventWorkStatus(selected.id) === "invited"
+                      ? "Invited — check My Work"
+                      : eventWorkStatus(selected.id) === "confirmed"
+                        ? "✓ Confirmed"
+                        : "Request to Work Game"}
               </button>
             </div>
           </div>

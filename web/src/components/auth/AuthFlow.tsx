@@ -399,33 +399,35 @@ export function AuthFlow() {
         </div>
 
         {step === "email" && (
-          <form onSubmit={continueWithEmail} className="space-y-4">
-            <label className="block text-sm font-bold text-[var(--navy)]">
-              Email
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:opacity-95 disabled:opacity-60"
-            >
-              {loading ? "Checking..." : "Continue"}
-            </button>
-            <button
-              type="button"
-              onClick={startSignup}
-              className="mx-auto block text-xs font-bold text-[var(--muted)] underline-offset-4 hover:text-[var(--navy)] hover:underline"
-            >
-              Sign up
-            </button>
+          <div className="space-y-4">
+            <form onSubmit={continueWithEmail} className="space-y-4">
+              <label className="block text-sm font-bold text-[var(--navy)]">
+                Email
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:opacity-95 disabled:opacity-60"
+              >
+                {loading ? "Checking..." : "Continue"}
+              </button>
+              <button
+                type="button"
+                onClick={startSignup}
+                className="mx-auto block text-xs font-bold text-[var(--muted)] underline-offset-4 hover:text-[var(--navy)] hover:underline"
+              >
+                Sign up
+              </button>
+            </form>
             <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
               or
@@ -434,48 +436,50 @@ export function AuthFlow() {
             <div className="grid gap-2">
               <OAuthContinueButton
                 provider="google"
-                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
               >
                 [G] Continue with Google
               </OAuthContinueButton>
               <OAuthContinueButton
                 provider="apple"
-                className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-[var(--navy)] transition hover:border-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
               >
                 [A] Continue with Apple
               </OAuthContinueButton>
             </div>
-          </form>
+          </div>
         )}
 
         {step === "password" && (
-          <form onSubmit={login} className="space-y-4">
-            <button type="button" onClick={() => setStep("email")} className="text-sm font-bold text-[var(--muted)]">
-              Back to email
-            </button>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-500">Existing account</p>
-              <p className="mt-1 font-bold text-[var(--navy)]">{email}</p>
-              {existingProviders.includes("google") && (
-                <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                  This email is connected to Google. You can continue with Google or use a password if you added one.
-                </p>
-              )}
-            </div>
-            <label className="block text-sm font-bold text-[var(--navy)]">
-              Password
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
-              />
-            </label>
-            <button type="submit" disabled={loading} className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
-              {loading ? "Signing in..." : "Log in"}
-            </button>
+          <div className="space-y-4">
+            <form onSubmit={login} className="space-y-4">
+              <button type="button" onClick={() => setStep("email")} className="text-sm font-bold text-[var(--muted)]">
+                Back to email
+              </button>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-500">Existing account</p>
+                <p className="mt-1 font-bold text-[var(--navy)]">{email}</p>
+                {existingProviders.includes("google") && (
+                  <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
+                    This email is connected to Google. You can continue with Google or use a password if you added one.
+                  </p>
+                )}
+              </div>
+              <label className="block text-sm font-bold text-[var(--navy)]">
+                Password
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
+                />
+              </label>
+              <button type="submit" disabled={loading} className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+                {loading ? "Signing in..." : "Log in"}
+              </button>
+            </form>
             {existingProviders.includes("google") && (
               <>
                 <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -491,7 +495,7 @@ export function AuthFlow() {
                 </OAuthContinueButton>
               </>
             )}
-          </form>
+          </div>
         )}
 
         {step === "role" && (

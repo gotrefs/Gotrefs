@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
+import { EventStaffingPanel } from "@/components/marketplace/EventStaffingPanel";
+import { AirbnbMarketplaceSearch } from "@/components/marketplace/AirbnbMarketplaceSearch";
+import { StickyMarketplaceSearch } from "@/components/marketplace/StickyMarketplaceSearch";
+import { RefListingCard } from "@/components/marketplace/RefListingCard";
 import { SportsFields } from "@/components/SportsFields";
 import { ALL_SPORTS, formatEventLocation, formatPayOffer } from "@/data/sports";
 import { payRangesOverlap } from "@/lib/pay-range";
@@ -343,6 +347,7 @@ export default function OrganizerDashboardClient() {
   const [contactMessage, setContactMessage] = useState("");
   const [contactSending, setContactSending] = useState(false);
   const [checkoutEventId, setCheckoutEventId] = useState<string | null>(null);
+  const [staffingEventId, setStaffingEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const {
@@ -530,6 +535,13 @@ export default function OrganizerDashboardClient() {
     window.requestAnimationFrame(() => {
       marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  function openStaffingForEvent(eventId: string) {
+    if (!requireOrganizerOnboarding()) return;
+    setStaffingEventId(eventId);
+    setOfferEvent(eventId);
+    setOfferRef("");
   }
 
   function prefillEventDate(date: Date) {
@@ -808,11 +820,7 @@ export default function OrganizerDashboardClient() {
       setMsg(j.error || "Could not send request.");
       return;
     }
-    await supabase
-      .from("event_signup_requests")
-      .update({ status: "accepted" })
-      .eq("id", applicant.id);
-    setMsg("Request sent to referee.");
+    setMsg("Invite sent — waiting for the ref to accept.");
     await load();
   }
 
@@ -990,6 +998,7 @@ export default function OrganizerDashboardClient() {
     searchMatches(queryIncludes(ref.gotrefsId, ref.primarySport, ref.homeZip, ref.ratePerGame != null ? `$${ref.ratePerGame}` : ""))
   );
   const selectedOfferEvent = events.find((event) => event.id === offerEvent) ?? null;
+  const staffingEvent = events.find((event) => event.id === staffingEventId) ?? null;
   const matchingRefs = selectedOfferEvent
     ? filteredRefs.filter((ref) => {
         const available = ref.availability.some((slot) => slotCoversEvent(slot, selectedOfferEvent));
@@ -1091,31 +1100,33 @@ export default function OrganizerDashboardClient() {
         />
       </div>
 
-      <section className="rounded-3xl border border-[var(--border)] bg-white p-4 shadow-sm">
-        <label className="block">
-          <span className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Magic search</span>
-          <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-2 transition-all duration-200 focus-within:border-[var(--blue)] focus-within:ring-2 focus-within:ring-[var(--blue)]/15 sm:flex-row sm:items-center">
-            <span className="px-2 text-lg" aria-hidden="true">🔎</span>
-            <input
-              value={magicSearch}
-              onChange={(e) => setMagicSearch(e.target.value)}
-              placeholder="Find a referee... Basketball near 91322 tonight"
-              className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm font-semibold text-[var(--navy)] outline-none placeholder:text-slate-400"
-            />
-            <div className="flex flex-wrap gap-2">
-              {["Basketball", "Near 91322", "Tonight"].map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setMagicSearch((current) => `${current} ${chip}`.trim())}
-                  className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-all duration-200 hover:bg-[var(--navy)] hover:text-white"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </div>
-        </label>
+      <section className="py-2">
+        <StickyMarketplaceSearch>
+          <AirbnbMarketplaceSearch
+            searchLabel="Search refs"
+            fields={[
+              {
+                id: "organizer-ref-search",
+                label: "Search refs",
+                value: magicSearch,
+                placeholder: "Basketball officials near 91322",
+                onChange: setMagicSearch,
+              },
+            ]}
+          />
+        </StickyMarketplaceSearch>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {["Basketball", "Near 91322", "Tonight"].map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => setMagicSearch((current) => `${current} ${chip}`.trim())}
+              className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition hover:border-neutral-900"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
       </section>
 
       {msg && (
@@ -1868,20 +1879,17 @@ export default function OrganizerDashboardClient() {
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (applicantCount > 0) {
-                          applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        } else {
-                          browseRefsForEvent(e.id);
-                        }
-                      }}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 ${
-                        applicantCount > 0
-                          ? "border border-[var(--border)] text-[var(--navy)] hover:border-[var(--blue)] hover:bg-[var(--blue)] hover:text-white"
-                          : "bg-[var(--red)] text-white hover:bg-[var(--red-dark)]"
-                      }`}
+                      onClick={() => openStaffingForEvent(e.id)}
+                      className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
                     >
-                      {applicantCount > 0 ? `View Applicants (${applicantCount})` : "Browse Refs for this Game"}
+                      {applicantCount > 0 ? `Staff game (${applicantCount} applied)` : "Staff game"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => browseRefsForEvent(e.id)}
+                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--navy)] transition-all duration-200 hover:border-[var(--blue)]"
+                    >
+                      Browse all refs
                     </button>
                   </div>
                 </div>
@@ -2054,13 +2062,12 @@ export default function OrganizerDashboardClient() {
         </section>
       )}
 
-      <section ref={marketplaceRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section ref={marketplaceRef} className="space-y-5 py-2">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Marketplace</p>
-            <h2 className="mt-1 font-display text-2xl font-bold text-[var(--blue)]">Hire a verified ref</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Discover verified officials by GotREFS ID only. Request refs whose hourly rate fits your event pay range.
+            <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Hire verified refs</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Browse by GotREFS ID, rating, and pay fit — like finding the right stay on Airbnb.
             </p>
           </div>
           {selectedOfferEvent && (
@@ -2070,7 +2077,7 @@ export default function OrganizerDashboardClient() {
                 setOfferEvent("");
                 setOfferRef("");
               }}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-[var(--grey-light)]"
+              className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
             >
               Clear event filter
             </button>
@@ -2091,126 +2098,70 @@ export default function OrganizerDashboardClient() {
               </p>
             )}
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {(selectedOfferEvent ? matchingRefs : filteredRefs).slice(0, 20).map((r) => {
                 const cardAvailability = selectedOfferEvent
-                  ? r.availability.filter((slot) => slotCoversEvent(slot, selectedOfferEvent)).slice(0, 2)
-                  : r.availability.slice(0, 2);
+                  ? r.availability.filter((slot) => slotCoversEvent(slot, selectedOfferEvent)).slice(0, 1)
+                  : r.availability.slice(0, 1);
                 const priceFits = selectedOfferEvent ? refPriceFitsEvent(r, selectedOfferEvent) : true;
+                const availabilityLabel =
+                  cardAvailability.length > 0
+                    ? `Available ${new Date(cardAvailability[0].start_at).toLocaleDateString()} – ${new Date(cardAvailability[0].end_at).toLocaleDateString()}`
+                    : "No posted availability for this window";
                 return (
-                  <article
-                    key={r.id}
-                    className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--blue)] text-sm font-black text-white">
-                          {r.gotrefsId.slice(-2)}
-                        </div>
-                        <div>
-                          <p className="font-black text-[var(--navy)]">Official {r.gotrefsId}</p>
-                          <p className="mt-1 text-xs font-semibold text-emerald-700">
-                            ✓ Verified ·{" "}
-                            {r.ratingAverage != null && r.ratingCount > 0
-                              ? `⭐ ${r.ratingAverage.toFixed(1)} (${r.ratingCount} game${r.ratingCount === 1 ? "" : "s"})`
-                              : "No ratings yet"}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-right text-sm font-black text-[var(--navy)]">
-                        {formatRefRate(r)}
-                      </p>
-                    </div>
-
-                    {(r.reviews?.length ?? 0) > 0 && (
-                      <div className="mt-4 space-y-2">
-                        {r.reviews?.slice(0, 2).map((review) => (
-                          <blockquote
-                            key={`${review.createdAt}-${review.score}`}
-                            className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-[var(--slate)]"
-                          >
-                            <p className="font-bold text-amber-700">{renderStarScore(review.score)}</p>
-                            <p className="mt-1">{review.comment?.trim() || "No written comment."}</p>
-                          </blockquote>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[var(--blue)]/10 px-3 py-1 text-xs font-bold text-[var(--blue)]">
-                        {r.primarySport}
-                      </span>
-                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
-                        Certified
-                      </span>
-                    </div>
-
-                    <div className="mt-4 space-y-1 text-xs text-[var(--muted)]">
-                      {cardAvailability.length > 0 ? (
-                        cardAvailability.map((slot) => (
-                          <p key={`${slot.start_at}-${slot.end_at}`}>
-                            Available {new Date(slot.start_at).toLocaleString()} – {new Date(slot.end_at).toLocaleString()}
-                          </p>
-                        ))
-                      ) : (
-                        <p>No posted availability for the selected game window.</p>
-                      )}
-                    </div>
-
-                    <div className="mt-5 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setContactRefId(contactRefId === r.id ? null : r.id);
-                          setContactMessage("We'd love for you to ref for our upcoming event.");
-                        }}
-                        className="flex-1 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-[var(--grey-light)]"
-                      >
-                        Message
-                      </button>
-                      <button
-                        type="button"
-                        disabled={selectedOfferEvent ? !priceFits : false}
-                        onClick={() => {
-                          if (!requireOrganizerOnboarding()) return;
-                          if (selectedOfferEvent) {
-                            if (!priceFits) {
-                              setMsg("This ref's hourly rate is outside your event pay range.");
-                              return;
-                            }
-                            void sendOffer(r.id, selectedOfferEvent.id);
+                  <div key={r.id}>
+                    <RefListingCard
+                      gotrefsId={r.gotrefsId}
+                      primarySport={r.primarySport}
+                      rateLabel={formatRefRate(r)}
+                      ratingAverage={r.ratingAverage}
+                      ratingCount={r.ratingCount}
+                      reviewSnippet={r.reviews?.[0]?.comment}
+                      availabilityLabel={availabilityLabel}
+                      priceFits={selectedOfferEvent ? priceFits : undefined}
+                      inviteDisabled={selectedOfferEvent ? !priceFits : false}
+                      inviteLabel={
+                        selectedOfferEvent
+                          ? priceFits
+                            ? "Request this ref"
+                            : "Outside pay range"
+                          : "Invite to game"
+                      }
+                      onMessage={() => {
+                        setContactRefId(contactRefId === r.id ? null : r.id);
+                        setContactMessage("We'd love for you to ref for our upcoming event.");
+                      }}
+                      onInvite={() => {
+                        if (!requireOrganizerOnboarding()) return;
+                        if (selectedOfferEvent) {
+                          if (!priceFits) {
+                            setMsg("This ref's hourly rate is outside your event pay range.");
                             return;
                           }
-                          setInviteRef(r);
-                        }}
-                        className="flex-1 rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {selectedOfferEvent
-                          ? priceFits
-                            ? "Request this Ref"
-                            : "Outside pay range"
-                          : "Invite to Game"}
-                      </button>
-                    </div>
+                          void sendOffer(r.id, selectedOfferEvent.id);
+                          return;
+                        }
+                        setInviteRef(r);
+                      }}
+                    />
                     {contactRefId === r.id && (
-                      <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-3">
-                        <p className="mb-2 text-xs text-[var(--muted)]">Message goes to the ref dashboard.</p>
+                      <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                         <textarea
-                          className="min-h-[72px] w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm"
+                          className="min-h-[72px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                           value={contactMessage}
                           onChange={(e) => setContactMessage(e.target.value)}
                         />
                         <button
                           type="button"
                           disabled={contactSending}
-                          className="mt-2 rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          className="mt-2 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                           onClick={() => void sendContact(r.id)}
                         >
                           {contactSending ? "Sending…" : "Send message"}
                         </button>
                       </div>
                     )}
-                  </article>
+                  </div>
                 );
               })}
             </div>
@@ -2291,6 +2242,35 @@ export default function OrganizerDashboardClient() {
             </button>
           </div>
         </div>
+      )}
+
+      {staffingEvent && (
+        <EventStaffingPanel
+          event={staffingEvent}
+          applicants={signupRequests}
+          refs={refs.map((ref) => ({
+            id: ref.id,
+            gotrefsId: ref.gotrefsId,
+            primarySport: ref.primarySport,
+            ratingAverage: ref.ratingAverage,
+            ratingCount: ref.ratingCount,
+            rateLabel: formatRefRate(ref),
+            homeZip: ref.homeZip,
+            availability: ref.availability,
+            rateType: ref.rateType,
+            rateMin: ref.rateMin,
+            rateMax: ref.rateMax,
+            ratePerGame: ref.ratePerGame,
+          }))}
+          hiredCount={acceptedOffersByEvent[staffingEvent.id] || 0}
+          onClose={() => setStaffingEventId(null)}
+          onInviteApplicant={async (applicant) => {
+            await sendOfferFromRequest(applicant as ApplicantRow);
+          }}
+          onInviteRef={async (refId) => {
+            await sendOffer(refId, staffingEvent.id);
+          }}
+        />
       )}
     </div>
   );

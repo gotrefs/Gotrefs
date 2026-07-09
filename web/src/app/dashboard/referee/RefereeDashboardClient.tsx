@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
+import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
+import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
@@ -75,7 +77,7 @@ function isMissingRateRangeColumn(error: { message?: string } | null | undefined
 }
 
 function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
-  if (slots.length === 0) return "Add availability";
+  if (slots.length === 0) return "Set dates in Explore";
   const next = [...slots].sort(
     (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
   )[0];
@@ -100,7 +102,7 @@ export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   const gamesRef = useRef<HTMLDivElement | null>(null);
-  const availabilityRef = useRef<HTMLElement | null>(null);
+  const marketplaceRef = useRef<HTMLElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,8 @@ export default function RefereeDashboardClient() {
   }>({});
   const [screening, setScreening] = useState<Screening | null>(null);
   const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [applications, setApplications] = useState<RefWorkApplication[]>([]);
+  const [bookings, setBookings] = useState<RefWorkBooking[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [rate, setRate] = useState("");
   const [rateType, setRateType] = useState<"exact" | "range">("exact");
@@ -125,8 +129,6 @@ export default function RefereeDashboardClient() {
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [cert, setCert] = useState("Youth / Recreational");
   const [bio, setBio] = useState("");
-  const [startAt, setStartAt] = useState("");
-  const [endAt, setEndAt] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [verificationMethod, setVerificationMethod] = useState<"checkr" | "external">("checkr");
   const [externalCompany, setExternalCompany] = useState("");
@@ -192,6 +194,24 @@ export default function RefereeDashboardClient() {
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
     setOffers((o as unknown as OfferRow[]) || []);
+
+    const { data: apps } = await supabase
+      .from("event_signup_requests")
+      .select(
+        "id, event_id, status, created_at, scheduled_events ( title, sport, starts_at, city, state, zip_code )"
+      )
+      .eq("ref_member_id", user.id)
+      .order("created_at", { ascending: false });
+    setApplications((apps as unknown as RefWorkApplication[]) || []);
+
+    const { data: bks } = await supabase
+      .from("bookings")
+      .select(
+        "id, event_id, status, scheduled_events ( title, sport, starts_at, ends_at, city, state, zip_code )"
+      )
+      .eq("ref_member_id", user.id)
+      .order("created_at", { ascending: false });
+    setBookings((bks as unknown as RefWorkBooking[]) || []);
 
     const { data: av } = await supabase
       .from("ref_availability")
@@ -302,6 +322,8 @@ export default function RefereeDashboardClient() {
     setIsAssignor,
     setLoading,
     setOffers,
+    setApplications,
+    setBookings,
     setRate,
     setRateMax,
     setRateMin,
@@ -415,7 +437,7 @@ export default function RefereeDashboardClient() {
     const mapped = mapCardFieldToVerificationStep(field);
     if (mapped === "availability") {
       window.requestAnimationFrame(() => {
-        availabilityRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       return;
     }
@@ -527,62 +549,6 @@ export default function RefereeDashboardClient() {
       setRosterEntries((prev) => prev.filter((e) => e.id !== id));
       setMsg("Removed from roster.");
     }
-  }
-
-  async function addSlot() {
-    setMsg(null);
-    if (!startAt || !endAt) {
-      setMsg("Choose start and end times.");
-      return;
-    }
-    if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
-      setMsg("End time must be after start time.");
-      return;
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const startIso = new Date(startAt).toISOString();
-    const endIso = new Date(endAt).toISOString();
-    const { data, error } = await supabase
-      .from("ref_availability")
-      .insert({
-        ref_member_id: user.id,
-        start_at: startIso,
-        end_at: endIso,
-      })
-      .select("id, start_at, end_at")
-      .single();
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-    const nextSlot = (data as AvailabilitySlot | null) ?? {
-      id: crypto.randomUUID(),
-      start_at: startIso,
-      end_at: endIso,
-    };
-    setSlots((prev) =>
-      [...prev, nextSlot].sort(
-        (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
-      )
-    );
-    setStartAt("");
-    setEndAt("");
-    setMsg("Availability added. Your ref ID card is updated.");
-  }
-
-  async function removeSlot(id: string) {
-    const previous = slots;
-    setSlots((prev) => prev.filter((slot) => slot.id !== id));
-    const { error } = await supabase.from("ref_availability").delete().eq("id", id);
-    if (error) {
-      setSlots(previous);
-      setMsg(error.message);
-      return;
-    }
-    setMsg("Availability removed. Your ref ID card is updated.");
   }
 
   function rateLabel() {
@@ -921,57 +887,21 @@ export default function RefereeDashboardClient() {
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
       {canAcceptOffers && !profileWizard && (
-        <>
-        <section ref={availabilityRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-          <h2 className="font-display text-xl font-bold text-[var(--navy)]">Availability</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Post when you are open to work. Organizers match you to games in these windows.
-          </p>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              Start
-              <input
-                type="datetime-local"
-                className="rounded border border-[var(--border)] px-2 py-1"
-                value={startAt}
-                onChange={(e) => setStartAt(e.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              End
-              <input
-                type="datetime-local"
-                className="rounded border border-[var(--border)] px-2 py-1"
-                value={endAt}
-                onChange={(e) => setEndAt(e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => void addSlot()}
-              className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm text-white"
-            >
-              Add window
-            </button>
-          </div>
-          <ul className="mt-4 space-y-2 text-sm">
-            {slots.map((s) => (
-              <li key={s.id} className="flex items-center justify-between rounded border border-[var(--border)] px-3 py-2">
-                <span>
-                  {new Date(s.start_at).toLocaleString()} → {new Date(s.end_at).toLocaleString()}
-                </span>
-                <button type="button" className="text-red-600 underline" onClick={() => void removeSlot(s.id)}>
-                  Remove
-                </button>
-              </li>
-            ))}
-            {slots.length === 0 && <li className="text-[var(--muted)]">No availability posted yet.</li>}
-          </ul>
+        <section ref={marketplaceRef}>
+          <RefMarketplaceHub
+            canApplyToEvents={canApplyToGames}
+            applicationPending={showPendingReviewView}
+            applicationRejected={verificationRejected}
+            onRequireProfile={() => {
+              const next = missingActions[0];
+              if (next) openProfileWizard(next.field);
+            }}
+            onReload={load}
+            offers={offers}
+            applications={applications}
+            bookings={bookings}
+          />
         </section>
-        <section ref={gamesRef}>
-          <RefEventCalendar canApplyToEvents={canApplyToGames} />
-        </section>
-        </>
       )}
 
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
@@ -1054,20 +984,25 @@ export default function RefereeDashboardClient() {
               )}
             </article>
           )}
-          {pendingOffers.slice(0, 4).map((offer) => {
-            const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
-            return (
-              <article key={offer.id} className="rounded-2xl border border-red-100 bg-red-50 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New organizer invite</p>
-                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  {ev?.title ?? "An organizer"} invited you to work a game.
-                </p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {ev?.sport} {ev?.starts_at ? `· ${new Date(ev.starts_at).toLocaleString()}` : ""}
-                </p>
-              </article>
-            );
-          })}
+          {pendingOffers.length > 0 && (
+            <article className="rounded-2xl border border-red-100 bg-red-50 p-4 md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">Organizer invites</p>
+              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                You have {pendingOffers.length} pending invite{pendingOffers.length === 1 ? "" : "s"}.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("tab", "my-work");
+                  window.location.assign(url.toString());
+                }}
+                className="mt-3 rounded-full bg-[var(--navy)] px-4 py-2 text-xs font-black text-white"
+              >
+                Review in My Work
+              </button>
+            </article>
+          )}
           {inquiries.slice(0, 4).map((inq) => {
             const org = Array.isArray(inq.members) ? inq.members[0] : inq.members;
             return (

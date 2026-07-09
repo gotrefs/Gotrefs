@@ -3,6 +3,7 @@ import { oauthCallbackUrl, oauthSignInOptions, parseOAuthProvider } from "@/lib/
 import {
   applyRouteHandlerCookies,
   createRouteHandlerClientWithCookieBuffer,
+  safeRedirectPath,
   type RouteHandlerCookie,
 } from "@/lib/supabase/route-handler";
 
@@ -13,7 +14,7 @@ export async function GET(
   const { provider: rawProvider } = await context.params;
   const requestUrl = new URL(request.url);
   const provider = parseOAuthProvider(rawProvider);
-  const next = requestUrl.searchParams.get("next") || "/dashboard";
+  const next = safeRedirectPath(requestUrl.searchParams.get("next"));
 
   try {
     const cookieBuffer: RouteHandlerCookie[] = [];

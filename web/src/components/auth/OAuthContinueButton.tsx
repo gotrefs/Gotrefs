@@ -1,8 +1,7 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { signInWithOAuthAction } from "@/lib/auth/oauth-actions";
+import { useState } from "react";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 
 type OAuthContinueButtonProps = {
@@ -12,28 +11,14 @@ type OAuthContinueButtonProps = {
   disabled?: boolean;
 };
 
-function OAuthSubmitButton({
-  className,
-  children,
-  disabled,
-}: {
-  className?: string;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className={`${className}${disabled || pending ? " pointer-events-none opacity-60" : ""}`}
-    >
-      {pending ? "Redirecting…" : children}
-    </button>
-  );
+function safeNext(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/dashboard";
+  }
+  return next;
 }
 
-/** Server action starts OAuth so PKCE verifier cookies are set before leaving the site. */
+/** OAuth must not live inside another <form> — nested forms are invalid HTML and break the button. */
 export function OAuthContinueButton({
   provider,
   className,
@@ -41,14 +26,21 @@ export function OAuthContinueButton({
   disabled = false,
 }: OAuthContinueButtonProps) {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
-  const startOAuth = signInWithOAuthAction.bind(null, provider, next);
+  const next = safeNext(searchParams.get("next"));
+  const [pending, setPending] = useState(false);
 
   return (
-    <form action={startOAuth}>
-      <OAuthSubmitButton className={className} disabled={disabled}>
-        {children}
-      </OAuthSubmitButton>
-    </form>
+    <button
+      type="button"
+      disabled={disabled || pending}
+      className={`${className ?? ""}${disabled || pending ? " pointer-events-none opacity-60" : ""}`}
+      onClick={() => {
+        setPending(true);
+        const params = new URLSearchParams({ next });
+        window.location.assign(`/api/auth/oauth/${provider}?${params.toString()}`);
+      }}
+    >
+      {pending ? "Redirecting…" : children}
+    </button>
   );
 }

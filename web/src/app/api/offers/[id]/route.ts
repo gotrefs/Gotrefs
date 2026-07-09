@@ -154,5 +154,18 @@ export async function PATCH(
     return NextResponse.json({ error: uErr.message }, { status: 400 });
   }
 
+  if (action === "accept" && isRef) {
+    try {
+      const admin = createServiceClient();
+      await admin
+        .from("event_signup_requests")
+        .update({ status: "accepted" })
+        .eq("event_id", offer.event_id)
+        .eq("ref_member_id", user.id);
+    } catch {
+      // Non-fatal if application row cannot be updated.
+    }
+  }
+
   return NextResponse.json({ ok: true, status: nextStatus });
 }
