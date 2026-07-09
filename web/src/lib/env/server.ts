@@ -3,6 +3,8 @@
  * and server actions — never from client components.
  */
 
+import type { NextRequest } from "next/server";
+
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -38,6 +40,38 @@ export function resolveSiteUrl(requestOrigin?: string | null): string {
   if (origin && !origin.includes("localhost")) {
     return origin;
   }
+  return configured || "http://localhost:3000";
+}
+
+/** Resolve public site URL from an incoming API request (works on Vercel behind proxies). */
+export function resolveSiteUrlFromRequest(request: NextRequest): string {
+  const configured = optional("NEXT_PUBLIC_SITE_URL")?.replace(/\/$/, "");
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = (forwardedHost ?? request.headers.get("host"))?.split(",")[0]?.trim();
+  const protocol = request.headers.get("x-forwarded-proto") ?? "https";
+  if (host && !host.includes("localhost")) {
+    return `${protocol}://${host}`;
+  }
+
+  const vercelUrl = optional("VERCEL_URL");
+  if (vercelUrl && !vercelUrl.includes("localhost")) {
+    return `https://${vercelUrl.replace(/\/$/, "")}`;
+  }
+
+  if (configured && !configured.includes("localhost")) {
+    return configured;
+  }
+
+  try {
+    const origin = new URL(request.url).origin;
+    if (origin && !origin.includes("localhost")) {
+      return origin;
+    }
+  } catch {
+    // Ignore malformed request URLs.
+  }
+
   return configured || "http://localhost:3000";
 }
 
