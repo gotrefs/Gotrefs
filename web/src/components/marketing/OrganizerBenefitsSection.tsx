@@ -1,26 +1,18 @@
 import Link from "next/link";
 import { BrandName } from "@/components/BrandName";
 
-const ORGANIZER_BENEFITS = [
+const ORGANIZER_REASONS = [
   {
-    title: "Vetted, Quality Officials",
-    description: "Instant access to certified, dependable referees and umpires across sports and skill levels.",
+    title: "Major Savings",
+    description: "No travel expenses, no hassle.",
   },
   {
-    title: "Effortless Assigning",
-    description: "Ditch spreadsheets and group texts — assign, track, and manage officials in a few clicks.",
+    title: "Quality Guaranteed",
+    description: "Peer reviews keep refs accountable and performing at their best.",
   },
   {
-    title: "Automated Scheduling & Updates",
-    description: "Real-time alerts for schedule changes, rainouts, and venue updates to reduce no-shows.",
-  },
-  {
-    title: "Simplified Payments",
-    description: "Secure, transparent payouts built directly into the platform.",
-  },
-  {
-    title: "Dedicated Support",
-    description: "Focus on your event while we handle officiating logistics behind the scenes.",
+    title: "Tap & Book",
+    description: "Secure trusted talent in just a few clicks.",
   },
 ] as const;
 
@@ -32,30 +24,33 @@ export function OrganizerBenefitsSection() {
       className="viewport-screen scroll-mt-[4.25rem] flex flex-col items-center justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <p className="text-xs font-bold uppercase tracking-widest text-[var(--red)]">For Organizers</p>
-        <h2 className="mt-2 text-2xl font-bold leading-tight text-[#1b2132] md:text-3xl">
-          Streamline Your Event Officiating with <BrandName />
+        <p className="text-base font-black uppercase tracking-[0.18em] text-[#1b2132] sm:text-lg sm:tracking-[0.22em]">
+          For Event Organizers
+        </p>
+        <h2 className="mt-3 text-[2.6rem] font-black leading-[1.02] tracking-tight text-[#1b2132] sm:text-5xl md:text-[3.5rem] lg:text-7xl">
+          Certified Refs. Zero Logistics.
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--muted)] md:text-base">
-          Running a successful league or tournament requires flawless execution, and nothing impacts the quality of
-          your event quite like the officiating. <BrandName /> takes the stress out of assigning, managing, and paying
-          officials while keeping your games running smoothly and on schedule.
+        <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)] md:text-xl md:leading-8">
+          Cut the costly per diems, hotel blocks, and meal stipends. <BrandName /> connects you instantly with
+          verified, certified, local officials for a small convenience fee.
         </p>
 
-        <p className="mt-5 text-sm font-bold text-[#1b2132]">Why Organizers Partner with Us:</p>
-        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ORGANIZER_BENEFITS.map((benefit) => (
+        <h3 className="mt-8 text-xl font-black text-[#1b2132] md:text-2xl">Top 3 Reasons to Join:</h3>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-3">
+          {ORGANIZER_REASONS.map((reason) => (
             <li
-              key={benefit.title}
-              className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 shadow-sm"
+              key={reason.title}
+              className="rounded-xl border border-[var(--border)] bg-white px-5 py-5 shadow-sm"
             >
-              <p className="text-sm font-bold text-[#1b2132]">{benefit.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{benefit.description}</p>
+              <p className="text-base font-black text-[#1b2132] md:text-xl">{reason.title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] md:text-base md:leading-7">
+                {reason.description}
+              </p>
             </li>
           ))}
         </ul>
 
-        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-6 inline-flex w-full sm:w-auto">
+        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-8 inline-flex w-full sm:w-auto">
           Post your first event
         </Link>
       </div>

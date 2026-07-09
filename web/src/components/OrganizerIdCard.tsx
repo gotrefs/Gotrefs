@@ -12,6 +12,7 @@ type OrganizerIdCardProps = {
   eventsCount?: number;
   idUploaded?: boolean;
   logoUploaded?: boolean;
+  logoUrl?: string | null;
 };
 
 export function OrganizerIdCard({
@@ -25,6 +26,7 @@ export function OrganizerIdCard({
   eventsCount = 0,
   idUploaded,
   logoUploaded,
+  logoUrl,
 }: OrganizerIdCardProps) {
   const initials =
     organizationName
@@ -39,20 +41,27 @@ export function OrganizerIdCard({
     <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-slate-950 p-5 text-white shadow-2xl">
       <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(13,27,59,0.96),rgba(8,18,38,0.92)_45%,rgba(127,29,29,0.88))]" />
       <div className="relative">
-        <div className="flex items-start justify-between gap-4">
-          <div className="rounded-xl bg-white/95 px-3 py-2 shadow-lg">
-            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-8 w-auto" />
-          </div>
-          {idUploaded && (
+        {idUploaded && (
+          <div className="flex justify-end">
             <span className="rounded-full border border-emerald-200 bg-emerald-300/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-50">
               ID on file
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="mt-6 grid grid-cols-[7rem_1fr] gap-4">
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/25 bg-white/10 text-3xl font-black">
-            {logoUploaded ? "LOGO" : initials}
+        <div className={`grid grid-cols-[7rem_1fr] gap-4 ${idUploaded ? "mt-4" : ""}`}>
+          <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/25 bg-white/10 text-3xl font-black text-white">
+            {logoUploaded ? (
+              <Image
+                src={logoUrl || "/gotrefs-logo.png"}
+                alt={`${organizationName ?? "Organization"} logo`}
+                fill
+                className="object-contain p-3"
+                sizes="112px"
+              />
+            ) : (
+              initials
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-100/80">

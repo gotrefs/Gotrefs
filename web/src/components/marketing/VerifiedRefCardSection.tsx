@@ -1,26 +1,18 @@
 import Link from "next/link";
 import { BrandName } from "@/components/BrandName";
 
-const REFEREE_BENEFITS = [
+const REFEREE_REASONS = [
   {
-    title: "Flexible Scheduling",
-    description: "Control your availability and work when it fits your lifestyle.",
+    title: "$0 to Join",
+    description: "Always 100% free for officials.",
   },
   {
-    title: "Prompt, Reliable Pay",
-    description: "Transparent payment tracking and timely payouts.",
+    title: "Zero Travel",
+    description: "No flights, no hotels, no road fatigue.",
   },
   {
-    title: "Diverse Game Opportunities",
-    description: "Leagues, tournaments, and age groups to grow your experience.",
-  },
-  {
-    title: "User-Friendly Platform",
-    description: "Accept assignments, communicate, and manage your calendar on the go.",
-  },
-  {
-    title: "Community & Support",
-    description: "A respected network of officials with resources to help you excel.",
+    title: "Instant Bookings",
+    description: "Organizers reach out to you directly.",
   },
 ] as const;
 
@@ -32,30 +24,33 @@ export function VerifiedRefCardSection() {
       className="viewport-screen scroll-mt-[4.25rem] flex flex-col items-center justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <p className="text-xs font-bold uppercase tracking-widest text-[var(--red)]">For Referees</p>
-        <h2 className="mt-2 text-2xl font-bold leading-tight text-[#1b2132] md:text-3xl">
-          Why Join the <BrandName /> Team?
+        <p className="text-base font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-lg sm:tracking-[0.22em]">
+          For Referees
+        </p>
+        <h2 className="mt-3 text-[2.6rem] font-black leading-[1.02] tracking-tight text-[#1b2132] sm:text-5xl md:text-[3.5rem] lg:text-7xl">
+          Your Whistle. Your Backyard.
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--muted)] md:text-base">
-          At <BrandName />, we know that great officiating is the backbone of every great game. That&apos;s why
-          we&apos;ve built a platform designed entirely around supporting you, streamlining your schedule, and
-          maximizing your opportunities — whether you are a seasoned veteran or just starting out.
+        <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)] md:text-xl md:leading-8">
+          Stop chasing gigs across state lines. With <BrandName />, local event organizers come directly to you. Sleep
+          in your own bed, call the games you love, and own your home turf.
         </p>
 
-        <p className="mt-5 text-sm font-bold text-[#1b2132]">What You Get When You Sign Up:</p>
-        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {REFEREE_BENEFITS.map((benefit) => (
+        <h3 className="mt-8 text-xl font-black text-[#1b2132] md:text-2xl">Top 3 Reasons to Join:</h3>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-3">
+          {REFEREE_REASONS.map((reason) => (
             <li
-              key={benefit.title}
-              className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 shadow-sm"
+              key={reason.title}
+              className="rounded-xl border border-[var(--border)] bg-white px-5 py-5 shadow-sm"
             >
-              <p className="text-sm font-bold text-[#1b2132]">{benefit.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{benefit.description}</p>
+              <p className="text-base font-black text-[#1b2132] md:text-xl">{reason.title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] md:text-base md:leading-7">
+                {reason.description}
+              </p>
             </li>
           ))}
         </ul>
 
-        <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-6 inline-flex w-full sm:w-auto">
+        <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-8 inline-flex w-full sm:w-auto">
           Join as a referee
         </Link>
       </div>

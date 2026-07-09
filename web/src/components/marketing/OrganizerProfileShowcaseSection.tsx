@@ -6,14 +6,16 @@ export function OrganizerProfileShowcaseSection() {
   return (
     <section className="viewport-screen flex flex-col items-center justify-center border-t border-[var(--border)] bg-white px-4">
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center">
-        <p className="text-center text-xs font-bold uppercase tracking-widest text-[var(--red)]">For Organizers</p>
-        <h2 className="mt-2 text-center text-2xl font-bold leading-tight text-[#1b2132] md:text-3xl">
+        <p className="text-center text-base font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-lg sm:tracking-[0.22em]">
+          For Organizers
+        </p>
+        <h2 className="mt-3 text-center text-[2.6rem] font-black leading-[1.02] tracking-tight text-[#1b2132] sm:text-5xl md:text-[3.5rem] lg:text-7xl">
           Your organizer dashboard profile
         </h2>
-        <p className="mt-2 max-w-xl text-center text-sm leading-relaxed text-[var(--muted)]">
+        <p className="mt-4 max-w-2xl text-center text-base leading-7 text-[var(--muted)] md:text-xl md:leading-8">
           Post events, set pay rates, and manage staffing from one profile organizers and refs can trust.
         </p>
-        <div className="mt-6 w-full max-w-lg">
+        <div className="mt-8 w-full max-w-lg">
           <OrganizerIdCard
             organizationName="Metro Youth Basketball"
             contactName="Jordan Lee"
@@ -27,7 +29,7 @@ export function OrganizerProfileShowcaseSection() {
             logoUploaded
           />
         </div>
-        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-6 inline-flex w-full sm:w-auto">
+        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-8 inline-flex w-full sm:w-auto">
           Create organizer profile
         </Link>
       </div>
