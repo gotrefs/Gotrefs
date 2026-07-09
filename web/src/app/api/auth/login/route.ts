@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
 import { gotrefsAdminDashboardPath, isGotrefsAdminEmail } from "@/lib/auth/admin-access";
+import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { resolveAuthenticatedHomePath } from "@/lib/auth/onboarding-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail } from "@/lib/auth/validation";
@@ -124,6 +125,9 @@ export async function POST(request: NextRequest) {
   try {
     const admin = createServiceClient();
     if (data.user) {
+      if (isGotrefsAdminEmail(email)) {
+        await ensureAdminOAuthMember(admin, data.user);
+      }
       const sync = await syncMemberAccount(admin, data.user);
       role = sync.role;
       const { data: memberRow } = await admin
