@@ -1,8 +1,14 @@
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { resolveMemberRole, dashboardPathForRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
-import AdminVerificationClient from "./AdminVerificationClient";
+
+const AdminVerificationClient = dynamic(() => import("./AdminVerificationClient"), {
+  loading: () => (
+    <p className="text-sm text-[var(--muted)]">Loading verification review tools…</p>
+  ),
+});
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();

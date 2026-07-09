@@ -84,7 +84,7 @@ export default function AdminVerificationClient() {
   }, [entries, filter]);
 
   const selected = useMemo(
-    () => filteredEntries.find((entry) => entry.ref_member_id === selectedId) ?? filteredEntries[0] ?? null,
+    () => filteredEntries.find((entry) => entry.ref_member_id === selectedId) ?? null,
     [filteredEntries, selectedId]
   );
 
@@ -378,7 +378,13 @@ export default function AdminVerificationClient() {
                 />
               </label>
 
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-black text-[var(--navy)]">Review decision</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  Approve sends the ref to the marketplace. Request info asks them to fix specific signup steps.
+                  Reject declines their verification (requires selecting steps 1–5 above).
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={submitting}
@@ -407,8 +413,9 @@ export default function AdminVerificationClient() {
                     rejectMarked ? "bg-[var(--red-dark)] ring-2 ring-red-300" : "bg-[var(--red)]"
                   }`}
                 >
-                  {rejectMarked ? "✓ Rejected" : "Reject"}
+                  {rejectMarked ? "✓ Rejected" : "Reject application"}
                 </button>
+                </div>
               </div>
             </>
           ) : (

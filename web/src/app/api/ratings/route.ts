@@ -6,6 +6,7 @@ type RatingBody = {
   refMemberId?: string;
   score?: number | null;
   skipped?: boolean;
+  comment?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -31,12 +32,15 @@ export async function POST(request: Request) {
 
   const skipped = Boolean(body.skipped);
   let score: number | null = null;
+  let comment: string | null = null;
   if (!skipped) {
     const submittedScore = Number(body.score);
     if (!Number.isInteger(submittedScore) || submittedScore < 1 || submittedScore > 5) {
       return NextResponse.json({ error: "Score must be a whole number from 1 to 5." }, { status: 400 });
     }
     score = submittedScore;
+    const rawComment = typeof body.comment === "string" ? body.comment.trim() : "";
+    comment = rawComment ? rawComment.slice(0, 1000) : null;
   }
 
   const { data: event, error: eventError } = await supabase
@@ -71,6 +75,7 @@ export async function POST(request: Request) {
       ref_member_id: body.refMemberId,
       organizer_member_id: user.id,
       score,
+      comment,
       skipped,
       updated_at: new Date().toISOString(),
     },

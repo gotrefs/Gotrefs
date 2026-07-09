@@ -10,7 +10,8 @@ comment on column public.ref_verification_submissions.fix_required_steps is
 comment on column public.ref_verification_submissions.resubmitted_at is
   'Set when a ref completes a fix/resubmit cycle and sends verification back to admin review.';
 
-create or replace view public.ref_verification_review_queue as
+drop view if exists public.ref_verification_review_queue;
+create view public.ref_verification_review_queue as
 select
   s.ref_member_id,
   s.status,

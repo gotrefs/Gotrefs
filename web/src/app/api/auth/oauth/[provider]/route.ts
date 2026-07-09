@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { oauthCallbackUrl, oauthSignInOptions, parseOAuthProvider } from "@/lib/auth/oauth-providers";
-import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+import {
+  applyRouteHandlerCookies,
+  createRouteHandlerClientWithCookieBuffer,
+  type RouteHandlerCookie,
+} from "@/lib/supabase/route-handler";
 
 export async function GET(
   request: NextRequest,
@@ -10,10 +14,10 @@ export async function GET(
   const requestUrl = new URL(request.url);
   const provider = parseOAuthProvider(rawProvider);
   const next = requestUrl.searchParams.get("next") || "/dashboard";
-  const cookieResponse = NextResponse.next();
 
   try {
-    const supabase = createRouteHandlerClient(request, cookieResponse);
+    const cookieBuffer: RouteHandlerCookie[] = [];
+    const supabase = createRouteHandlerClientWithCookieBuffer(request, cookieBuffer);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -30,9 +34,8 @@ export async function GET(
     }
 
     const redirect = NextResponse.redirect(data.url);
-    cookieResponse.cookies.getAll().forEach((cookie) => {
-      redirect.cookies.set(cookie.name, cookie.value, cookie);
-    });
+    redirect.headers.set("Cache-Control", "no-store");
+    applyRouteHandlerCookies(redirect, cookieBuffer);
     return redirect;
   } catch {
     return NextResponse.redirect(

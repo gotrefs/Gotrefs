@@ -7,11 +7,15 @@ import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/Assi
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
-import { SportsFields } from "@/components/SportsFields";
-import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
-import { normalizeFixRequiredSteps, REF_VERIFICATION_STEPS, type RefVerificationStepKey } from "@/lib/ref-verification-steps";
+import {
+  ALL_REF_VERIFICATION_STEP_KEYS,
+  mapCardFieldToVerificationStep,
+  normalizeFixRequiredSteps,
+  REF_VERIFICATION_STEPS,
+  type RefVerificationStepKey,
+} from "@/lib/ref-verification-steps";
 
 type InquiryRow = {
   id: string;
@@ -53,7 +57,13 @@ type OfferRow = {
 };
 
 type AvailabilitySlot = { id: string; start_at: string; end_at: string };
-type VerificationStep = "id" | "certification" | "external" | "submit";
+
+type ProfileWizardState = {
+  mode: "edit" | "resubmit";
+  initialStep: RefVerificationStepKey;
+  steps: RefVerificationStepKey[];
+  adminMessage?: string;
+};
 
 function refVerificationNeedsFix(status: string, fixSteps: RefVerificationStepKey[]): boolean {
   return (status === "rejected" || status === "under_review") && fixSteps.length > 0;
@@ -89,13 +99,12 @@ function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
 export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
-  const editorRef = useRef<HTMLElement | null>(null);
   const gamesRef = useRef<HTMLDivElement | null>(null);
+  const availabilityRef = useRef<HTMLElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeEditor, setActiveEditor] = useState<EditableRefCardField | "assignor" | null>(null);
-  const [verificationStep, setVerificationStep] = useState<VerificationStep>("id");
+  const [profileWizard, setProfileWizard] = useState<ProfileWizardState | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [cardMeta, setCardMeta] = useState<{
     gotrefsId?: string;
@@ -129,7 +138,6 @@ export default function RefereeDashboardClient() {
   const [verificationNotesUpdatedAt, setVerificationNotesUpdatedAt] = useState<string | null>(null);
   const [verificationReviewedAt, setVerificationReviewedAt] = useState<string | null>(null);
   const [verificationFixRequiredSteps, setVerificationFixRequiredSteps] = useState<RefVerificationStepKey[]>([]);
-  const [showResubmitFlow, setShowResubmitFlow] = useState(false);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [verificationNotice, setVerificationNotice] = useState<{
     type: "approved" | "fix_required" | "rejected";
@@ -377,30 +385,60 @@ export default function RefereeDashboardClient() {
     }
 
     if (verificationFixRequiredSteps.length > 0) {
-      setShowResubmitFlow(true);
+      setProfileWizard({
+        mode: "resubmit",
+        initialStep: verificationFixRequiredSteps[0],
+        steps: verificationFixRequiredSteps,
+        adminMessage: verificationAdminNotes || "GotREFS requested updates to your application.",
+      });
     }
   }
 
-  async function handleResubmitComplete() {
-    setShowResubmitFlow(false);
-    setMsg("Application successfully submitted — we'll review your updates within 1-2 business days.");
+  async function handleProfileWizardComplete() {
+    const wasResubmit = profileWizard?.mode === "resubmit";
+    setProfileWizard(null);
+    setMsg(
+      wasResubmit
+        ? "Application successfully submitted — we'll review your updates within 1-2 business days."
+        : "Profile updated."
+    );
     await load();
+    if (!verificationSubmitted && govIdPath && certDocPath && profileReady) {
+      await submitVerificationPackage();
+    }
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  function openProfileWizard(field: EditableRefCardField) {
+    const mapped = mapCardFieldToVerificationStep(field);
+    if (mapped === "availability") {
+      window.requestAnimationFrame(() => {
+        availabilityRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+    setProfileWizard({
+      mode: "edit",
+      initialStep: mapped,
+      steps: ALL_REF_VERIFICATION_STEP_KEYS,
+    });
+  }
+
+  function openResubmitWizard() {
+    if (verificationFixRequiredSteps.length === 0) return;
+    setProfileWizard({
+      mode: "resubmit",
+      initialStep: verificationFixRequiredSteps[0],
+      steps: verificationFixRequiredSteps,
+      adminMessage: verificationAdminNotes || "GotREFS requested updates to your application.",
     });
   }
 
   useEffect(() => {
     queueMicrotask(() => void load());
   }, [load]);
-
-  useEffect(() => {
-    if (!activeEditor) return;
-    const frame = window.requestAnimationFrame(() => {
-      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeEditor]);
 
   useEffect(() => {
     const panel = searchParams.get("panel");
@@ -411,59 +449,6 @@ export default function RefereeDashboardClient() {
       if (panel === "notifications") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [loading, searchParams]);
-
-  async function saveProfile() {
-    setMsg(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const rateNum = rate === "" ? null : Number(rate);
-    const minNum = rateMin === "" ? null : Number(rateMin);
-    const maxNum = rateMax === "" ? null : Number(rateMax);
-    const update = {
-      member_id: user.id,
-      rate_per_game: rateType === "range" && Number.isFinite(minNum as number) ? minNum : rateNum,
-      rate_type: rateType,
-      rate_min: rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
-      rate_max: rateType === "range" && Number.isFinite(maxNum as number) ? maxNum : null,
-      primary_sport: sport,
-      additional_sports: additionalSports,
-      certification_level: cert,
-      bio,
-      updated_at: new Date().toISOString(),
-    };
-    let { error } = await supabase
-      .from("ref_profiles")
-      .upsert(update, { onConflict: "member_id" });
-    if (isMissingRateRangeColumn(error)) {
-      const legacyUpdate: Record<string, unknown> = { ...update };
-      delete legacyUpdate.rate_type;
-      delete legacyUpdate.rate_min;
-      delete legacyUpdate.rate_max;
-      const retry = await supabase.from("ref_profiles").upsert(legacyUpdate, { onConflict: "member_id" });
-      error = retry.error;
-    }
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-    await load();
-    guideToNextMissingStep({ bio, sport, cert });
-  }
-
-  async function saveCardMetadata() {
-    setMsg(null);
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        certified_by: cardMeta.certifiedBy || null,
-        base_city: cardMeta.baseCity || null,
-        work_regions: cardMeta.workRegions ?? [],
-        travel_radius_miles: cardMeta.travelRadius ? Number(cardMeta.travelRadius) : null,
-      },
-    });
-    setMsg(error ? error.message : "Card details saved.");
-  }
 
   async function toggleAssignor(enabled: boolean) {
     setAssignorSaving(true);
@@ -629,64 +614,29 @@ export default function RefereeDashboardClient() {
       nextScreeningStatus === "clear" || ["submitted", "under_review", "approved"].includes(nextVerificationStatus);
 
     if (!nextProfileReady) {
-      setMsg("Profile saved. Finish your profile details next.");
-      openEditor("profile");
+      setMsg("Finish your profile details next.");
+      openProfileWizard("profile");
       return;
     }
     if (!nextGovIdPath) {
-      setMsg("Profile saved. Next, upload your government ID.");
-      openEditor("verification", "id");
+      setMsg("Next, upload your government ID.");
+      openProfileWizard("verification");
       return;
     }
     if (!nextCertDocPath) {
-      setMsg("Government ID saved. Next, upload your certification.");
-      openEditor("verification", "certification");
+      setMsg("Next, upload your certification.");
+      openProfileWizard("verification");
       return;
     }
     if (!nextBackgroundReady) {
-      setMsg("Certification saved. Next, submit your verification package.");
-      openEditor("verification", "submit");
+      setMsg("Next, submit your verification package.");
+      openProfileWizard("verification");
       return;
     }
 
     setMsg("Success, Find Games Now!");
-    setActiveEditor(null);
     window.requestAnimationFrame(() => {
       gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
-  async function uploadVerificationFile(
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "government_id_path" | "certification_document_path"
-  ) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMsg(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const prefix = field === "government_id_path" ? "gov_id" : "cert";
-    const path = `${user.id}/${prefix}_${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const { error: upErr } = await supabase.storage
-      .from("verification_documents")
-      .upload(path, file, { upsert: true });
-    if (upErr) {
-      setMsg(upErr.message);
-      return;
-    }
-    const update: Record<string, string> = { [field]: path, updated_at: new Date().toISOString() };
-    if (field === "government_id_path") {
-      update.verification_doc_path = path;
-    }
-    await supabase.from("ref_profiles").update(update).eq("member_id", user.id);
-    if (field === "government_id_path") setGovIdPath(path);
-    else setCertDocPath(path);
-    await load();
-    guideToNextMissingStep({
-      govIdPath: field === "government_id_path" ? path : govIdPath,
-      certDocPath: field === "certification_document_path" ? path : certDocPath,
     });
   }
 
@@ -708,53 +658,6 @@ export default function RefereeDashboardClient() {
     } finally {
       setSubmittingVerification(false);
     }
-  }
-
-  async function saveExternalVerification(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!externalCompany.trim()) {
-      setMsg("Enter the company or organization that verified you first.");
-      return;
-    }
-    setMsg(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const path = `${user.id}/external_${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const { error: upErr } = await supabase.storage
-      .from("verification_documents")
-      .upload(path, file, { upsert: true });
-    if (upErr) {
-      setMsg(upErr.message);
-      return;
-    }
-    const { error: profErr } = await supabase
-      .from("ref_profiles")
-      .update({
-        verification_method: "external",
-        external_verifier_name: externalCompany.trim(),
-        external_verification_proof_path: path,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("member_id", user.id);
-    if (profErr) {
-      setMsg(profErr.message);
-      return;
-    }
-    await supabase
-      .from("screening_checks")
-      .update({
-        status: "clear",
-        summary: `External verification on file (${externalCompany.trim()})`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("ref_member_id", user.id);
-    setExternalProofPath(path);
-    setVerificationMethod("external");
-    await load();
-    guideToNextMissingStep({ screeningStatus: "clear" });
   }
 
   const isVerified = refOfferEligible({
@@ -801,7 +704,6 @@ export default function RefereeDashboardClient() {
     label: string;
     description: string;
     field: EditableRefCardField;
-    step?: VerificationStep;
   }[] = showPendingReviewView || verificationApproved
     ? []
     : ([
@@ -814,25 +716,21 @@ export default function RefereeDashboardClient() {
           label: "Government ID",
           description: "Upload a driver license, passport, or state ID.",
           field: "verification" as const,
-          step: "id" as const,
         },
         !certificationReady && {
           label: "Certification",
           description: "Upload NFHS, state association, or league credentials.",
           field: "verification" as const,
-          step: "certification" as const,
         },
         !verificationSubmitted && {
           label: "Submit for review",
-          description: "Submit your verification package or upload proof if you were verified elsewhere.",
+          description: "Submit your verification package after your documents are uploaded.",
           field: "verification" as const,
-          step: "submit" as const,
         },
       ].filter(Boolean) as {
         label: string;
         description: string;
         field: EditableRefCardField;
-        step?: VerificationStep;
       }[]);
   const availabilitySummary = formatAvailabilityForCard(slots);
   const avatarLabel = displayName
@@ -841,14 +739,6 @@ export default function RefereeDashboardClient() {
     .join("")
     .slice(0, 2)
     .toUpperCase() || "REF";
-
-  function openEditor(field: EditableRefCardField | "assignor", step?: VerificationStep) {
-    if (step) setVerificationStep(step);
-    setActiveEditor(field);
-    window.requestAnimationFrame(() => {
-      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
 
   if (loading) {
     return <p className="text-[var(--muted)]">Loading…</p>;
@@ -917,13 +807,18 @@ export default function RefereeDashboardClient() {
         </div>
       )}
 
-      {showResubmitFlow && memberId && verificationFixRequiredSteps.length > 0 && (
+      {profileWizard && memberId && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/55 p-4">
           <div className="mx-auto flex min-h-full max-w-2xl items-start py-6">
             <RefVerificationResubmitFlow
               memberId={memberId}
-              steps={verificationFixRequiredSteps}
-              adminMessage={verificationAdminNotes || "GotREFS requested updates to your application."}
+              mode={profileWizard.mode}
+              steps={profileWizard.steps}
+              initialStep={profileWizard.initialStep}
+              adminMessage={profileWizard.adminMessage}
+              existingGovId={Boolean(govIdPath)}
+              existingCert={Boolean(certDocPath)}
+              initialHourlyRateMax={rateMax || rateMin || "75"}
               displayName={displayName}
               primarySport={sport}
               additionalSports={additionalSports}
@@ -931,13 +826,14 @@ export default function RefereeDashboardClient() {
               baseCity={cardMeta.baseCity ?? ""}
               travelRadius={cardMeta.travelRadius ?? ""}
               workRegions={cardMeta.workRegions ?? []}
-              onComplete={() => void handleResubmitComplete()}
+              onComplete={() => void handleProfileWizardComplete()}
+              onClose={() => setProfileWizard(null)}
             />
           </div>
         </div>
       )}
 
-      {!showResubmitFlow && !canAcceptOffers ? (
+      {!profileWizard && !canAcceptOffers ? (
         <div
           ref={gamesRef}
           className="grid gap-6 rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_1.15fr] lg:p-7"
@@ -964,10 +860,10 @@ export default function RefereeDashboardClient() {
                   ? "You can still browse open games, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotREFS."
                   : "Once approved, you will be able to request to work at any games. Approvals take 1-2 business days."}
             </p>
-            {verificationNeedsFix && !showResubmitFlow && (
+            {verificationNeedsFix && !profileWizard && (
               <button
                 type="button"
-                onClick={() => setShowResubmitFlow(true)}
+                onClick={openResubmitWizard}
                 className="mt-4 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-black text-white"
               >
                 Fix & resubmit application
@@ -982,11 +878,11 @@ export default function RefereeDashboardClient() {
             onRequireProfile={() => {
               if (showPendingReviewView) return;
               const next = missingActions[0];
-              if (next) openEditor(next.field, next.step);
+              if (next) openProfileWizard(next.field);
             }}
           />
         </div>
-      ) : !showResubmitFlow ? (
+      ) : !profileWizard ? (
         <div className="grid gap-6 rounded-[2rem] border border-green-200 bg-gradient-to-br from-green-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-green-700">Approved</p>
@@ -1017,17 +913,65 @@ export default function RefereeDashboardClient() {
             verificationStatus={verificationStatus}
             verificationSkipped={cardMeta.verificationSkipped}
             profileComplete={profileComplete}
-            onEditField={(field) => openEditor(field)}
+            onEditField={(field) => openProfileWizard(field)}
           />
         </div>
       ) : null}
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
-      {canAcceptOffers && !showResubmitFlow && (
+      {canAcceptOffers && !profileWizard && (
+        <>
+        <section ref={availabilityRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <h2 className="font-display text-xl font-bold text-[var(--navy)]">Availability</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Post when you are open to work. Organizers match you to games in these windows.
+          </p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              Start
+              <input
+                type="datetime-local"
+                className="rounded border border-[var(--border)] px-2 py-1"
+                value={startAt}
+                onChange={(e) => setStartAt(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              End
+              <input
+                type="datetime-local"
+                className="rounded border border-[var(--border)] px-2 py-1"
+                value={endAt}
+                onChange={(e) => setEndAt(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void addSlot()}
+              className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm text-white"
+            >
+              Add window
+            </button>
+          </div>
+          <ul className="mt-4 space-y-2 text-sm">
+            {slots.map((s) => (
+              <li key={s.id} className="flex items-center justify-between rounded border border-[var(--border)] px-3 py-2">
+                <span>
+                  {new Date(s.start_at).toLocaleString()} → {new Date(s.end_at).toLocaleString()}
+                </span>
+                <button type="button" className="text-red-600 underline" onClick={() => void removeSlot(s.id)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+            {slots.length === 0 && <li className="text-[var(--muted)]">No availability posted yet.</li>}
+          </ul>
+        </section>
         <section ref={gamesRef}>
           <RefEventCalendar canApplyToEvents={canApplyToGames} />
         </section>
+        </>
       )}
 
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
@@ -1075,7 +1019,7 @@ export default function RefereeDashboardClient() {
               )}
               <button
                 type="button"
-                onClick={() => setShowResubmitFlow(true)}
+                onClick={openResubmitWizard}
                 className="mt-3 rounded-full bg-amber-600 px-4 py-2 text-xs font-black text-white"
               >
                 Fix & resubmit
@@ -1143,387 +1087,6 @@ export default function RefereeDashboardClient() {
           )}
         </div>
       </section>
-
-      {activeEditor && (
-        <section ref={editorRef} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Edit card</p>
-              <h2 className="mt-1 font-display text-2xl font-bold text-[var(--navy)]">
-                {activeEditor === "availability"
-                  ? "Availability"
-                  : activeEditor === "verification"
-                    ? "How to become verified"
-                    : activeEditor === "location"
-                      ? "Location & travel range"
-                      : "Profile details"}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveEditor(null)}
-              className="rounded-full border border-[var(--border)] px-3 py-1 text-sm font-medium"
-            >
-              Close
-            </button>
-          </div>
-
-          {(activeEditor === "profile" ||
-            activeEditor === "photo" ||
-            activeEditor === "sports" ||
-            activeEditor === "certification" ||
-            activeEditor === "rate") && (
-            <div className="mt-5">
-              {activeEditor === "photo" && (
-                <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Photo upload is preview-only during signup right now. Permanent headshots need a small Supabase
-                  storage field next.
-                </p>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <SportsFields
-                  primarySport={sport}
-                  additionalSports={additionalSports}
-                  onPrimaryChange={setSport}
-                  onAdditionalChange={setAdditionalSports}
-                />
-                <label className="flex flex-col gap-1 text-sm">
-                  Certified by
-                  <input
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={cardMeta.certifiedBy ?? ""}
-                    placeholder="NFHS, AIA, USSF, local association"
-                    onChange={(e) => setCardMeta((prev) => ({ ...prev, certifiedBy: e.target.value }))}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Certification level
-                  <input
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={cert}
-                    onChange={(e) => setCert(e.target.value)}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Rate per game
-                  <div className="rounded border border-[var(--border)] p-2">
-                    <div className="mb-2 flex gap-2 text-xs font-bold">
-                      {(["exact", "range"] as const).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setRateType(type)}
-                          className={`rounded-full px-3 py-1 capitalize ${
-                            rateType === type ? "bg-[var(--navy)] text-white" : "bg-slate-100 text-[var(--muted)]"
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                    {rateType === "exact" ? (
-                      <input
-                        type="number"
-                        min={0}
-                        className="w-full rounded border border-[var(--border)] px-2 py-1"
-                        value={rate}
-                        onChange={(e) => setRate(e.target.value)}
-                        placeholder="e.g. 45"
-                      />
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          className="rounded border border-[var(--border)] px-2 py-1"
-                          value={rateMin}
-                          onChange={(e) => setRateMin(e.target.value)}
-                          placeholder="Min"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          className="rounded border border-[var(--border)] px-2 py-1"
-                          value={rateMax}
-                          onChange={(e) => setRateMax(e.target.value)}
-                          placeholder="Max"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </label>
-              </div>
-              <label className="mt-4 flex flex-col gap-1 text-sm">
-                Bio
-                <textarea
-                  className="min-h-[80px] rounded border border-[var(--border)] px-2 py-1"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                />
-              </label>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveProfile()}
-                  className="rounded-lg bg-[var(--orange)] px-4 py-2 text-sm font-medium text-white"
-                >
-                  Save profile
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void saveCardMetadata()}
-                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white"
-                >
-                  Save card details
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeEditor === "location" && (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-sm">
-                Base city
-                <input
-                  className="rounded border border-[var(--border)] px-2 py-1"
-                  value={cardMeta.baseCity ?? ""}
-                  placeholder="Phoenix, AZ"
-                  onChange={(e) => setCardMeta((prev) => ({ ...prev, baseCity: e.target.value }))}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Travel radius (miles)
-                <input
-                  type="number"
-                  min={0}
-                  className="rounded border border-[var(--border)] px-2 py-1"
-                  value={cardMeta.travelRadius ?? ""}
-                  onChange={(e) => setCardMeta((prev) => ({ ...prev, travelRadius: e.target.value }))}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-                Regions willing to work
-                <input
-                  className="rounded border border-[var(--border)] px-2 py-1"
-                  value={(cardMeta.workRegions ?? []).join(", ")}
-                  placeholder="County-wide, Statewide, Tournament travel"
-                  onChange={(e) =>
-                    setCardMeta((prev) => ({
-                      ...prev,
-                      workRegions: e.target.value
-                        .split(",")
-                        .map((item) => item.trim())
-                        .filter(Boolean),
-                    }))
-                  }
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void saveCardMetadata()}
-                className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white sm:w-fit"
-              >
-                Save location
-              </button>
-            </div>
-          )}
-
-          {activeEditor === "availability" && (
-            <div className="mt-5">
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col gap-1 text-sm">
-                  Start
-                  <input
-                    type="datetime-local"
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={startAt}
-                    onChange={(e) => setStartAt(e.target.value)}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  End
-                  <input
-                    type="datetime-local"
-                    className="rounded border border-[var(--border)] px-2 py-1"
-                    value={endAt}
-                    onChange={(e) => setEndAt(e.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void addSlot()}
-                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm text-white"
-                >
-                  Add window
-                </button>
-              </div>
-              <ul className="mt-4 space-y-2 text-sm">
-                {slots.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between rounded border border-[var(--border)] px-3 py-2">
-                    <span>
-                      {new Date(s.start_at).toLocaleString()} → {new Date(s.end_at).toLocaleString()}
-                    </span>
-                    <button type="button" className="text-red-600 underline" onClick={() => void removeSlot(s.id)}>
-                      Remove
-                    </button>
-                  </li>
-                ))}
-                {slots.length === 0 && <li className="text-[var(--muted)]">No availability yet.</li>}
-              </ul>
-            </div>
-          )}
-
-          {activeEditor === "verification" && (
-            <div className="mt-5 grid gap-5">
-              <div className="rounded-xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4 text-sm text-[var(--slate)]">
-                <p className="font-bold text-[var(--navy)]">How a pending ref becomes verified</p>
-                <p className="mt-2">
-                  Upload a government ID, upload a certification/license document, complete your profile, then submit
-                  the verification package. You can also upload proof if you were verified elsewhere.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  ["id", "Government ID"],
-                  ["certification", "Certification"],
-                  ["external", "Verified elsewhere"],
-                  ["submit", "Submit"],
-                ].map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setVerificationStep(key as VerificationStep)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                      verificationStep === key
-                        ? "bg-[var(--red)] text-white"
-                        : "border border-[var(--border)] bg-white text-[var(--muted)]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {verificationStep === "id" && (
-                <VerificationUploadField
-                  title="Government ID"
-                  description="Driver license, passport, or state ID — required for all referees."
-                  uploaded={Boolean(govIdPath)}
-                  uploadedLabel="✓ Government ID on file"
-                  onFile={(e) => void uploadVerificationFile(e, "government_id_path")}
-                />
-              )}
-
-              {verificationStep === "certification" && (
-                <VerificationUploadField
-                  title="Certification / license document"
-                  description="NFHS, state association, or league certification — required to verify your credentials."
-                  uploaded={Boolean(certDocPath)}
-                  uploadedLabel="✓ Certification document on file"
-                  onFile={(e) => void uploadVerificationFile(e, "certification_document_path")}
-                />
-              )}
-
-              {verificationStep === "external" && (
-                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
-                  <p className="font-display text-lg font-bold text-[var(--navy)]">Already verified elsewhere?</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Upload a receipt or screenshot from another company/association.
-                  </p>
-                  <label className="mt-3 flex flex-col gap-1 text-sm">
-                    Verifying company / organization
-                    <input
-                      className="rounded border border-[var(--border)] px-2 py-1"
-                      value={externalCompany}
-                      onChange={(e) => setExternalCompany(e.target.value)}
-                      placeholder="e.g. NFHS, local assignor, prior platform"
-                    />
-                  </label>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf"
-                    className="mt-3 text-sm"
-                    onChange={(e) => void saveExternalVerification(e)}
-                  />
-                </div>
-              )}
-
-              {verificationStep === "submit" && (
-                <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
-                  <p className="font-display text-lg font-bold text-[var(--navy)]">Submit verification package</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Submit after your government ID, certification, and profile information are complete.
-                  </p>
-                  <p className="text-sm">
-                    Verification package status:{" "}
-                    <span className="font-semibold capitalize text-[var(--blue)]">
-                      {verificationStatus.replace(/_/g, " ")}
-                    </span>
-                  </p>
-                  <button
-                    type="button"
-                    disabled={
-                      submittingVerification ||
-                      verificationStatus === "submitted" ||
-                      verificationStatus === "under_review"
-                    }
-                    onClick={() => void submitVerificationPackage()}
-                    className="mt-3 rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {submittingVerification
-                      ? "Submitting..."
-                      : verificationStatus === "submitted" || verificationStatus === "under_review"
-                        ? "Submitted - awaiting review"
-                        : "Submit verification package"}
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={verificationStep === "id"}
-                  onClick={() => {
-                    const steps: VerificationStep[] = ["id", "certification", "external", "submit"];
-                    const index = steps.indexOf(verificationStep);
-                    setVerificationStep(steps[Math.max(0, index - 1)]);
-                  }}
-                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium disabled:opacity-40"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  disabled={verificationStep === "submit"}
-                  onClick={() => {
-                    const steps: VerificationStep[] = ["id", "certification", "external", "submit"];
-                    const index = steps.indexOf(verificationStep);
-                    setVerificationStep(steps[Math.min(steps.length - 1, index + 1)]);
-                  }}
-                  className="rounded-lg bg-[var(--navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeEditor === "assignor" && (
-            <div className="mt-5">
-              <AssignorRosterPanel
-                isAssignor={isAssignor}
-                assignorSaving={assignorSaving}
-                entries={rosterEntries}
-                rosterSaving={rosterSaving}
-                onToggleAssignor={(enabled) => void toggleAssignor(enabled)}
-                onAddRef={addRosterRef}
-                onRemoveRef={(id) => void removeRosterRef(id)}
-              />
-            </div>
-          )}
-        </section>
-      )}
 
       {inquiries.length > 0 && (
         <section ref={messagesRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">

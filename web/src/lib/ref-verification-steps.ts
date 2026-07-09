@@ -33,3 +33,38 @@ export function normalizeFixRequiredSteps(values: unknown): RefVerificationStepK
 export function stepLabelForKey(key: RefVerificationStepKey): string {
   return REF_VERIFICATION_STEPS.find((step) => step.key === key)?.label ?? key;
 }
+
+export const ALL_REF_VERIFICATION_STEP_KEYS: RefVerificationStepKey[] = REF_VERIFICATION_STEPS.map(
+  (step) => step.key
+);
+
+/** Maps ref ID card tap targets to signup wizard steps (1–5). */
+export function mapCardFieldToVerificationStep(
+  field: string
+): RefVerificationStepKey | "availability" {
+  switch (field) {
+    case "profile":
+    case "photo":
+      return "profile";
+    case "sports":
+    case "certification":
+    case "rate":
+      return "sports";
+    case "verification":
+      return "government_id";
+    case "location":
+      return "location";
+    case "availability":
+      return "availability";
+    default:
+      return "profile";
+  }
+}
+
+export function wizardIndexForStep(
+  steps: RefVerificationStepKey[],
+  stepKey: RefVerificationStepKey
+): number {
+  const index = steps.indexOf(stepKey);
+  return index >= 0 ? index : 0;
+}

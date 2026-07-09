@@ -90,7 +90,7 @@ export async function loadVerificationReviewQueue(
       return {
         entries: [],
         error:
-          "The ref_verification_submissions table is missing. Run the SQL from supabase/migrations/20260708160000_ref_verification_review_queue.sql in Supabase.",
+          "The ref_verification_submissions table is missing. In Supabase → SQL Editor, run the full script in supabase/RUN_ADMIN_VERIFICATION_SETUP.sql (it creates the table and backfills existing refs).",
       };
     }
     return { entries: [], error: submissionsError.message };

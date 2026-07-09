@@ -4,7 +4,11 @@ import { isGotrefsAdminEmail, isGotrefsAdminUser, gotrefsAdminDashboardPath } fr
 import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { resolvePostOAuthRedirect } from "@/lib/auth/oauth-redirect";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
-import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+import {
+  applyRouteHandlerCookies,
+  createRouteHandlerClientWithCookieBuffer,
+  type RouteHandlerCookie,
+} from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export type { OAuthProvider } from "@/lib/auth/oauth-providers";
@@ -283,6 +287,17 @@ export async function upsertOAuthMember(
   };
 }
 
+function redirectWithAuthCookies(
+  origin: string,
+  cookieBuffer: RouteHandlerCookie[],
+  destination: string | URL
+) {
+  const target = typeof destination === "string" ? new URL(destination, origin) : destination;
+  const redirect = NextResponse.redirect(target);
+  applyRouteHandlerCookies(redirect, cookieBuffer);
+  return redirect;
+}
+
 export async function handleOAuthCallback(
   request: NextRequest,
   provider: OAuthProvider,
@@ -291,12 +306,12 @@ export async function handleOAuthCallback(
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") || "/dashboard";
-  const sessionResponse = NextResponse.next();
-  const supabase = createRouteHandlerClient(request, sessionResponse);
-
   if (!code) {
     return NextResponse.redirect(new URL("/auth/login?error=oauth_missing_code", requestUrl.origin));
   }
+
+  const cookieBuffer: RouteHandlerCookie[] = [];
+  const supabase = createRouteHandlerClientWithCookieBuffer(request, cookieBuffer);
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
@@ -318,31 +333,20 @@ export async function handleOAuthCallback(
 
     if (isGotrefsAdminUser(user)) {
       await ensureAdminOAuthMember(admin, user);
-      const redirect = NextResponse.redirect(new URL(gotrefsAdminDashboardPath(), requestUrl.origin));
-      sessionResponse.cookies.getAll().forEach((cookie) => {
-        redirect.cookies.set(cookie.name, cookie.value, cookie);
-      });
-      return redirect;
+      return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, gotrefsAdminDashboardPath());
     }
 
     const member = await upsertOAuthMember(admin, user, provider, appleIdentity);
-
     const destination = resolvePostOAuthRedirect(requestUrl.origin, member, next, user.email);
-
-    const redirect = NextResponse.redirect(destination);
-    sessionResponse.cookies.getAll().forEach((cookie) => {
-      redirect.cookies.set(cookie.name, cookie.value, cookie);
-    });
-    return redirect;
+    return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, destination);
   } catch (error) {
     const reason = error instanceof Error ? error.message : "oauth_callback_failed";
     console.error("[auth/oauth] callback:", reason);
-    const redirect = NextResponse.redirect(
-      new URL(`/auth/login?error=oauth_failed&reason=${encodeURIComponent(reason)}`, requestUrl.origin)
-    );
-    sessionResponse.cookies.getAll().forEach((cookie) => {
-      redirect.cookies.set(cookie.name, cookie.value, cookie);
-    });
-    return redirect;
+    const fallback = isGotrefsAdminUser(user)
+      ? gotrefsAdminDashboardPath()
+      : user.user_metadata?.role === "organizer"
+        ? "/dashboard/organizer"
+        : "/dashboard/referee";
+    return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, fallback);
   }
 }

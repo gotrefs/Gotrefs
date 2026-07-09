@@ -9,6 +9,10 @@ import { createClient } from "@/lib/supabase/client";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
 import { OAuthContinueButton } from "@/components/auth/OAuthContinueButton";
 import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
+import { formatHourlyRateRange } from "@/lib/pay-range";
+
+const SIGNUP_HOURLY_RATE_FLOOR = 10;
+const SIGNUP_HOURLY_RATE_CEILING = 150;
 
 type AuthStep = "email" | "password" | "role" | "onboarding";
 type AudienceRole = "ref" | "organizer" | "assignor";
@@ -71,6 +75,7 @@ export function AuthFlow() {
   const [customPrimarySport, setCustomPrimarySport] = useState("");
   const [selectedSports, setSelectedSports] = useState<string[]>(["Basketball"]);
   const [certificationLevel, setCertificationLevel] = useState("");
+  const [hourlyRateMax, setHourlyRateMax] = useState("75");
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
   const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
   const [certDocFile, setCertDocFile] = useState<File | null>(null);
@@ -254,6 +259,13 @@ export function AuthFlow() {
       setError("Enter the sport you officiate.");
       return;
     }
+    if (role === "ref" && wizardStep === 1) {
+      const maxRate = Number(hourlyRateMax);
+      if (!Number.isFinite(maxRate) || maxRate < SIGNUP_HOURLY_RATE_FLOOR) {
+        setError(`Set your hourly rate to at least $${SIGNUP_HOURLY_RATE_FLOOR}.`);
+        return;
+      }
+    }
     if (role === "ref" && wizardStep === 2 && (!govIdFrontFile || !govIdBackFile)) {
       setError("Upload the front and back of your government ID to continue.");
       return;
@@ -302,6 +314,10 @@ export function AuthFlow() {
         primarySport: resolvedPrimarySport,
         additionalSports: selectedSports.filter((sport) => sport !== primarySport),
         certificationLevel: certificationLevel.trim() || undefined,
+        rateMin: role === "ref" ? SIGNUP_HOURLY_RATE_FLOOR : undefined,
+        rateMax: role === "ref" ? Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
+        rateType: role === "ref" ? "range" : undefined,
+        rateUnit: role === "ref" ? "hour" : undefined,
         gotrefsId,
         baseCity: baseCity.trim() || undefined,
         workRegions,
@@ -352,8 +368,12 @@ export function AuthFlow() {
             );
             await submitRefVerificationForReview();
           }
-        } catch {
-          setNotice("Account created, but verification could not be submitted automatically. You can finish from your dashboard.");
+        } catch (submitError) {
+          const detail =
+            submitError instanceof Error ? submitError.message : "Could not submit verification.";
+          setNotice(
+            `Account created, but verification was not queued for review (${detail}). Ask your admin to run supabase/RUN_ADMIN_VERIFICATION_SETUP.sql in Supabase, then open your referee dashboard to resubmit.`
+          );
         }
       }
 
@@ -567,10 +587,12 @@ export function AuthFlow() {
                 primarySport={primarySport}
                 customPrimarySport={customPrimarySport}
                 certificationLevel={certificationLevel}
+                hourlyRateMax={hourlyRateMax}
                 onToggleSport={toggleSport}
                 onPrimarySport={setPrimarySport}
                 onCustomPrimarySport={setCustomPrimarySport}
                 onCertificationLevel={setCertificationLevel}
+                onHourlyRateMax={setHourlyRateMax}
               />
             )}
 
@@ -796,19 +818,23 @@ function SportsAndCerts({
   primarySport,
   customPrimarySport,
   certificationLevel,
+  hourlyRateMax,
   onToggleSport,
   onPrimarySport,
   onCustomPrimarySport,
   onCertificationLevel,
+  onHourlyRateMax,
 }: {
   selectedSports: string[];
   primarySport: string;
   customPrimarySport: string;
   certificationLevel: string;
+  hourlyRateMax: string;
   onToggleSport: (sport: string) => void;
   onPrimarySport: (sport: string) => void;
   onCustomPrimarySport: (value: string) => void;
   onCertificationLevel: (value: string) => void;
+  onHourlyRateMax: (value: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -855,6 +881,31 @@ function SportsAndCerts({
         Certification level
         <input value={certificationLevel} onChange={(event) => onCertificationLevel(event.target.value)} placeholder="Youth, varsity, NFHS, USSF, etc." className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
       </label>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Event organizers only see your GotREFS ID until you accept a game. Set the hourly pay you expect.
+        </p>
+        <p className="mt-3 text-lg font-black text-[var(--navy)]">
+          {formatHourlyRateRange(SIGNUP_HOURLY_RATE_FLOOR, Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR)}
+        </p>
+        <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+          Max hourly rate
+          <input
+            type="range"
+            min={SIGNUP_HOURLY_RATE_FLOOR}
+            max={SIGNUP_HOURLY_RATE_CEILING}
+            step={5}
+            value={hourlyRateMax}
+            onChange={(event) => onHourlyRateMax(event.target.value)}
+            className="mt-2 w-full accent-[var(--navy)]"
+          />
+        </label>
+        <div className="mt-1 flex justify-between text-xs font-semibold text-[var(--muted)]">
+          <span>${SIGNUP_HOURLY_RATE_FLOOR}/hr</span>
+          <span>${SIGNUP_HOURLY_RATE_CEILING}/hr</span>
+        </div>
+      </div>
     </div>
   );
 }

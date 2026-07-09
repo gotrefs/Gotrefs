@@ -5,18 +5,15 @@ import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { upsertOAuthMember } from "@/lib/auth/oauth";
 import { parseOAuthProvider, type OAuthProvider } from "@/lib/auth/oauth-providers";
 import { resolvePostOAuthRedirect } from "@/lib/auth/oauth-redirect";
+import { resolveAuthenticatedHomePath } from "@/lib/auth/onboarding-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
-import { dashboardPathForRole } from "@/lib/member-role";
-import { createRouteHandlerClient, safeRedirectPath } from "@/lib/supabase/route-handler";
+import {
+  applyRouteHandlerCookies,
+  createRouteHandlerClientWithCookieBuffer,
+  safeRedirectPath,
+  type RouteHandlerCookie,
+} from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
-
-function redirectWithCookies(from: NextResponse, url: URL): NextResponse {
-  const redirect = NextResponse.redirect(url);
-  from.cookies.getAll().forEach((cookie) => {
-    redirect.cookies.set(cookie.name, cookie.value, cookie);
-  });
-  return redirect;
-}
 
 function oauthProviderFromRequest(requestUrl: URL, userProvider?: string | null): OAuthProvider | null {
   const raw = requestUrl.searchParams.get("provider") ?? userProvider;
@@ -35,6 +32,17 @@ function authErrorRedirect(origin: string, oauthFlow: boolean, reason: string) {
   );
 }
 
+function redirectWithAuthCookies(
+  origin: string,
+  cookieBuffer: RouteHandlerCookie[],
+  destination: string | URL
+) {
+  const target = typeof destination === "string" ? new URL(destination, origin) : destination;
+  const redirect = NextResponse.redirect(target);
+  applyRouteHandlerCookies(redirect, cookieBuffer);
+  return redirect;
+}
+
 /** Exchange auth codes for a session (email links + Google/Apple/Facebook OAuth). */
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -48,10 +56,10 @@ export async function GET(request: NextRequest) {
     return authErrorRedirect(requestUrl.origin, oauthFlow, "missing_code");
   }
 
-  const sessionResponse = NextResponse.redirect(new URL(next, requestUrl.origin));
+  const cookieBuffer: RouteHandlerCookie[] = [];
 
   try {
-    const supabase = createRouteHandlerClient(request, sessionResponse);
+    const supabase = createRouteHandlerClientWithCookieBuffer(request, cookieBuffer);
 
     if (code) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -91,18 +99,24 @@ export async function GET(request: NextRequest) {
         const admin = createServiceClient();
         if (isGotrefsAdminUser(user)) {
           await ensureAdminOAuthMember(admin, user);
-          return redirectWithCookies(
-            sessionResponse,
-            new URL(gotrefsAdminDashboardPath(), requestUrl.origin)
+          return redirectWithAuthCookies(
+            requestUrl.origin,
+            cookieBuffer,
+            gotrefsAdminDashboardPath()
           );
         }
         const member = await upsertOAuthMember(admin, user, provider);
         const destination = resolvePostOAuthRedirect(requestUrl.origin, member, next, user.email);
-        return redirectWithCookies(sessionResponse, destination);
+        return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, destination);
       } catch (error) {
         const reason = error instanceof Error ? error.message : "oauth_callback_failed";
         console.error("[auth/callback] oauth member sync:", reason);
-        return authErrorRedirect(requestUrl.origin, true, reason);
+        const fallback = isGotrefsAdminUser(user)
+          ? gotrefsAdminDashboardPath()
+          : user.user_metadata?.role === "organizer"
+            ? "/dashboard/organizer"
+            : "/dashboard/referee";
+        return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, fallback);
       }
     }
 
@@ -112,8 +126,17 @@ export async function GET(request: NextRequest) {
       } else {
         try {
           const admin = createServiceClient();
-          const sync = await syncMemberAccount(admin, user);
-          redirectPath = dashboardPathForRole(sync.role);
+          await syncMemberAccount(admin, user);
+          const { data: member } = await admin
+            .from("members")
+            .select("is_onboarded, role")
+            .eq("id", user.id)
+            .maybeSingle();
+          redirectPath = resolveAuthenticatedHomePath({
+            member,
+            email: user.email,
+            next,
+          });
         } catch {
           redirectPath =
             user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
@@ -121,11 +144,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (redirectPath !== next) {
-      return redirectWithCookies(sessionResponse, new URL(redirectPath, requestUrl.origin));
-    }
-
-    return sessionResponse;
+    return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, redirectPath);
   } catch (err) {
     console.error("[auth/callback] unexpected:", err);
     return authErrorRedirect(requestUrl.origin, oauthFlow, "server_error");

@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+export type RouteHandlerCookie = {
+  name: string;
+  value: string;
+  options?: Parameters<NextResponse["cookies"]["set"]>[2];
+};
+
 /** Supabase client for Route Handlers — session cookies must be set on the response. */
 export function createRouteHandlerClient(request: NextRequest, response: NextResponse) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -20,6 +26,35 @@ export function createRouteHandlerClient(request: NextRequest, response: NextRes
         });
       },
     },
+  });
+}
+
+/** Collect PKCE/session cookies with full options before attaching them to a redirect response. */
+export function createRouteHandlerClientWithCookieBuffer(
+  request: NextRequest,
+  cookieBuffer: RouteHandlerCookie[]
+) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  }
+
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookieBuffer.push(...cookiesToSet);
+      },
+    },
+  });
+}
+
+export function applyRouteHandlerCookies(response: NextResponse, cookieBuffer: RouteHandlerCookie[]) {
+  cookieBuffer.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
   });
 }
 

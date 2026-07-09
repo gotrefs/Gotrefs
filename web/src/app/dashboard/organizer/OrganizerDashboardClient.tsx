@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { SportsFields } from "@/components/SportsFields";
 import { ALL_SPORTS, formatEventLocation, formatPayOffer } from "@/data/sports";
+import { payRangesOverlap } from "@/lib/pay-range";
+
+type RefReview = {
+  score: number;
+  comment: string | null;
+  createdAt: string;
+};
 
 type DirectoryRef = {
   id: string;
@@ -17,11 +24,13 @@ type DirectoryRef = {
   rateType?: "exact" | "range" | null;
   rateMin?: number | null;
   rateMax?: number | null;
+  rateUnit?: "hour" | "game" | null;
   homeZip: string | null;
   availability: { start_at: string; end_at: string }[];
   maskedEmail: string;
   ratingAverage: number | null;
   ratingCount: number;
+  reviews?: RefReview[];
 };
 
 function slotCoversEvent(
@@ -66,13 +75,41 @@ function formatPayRange(value: {
 }
 
 function formatRefRate(ref: DirectoryRef) {
+  const unit = ref.rateUnit === "game" ? "game" : "hr";
   if (ref.rateType === "range") {
     const min = ref.rateMin ?? ref.ratePerGame;
     const max = ref.rateMax;
-    if (min != null && max != null) return `$${Number(min).toFixed(0)}-$${Number(max).toFixed(0)}`;
-    if (min != null) return `$${Number(min).toFixed(0)}+`;
+    if (min != null && max != null) return `$${Number(min).toFixed(0)}-$${Number(max).toFixed(0)}/${unit}`;
+    if (min != null) return `$${Number(min).toFixed(0)}+/${unit}`;
   }
-  return ref.ratePerGame != null ? `$${Number(ref.ratePerGame).toFixed(0)}` : "Rate TBD";
+  return ref.ratePerGame != null ? `$${Number(ref.ratePerGame).toFixed(0)}/${unit}` : "Rate TBD";
+}
+
+function refPayInput(ref: DirectoryRef) {
+  return {
+    type: ref.rateType === "range" ? ("range" as const) : ("exact" as const),
+    exact: ref.ratePerGame,
+    min: ref.rateMin,
+    max: ref.rateMax,
+  };
+}
+
+function eventPayInput(event: EventRow) {
+  return {
+    type: event.pay_type === "range" ? ("range" as const) : ("exact" as const),
+    exact: event.pay_offer,
+    min: event.pay_min,
+    max: event.pay_max,
+  };
+}
+
+function refPriceFitsEvent(ref: DirectoryRef, event: EventRow) {
+  return payRangesOverlap(refPayInput(ref), eventPayInput(event));
+}
+
+function renderStarScore(score: number) {
+  const safe = Math.max(1, Math.min(5, Math.round(score)));
+  return `${"★".repeat(safe)}${"☆".repeat(5 - safe)}`;
 }
 
 function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
@@ -135,15 +172,18 @@ type EventRow = {
   pay_max?: number | null;
 };
 
-type SignupRequestRow = {
+type ApplicantRow = {
   id: string;
-  event_id: string;
-  ref_member_id: string;
-  members: { display_name: string } | { display_name: string }[] | null;
-  scheduled_events:
-    | { title: string; pay_offer: number | null }
-    | { title: string; pay_offer: number | null }[]
-    | null;
+  eventId: string;
+  refMemberId: string;
+  createdAt: string;
+  gotrefsId: string;
+  eventTitle: string;
+  eventPayLabel: string | null;
+  refRateLabel: string | null;
+  ratingAverage: number | null;
+  ratingCount: number;
+  reviews: RefReview[];
 };
 
 type OrganizerOfferRow = {
@@ -289,10 +329,11 @@ export default function OrganizerDashboardClient() {
   const [selectedManageDate, setSelectedManageDate] = useState<Date | null>(null);
   const [refs, setRefs] = useState<DirectoryRef[]>([]);
   const [canContactRefs, setCanContactRefs] = useState(true);
-  const [signupRequests, setSignupRequests] = useState<SignupRequestRow[]>([]);
+  const [signupRequests, setSignupRequests] = useState<ApplicantRow[]>([]);
   const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
   const [submittedRatings, setSubmittedRatings] = useState<RefRatingRow[]>([]);
   const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
+  const [ratingDrafts, setRatingDrafts] = useState<Record<string, { score: number; comment: string }>>({});
   const [ratingCutoffIso, setRatingCutoffIso] = useState("");
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
@@ -365,14 +406,9 @@ export default function OrganizerDashboardClient() {
     }
     setEvents((ev as EventRow[]) || []);
 
-    const { data: sr } = await supabase
-      .from("event_signup_requests")
-      .select(
-        "id, event_id, ref_member_id, members ( display_name ), scheduled_events!inner ( title, pay_offer, organizer_member_id )"
-      )
-      .eq("scheduled_events.organizer_member_id", user.id)
-      .eq("status", "pending");
-    setSignupRequests((sr as unknown as SignupRequestRow[]) || []);
+    const applicantsRes = await fetch("/api/organizer/applicants");
+    const applicantsJson = (await applicantsRes.json()) as { applicants?: ApplicantRow[] };
+    setSignupRequests(applicantsJson.applicants ?? []);
 
     const { data: offers } = await supabase
       .from("assignment_offers")
@@ -758,27 +794,25 @@ export default function OrganizerDashboardClient() {
     }
   }
 
-  async function sendOfferFromRequest(sr: SignupRequestRow) {
-    const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
+  async function sendOfferFromRequest(applicant: ApplicantRow) {
     const res = await fetch("/api/offers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        eventId: sr.event_id,
-        refMemberId: sr.ref_member_id,
-        offeredPay: ev?.pay_offer ?? null,
+        eventId: applicant.eventId,
+        refMemberId: applicant.refMemberId,
       }),
     });
     const j = (await res.json()) as { error?: string };
     if (!res.ok) {
-      setMsg(j.error || "Could not send offer.");
+      setMsg(j.error || "Could not send request.");
       return;
     }
     await supabase
       .from("event_signup_requests")
       .update({ status: "accepted" })
-      .eq("id", sr.id);
-    setMsg("Offer sent to referee.");
+      .eq("id", applicant.id);
+    setMsg("Request sent to referee.");
     await load();
   }
 
@@ -861,7 +895,12 @@ export default function OrganizerDashboardClient() {
     }
   }
 
-  async function submitRating(offer: OrganizerOfferRow, score: number | null, skipped = false) {
+  async function submitRating(
+    offer: OrganizerOfferRow,
+    score: number | null,
+    skipped = false,
+    comment = ""
+  ) {
     const key = ratingKey(offer.event_id, offer.ref_member_id);
     setRatingSubmitting(key);
     try {
@@ -873,6 +912,7 @@ export default function OrganizerDashboardClient() {
           refMemberId: offer.ref_member_id,
           score,
           skipped,
+          comment: skipped ? null : comment,
         }),
       });
       const json = (await res.json()) as { error?: string };
@@ -884,7 +924,16 @@ export default function OrganizerDashboardClient() {
         ...current.filter((rating) => ratingKey(rating.event_id, rating.ref_member_id) !== key),
         { event_id: offer.event_id, ref_member_id: offer.ref_member_id, score, skipped },
       ]);
-      setMsg(skipped ? "Rating skipped for this completed game." : "Rating saved. Thanks for building ref trust.");
+      setRatingDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMsg(
+        skipped
+          ? "Rating skipped for this completed game."
+          : "Review published. Thanks for helping organizers find trusted refs."
+      );
       await load();
     } catch {
       setMsg("Could not reach the server.");
@@ -949,7 +998,8 @@ export default function OrganizerDashboardClient() {
           ref.primarySport === selectedOfferEvent.sport ||
           selectedOfferEvent.sport === sport ||
           additionalSports.includes(selectedOfferEvent.sport);
-        return available && zipFits && sportFits;
+        const priceFits = refPriceFitsEvent(ref, selectedOfferEvent);
+        return available && zipFits && sportFits && priceFits;
       })
     : [];
   const manageMonthLabel = manageCalendarCursor.toLocaleString(undefined, { month: "long", year: "numeric" });
@@ -1097,10 +1147,7 @@ export default function OrganizerDashboardClient() {
           )}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {signupRequests.slice(0, 4).map((sr) => {
-            const ref = Array.isArray(sr.members) ? sr.members[0] : sr.members;
-            const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
-            return (
+          {signupRequests.slice(0, 4).map((sr) => (
               <button
                 key={sr.id}
                 type="button"
@@ -1109,14 +1156,20 @@ export default function OrganizerDashboardClient() {
               >
                 <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New ref application</p>
                 <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  {ref?.display_name ?? "A referee"} applied to ref {ev?.title ?? "your event"}.
+                  Official {sr.gotrefsId} applied to ref {sr.eventTitle}.
                 </p>
+                {sr.ratingAverage != null && sr.ratingCount > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-amber-700">
+                    {renderStarScore(Math.round(sr.ratingAverage))} {sr.ratingAverage.toFixed(1)} ({sr.ratingCount} review
+                    {sr.ratingCount === 1 ? "" : "s"})
+                  </p>
+                )}
               </button>
-            );
-          })}
+            ))}
           {respondedSentOffers.slice(0, 4).map((offer) => {
-            const ref = Array.isArray(offer.members) ? offer.members[0] : offer.members;
             const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+            const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+            const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
             const accepted = offer.status === "accepted";
             return (
               <article
@@ -1129,7 +1182,7 @@ export default function OrganizerDashboardClient() {
                   Invite {offer.status}
                 </p>
                 <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  {ref?.display_name ?? "A referee"} {accepted ? "accepted" : "declined"} {ev?.title ?? "your event"}.
+                  Official {officialId} {accepted ? "accepted" : "declined"} {ev?.title ?? "your event"}.
                 </p>
               </article>
             );
@@ -1677,7 +1730,7 @@ export default function OrganizerDashboardClient() {
               <div className="mt-4 grid gap-3">
                 {visibleManageEvents.map((e) => {
                   const loc = formatEventLocation(e.city, e.state, e.zip_code);
-                  const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
+                  const applicantCount = signupRequests.filter((request) => request.eventId === e.id).length;
                   const hiredCount = acceptedOffersByEvent[e.id] || 0;
                   const payment = acceptedOfferPaymentsByEvent[e.id];
                   const filled = hiredCount >= e.officials_needed;
@@ -1756,7 +1809,7 @@ export default function OrganizerDashboardClient() {
           {visibleManageEvents.map((e) => {
             const loc = formatEventLocation(e.city, e.state, e.zip_code);
             const payLabel = formatPayRange(e);
-            const applicantCount = signupRequests.filter((request) => request.event_id === e.id).length;
+            const applicantCount = signupRequests.filter((request) => request.eventId === e.id).length;
             const hiredCount = acceptedOffersByEvent[e.id] || 0;
             const payment = acceptedOfferPaymentsByEvent[e.id];
             const filled = hiredCount >= e.officials_needed;
@@ -1865,33 +1918,76 @@ export default function OrganizerDashboardClient() {
             {completedUnratedOffers.slice(0, 4).map((offer) => {
               const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
               const key = ratingKey(offer.event_id, offer.ref_member_id);
+              const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+              const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
+              const draft = ratingDrafts[key] ?? { score: 5, comment: "" };
               return (
                 <article key={key} className="rounded-2xl border border-amber-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-4">
                     <div>
                       <p className="font-black text-[var(--navy)]">{event?.title ?? "Completed game"}</p>
                       <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
-                        Official GR-{offer.ref_member_id.slice(0, 8).toUpperCase()} ·{" "}
+                        Official {officialId} ·{" "}
                         {event?.starts_at ? formatEventDateTime(event.starts_at) : "Game complete"}
                       </p>
+                      <p className="mt-2 text-sm text-amber-900">
+                        How was this ref? Share a star rating and a short review — like checking out on Airbnb.
+                      </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {[1, 2, 3, 4, 5].map((score) => (
-                        <button
-                          key={score}
-                          type="button"
-                          disabled={ratingSubmitting === key}
-                          onClick={() => void submitRating(offer, score)}
-                          className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-800 transition-all duration-200 hover:bg-amber-100 disabled:opacity-50"
-                        >
-                          {score} star{score === 1 ? "" : "s"}
-                        </button>
-                      ))}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">Overall rating</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <button
+                            key={score}
+                            type="button"
+                            disabled={ratingSubmitting === key}
+                            onClick={() =>
+                              setRatingDrafts((current) => ({
+                                ...current,
+                                [key]: { ...draft, score },
+                              }))
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-xs font-black transition-all duration-200 disabled:opacity-50 ${
+                              draft.score === score
+                                ? "border-amber-500 bg-amber-500 text-white"
+                                : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                            }`}
+                          >
+                            {renderStarScore(score)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="block text-sm font-bold text-[var(--navy)]">
+                      Written review (optional)
+                      <textarea
+                        className="mt-2 min-h-24 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-normal text-[var(--slate)]"
+                        placeholder="Professional, on time, great with players..."
+                        value={draft.comment}
+                        disabled={ratingSubmitting === key}
+                        onChange={(event) =>
+                          setRatingDrafts((current) => ({
+                            ...current,
+                            [key]: { ...draft, comment: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={ratingSubmitting === key}
+                        onClick={() => void submitRating(offer, draft.score, false, draft.comment)}
+                        className="rounded-full bg-[var(--navy)] px-4 py-2 text-xs font-black text-white transition-all duration-200 hover:bg-[var(--blue)] disabled:opacity-50"
+                      >
+                        {ratingSubmitting === key ? "Publishing..." : "Publish review"}
+                      </button>
                       <button
                         type="button"
                         disabled={ratingSubmitting === key}
                         onClick={() => void submitRating(offer, null, true)}
-                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--muted)] transition-all duration-200 hover:bg-[var(--grey-light)] disabled:opacity-50"
+                        className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-bold text-[var(--muted)] transition-all duration-200 hover:bg-[var(--grey-light)] disabled:opacity-50"
                       >
                         Skip
                       </button>
@@ -1908,37 +2004,52 @@ export default function OrganizerDashboardClient() {
         <section ref={applicantsRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <h2 className="font-display text-xl font-bold text-[var(--red)]">Ref applications on your events</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Referees who applied to work one of your events. Only you see these — not other organizers.
+            Referees who applied to work one of your events. You only see their GotREFS ID, star rating, and past reviews — not their name.
           </p>
-          <ul className="mt-3 space-y-2 text-sm">
-            {signupRequests.map((sr) => {
-              const ref = Array.isArray(sr.members) ? sr.members[0] : sr.members;
-              const ev = Array.isArray(sr.scheduled_events) ? sr.scheduled_events[0] : sr.scheduled_events;
-              const payLabel = ev ? formatPayRange(ev) : formatPayOffer(null);
-              return (
-                <li key={sr.id} className="flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-3">
-                  <div>
-                    <p>
-                      <strong>{ref?.display_name}</strong> applied to ref <strong>{ev?.title}</strong>
+          <ul className="mt-3 space-y-3 text-sm">
+            {signupRequests.map((sr) => (
+              <li key={sr.id} className="rounded-2xl border px-4 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-[var(--navy)]">Official {sr.gotrefsId}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      Requested to work <strong>{sr.eventTitle}</strong>
                     </p>
-                    {payLabel ? (
-                      <p className="mt-1 text-sm font-semibold text-[var(--blue)]">
-                        Event offer: {payLabel} per official
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-sm text-[var(--muted)]">No pay offer set on this event yet.</p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--blue)]">
+                      {sr.ratingAverage != null && sr.ratingCount > 0
+                        ? `${renderStarScore(Math.round(sr.ratingAverage))} ${sr.ratingAverage.toFixed(1)} · ${sr.ratingCount} past review${sr.ratingCount === 1 ? "" : "s"}`
+                        : "No reviews yet"}
+                    </p>
+                    {sr.refRateLabel && (
+                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Ref rate: {sr.refRateLabel}</p>
+                    )}
+                    {sr.eventPayLabel && (
+                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Your event pay: {sr.eventPayLabel}</p>
+                    )}
+                    {sr.reviews.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {sr.reviews.map((review) => (
+                          <blockquote
+                            key={`${review.createdAt}-${review.score}`}
+                            className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-[var(--slate)]"
+                          >
+                            <p className="font-bold text-amber-700">{renderStarScore(review.score)}</p>
+                            <p className="mt-1">{review.comment?.trim() || "No written comment."}</p>
+                          </blockquote>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <button
                     type="button"
-                    className="rounded bg-[var(--blue)] px-3 py-1.5 text-xs font-medium text-white"
+                    className="rounded-full bg-[var(--blue)] px-4 py-2 text-xs font-bold text-white"
                     onClick={() => void sendOfferFromRequest(sr)}
                   >
-                    Send offer{payLabel ? ` (${payLabel})` : ""}
+                    Request this ref
                   </button>
-                </li>
-              );
-            })}
+                </div>
+              </li>
+            ))}
           </ul>
         </section>
       )}
@@ -1949,7 +2060,7 @@ export default function OrganizerDashboardClient() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Marketplace</p>
             <h2 className="mt-1 font-display text-2xl font-bold text-[var(--blue)]">Hire a verified ref</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Discover verified officials, review availability, and invite them to your games.
+              Discover verified officials by GotREFS ID only. Request refs whose hourly rate fits your event pay range.
             </p>
           </div>
           {selectedOfferEvent && (
@@ -1985,6 +2096,7 @@ export default function OrganizerDashboardClient() {
                 const cardAvailability = selectedOfferEvent
                   ? r.availability.filter((slot) => slotCoversEvent(slot, selectedOfferEvent)).slice(0, 2)
                   : r.availability.slice(0, 2);
+                const priceFits = selectedOfferEvent ? refPriceFitsEvent(r, selectedOfferEvent) : true;
                 return (
                   <article
                     key={r.id}
@@ -2007,9 +2119,22 @@ export default function OrganizerDashboardClient() {
                       </div>
                       <p className="text-right text-sm font-black text-[var(--navy)]">
                         {formatRefRate(r)}
-                        <span className="block text-xs font-medium text-[var(--muted)]">/ game</span>
                       </p>
                     </div>
+
+                    {(r.reviews?.length ?? 0) > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {r.reviews?.slice(0, 2).map((review) => (
+                          <blockquote
+                            key={`${review.createdAt}-${review.score}`}
+                            className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-[var(--slate)]"
+                          >
+                            <p className="font-bold text-amber-700">{renderStarScore(review.score)}</p>
+                            <p className="mt-1">{review.comment?.trim() || "No written comment."}</p>
+                          </blockquote>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       <span className="rounded-full bg-[var(--blue)]/10 px-3 py-1 text-xs font-bold text-[var(--blue)]">
@@ -2045,17 +2170,26 @@ export default function OrganizerDashboardClient() {
                       </button>
                       <button
                         type="button"
+                        disabled={selectedOfferEvent ? !priceFits : false}
                         onClick={() => {
                           if (!requireOrganizerOnboarding()) return;
                           if (selectedOfferEvent) {
+                            if (!priceFits) {
+                              setMsg("This ref's hourly rate is outside your event pay range.");
+                              return;
+                            }
                             void sendOffer(r.id, selectedOfferEvent.id);
                             return;
                           }
                           setInviteRef(r);
                         }}
-                        className="flex-1 rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
+                        className="flex-1 rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {selectedOfferEvent ? "Request this Ref" : "Invite to Game"}
+                        {selectedOfferEvent
+                          ? priceFits
+                            ? "Request this Ref"
+                            : "Outside pay range"
+                          : "Invite to Game"}
                       </button>
                     </div>
                     {contactRefId === r.id && (
@@ -2083,15 +2217,19 @@ export default function OrganizerDashboardClient() {
             {filteredRefs.length === 0 && !selectedOfferEvent && (
               <div className="mt-5 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
                 <p className="text-3xl" aria-hidden="true">🔎</p>
-                <h3 className="mt-2 font-bold text-[var(--navy)]">No referees available in this window yet.</h3>
-                <p className="mt-1 text-sm text-[var(--muted)]">Expand your search radius or share your event link.</p>
+                <h3 className="mt-2 font-bold text-[var(--navy)]">No refs match this game yet.</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Try expanding your pay range, ZIP radius, or event window. Refs can still apply from the open games calendar.
+                </p>
               </div>
             )}
             {selectedOfferEvent && filteredRefs.length > 0 && matchingRefs.length === 0 && (
               <div className="mt-5 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
                 <p className="text-3xl" aria-hidden="true">🔎</p>
-                <h3 className="mt-2 font-bold text-[var(--navy)]">No referees available in this window yet.</h3>
-                <p className="mt-1 text-sm text-[var(--muted)]">Expand your search radius or share your event link.</p>
+                <h3 className="mt-2 font-bold text-[var(--navy)]">No refs match this game yet.</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Try expanding your pay range, ZIP radius, or event window. Refs can still apply from the open games calendar.
+                </p>
               </div>
             )}
           </>
@@ -2111,7 +2249,9 @@ export default function OrganizerDashboardClient() {
             </div>
             <p className="mt-3 text-sm text-[var(--muted)]">Select the game you want this referee to work.</p>
             <div className="mt-4 grid gap-2">
-              {events.map((event) => (
+              {events.map((event) => {
+                const priceFits = refPriceFitsEvent(inviteRef, event);
+                return (
                 <button
                   key={event.id}
                   type="button"
@@ -2125,22 +2265,29 @@ export default function OrganizerDashboardClient() {
                 >
                   <p className="font-bold text-[var(--navy)]">{event.title}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">{formatEventDateTime(event.starts_at)} · {event.sport}</p>
+                  <p className={`mt-1 text-xs font-semibold ${priceFits ? "text-green-700" : "text-amber-700"}`}>
+                    {priceFits ? "Pay range matches this ref" : "Outside this ref's hourly rate"}
+                  </p>
                 </button>
-              ))}
+              );
+              })}
             </div>
             <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-3 text-sm">
               We&apos;d love for you to ref for our upcoming event.
             </div>
             <button
               type="button"
-              disabled={!offerEvent}
+              disabled={
+                !offerEvent ||
+                !events.some((event) => event.id === offerEvent && refPriceFitsEvent(inviteRef, event))
+              }
               onClick={() => {
                 void sendOffer();
                 setInviteRef(null);
               }}
               className="mt-4 w-full rounded-full bg-[var(--red)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:opacity-50"
             >
-              Send invite
+              Send request
             </button>
           </div>
         </div>

@@ -21,6 +21,10 @@ type RegisterBody = {
   additionalSports?: string[];
   certificationLevel?: string;
   certifiedBy?: string;
+  rateMin?: number;
+  rateMax?: number;
+  rateType?: "exact" | "range";
+  rateUnit?: "hour" | "game";
   gotrefsId?: string;
   baseCity?: string;
   workRegions?: string[];
@@ -64,6 +68,12 @@ export async function POST(request: NextRequest) {
     : [];
   const certificationLevel = (body.certificationLevel ?? "").trim();
   const certifiedBy = (body.certifiedBy ?? "").trim();
+  const rateMin =
+    typeof body.rateMin === "number" && Number.isFinite(body.rateMin) ? body.rateMin : null;
+  const rateMax =
+    typeof body.rateMax === "number" && Number.isFinite(body.rateMax) ? body.rateMax : null;
+  const rateType = body.rateType === "range" ? "range" : body.rateType === "exact" ? "exact" : null;
+  const rateUnit = body.rateUnit === "game" ? "game" : body.rateUnit === "hour" ? "hour" : null;
   const gotrefsId = (body.gotrefsId ?? "").trim();
   const baseCity = (body.baseCity ?? "").trim();
   const workRegions = Array.isArray(body.workRegions)
@@ -233,12 +243,34 @@ export async function POST(request: NextRequest) {
             primary_sport: primarySport || "Basketball",
             additional_sports: additionalSports,
             certification_level: certificationLevel || "Youth / Recreational",
+            gotrefs_id: gotrefsId || null,
+            rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
+            rate_min: rateMin,
+            rate_max: rateMax,
+            rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
+            rate_unit: rateUnit ?? "hour",
             updated_at: new Date().toISOString(),
           },
           { onConflict: "member_id" }
         );
     } catch {
       // Profile row is created by trigger; non-fatal if upsert fails.
+    }
+  }
+
+  const signedInUserId = signInData.user?.id ?? userId;
+  if (signedInUserId) {
+    try {
+      const admin = createServiceClient();
+      await admin
+        .from("members")
+        .update({
+          is_onboarded: true,
+          last_login_at: new Date().toISOString(),
+        })
+        .eq("id", signedInUserId);
+    } catch {
+      // Non-fatal if onboarding flag cannot be set.
     }
   }
 

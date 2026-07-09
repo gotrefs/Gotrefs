@@ -32,7 +32,8 @@ create policy "ref_verification_submissions_own"
   using (ref_member_id = auth.uid())
   with check (ref_member_id = auth.uid());
 
-create or replace view public.ref_verification_review_queue as
+drop view if exists public.ref_verification_review_queue;
+create view public.ref_verification_review_queue as
 select
   s.ref_member_id,
   s.status,

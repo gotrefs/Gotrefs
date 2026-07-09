@@ -34,7 +34,7 @@ export async function GET() {
 
   const membersResult = await admin
     .from("members")
-    .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game, rate_type, rate_min, rate_max )")
+    .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game, rate_type, rate_min, rate_max, gotrefs_id, rate_unit )")
     .eq("role", "ref");
   let members: Array<{
     id: string;
@@ -47,6 +47,8 @@ export async function GET() {
           rate_type?: string | null;
           rate_min?: number | null;
           rate_max?: number | null;
+          gotrefs_id?: string | null;
+          rate_unit?: string | null;
         }>
       | {
           primary_sport?: string | null;
@@ -54,6 +56,8 @@ export async function GET() {
           rate_type?: string | null;
           rate_min?: number | null;
           rate_max?: number | null;
+          gotrefs_id?: string | null;
+          rate_unit?: string | null;
         }
       | null;
   }> | null = membersResult.data;
@@ -89,17 +93,28 @@ export async function GET() {
 
   const { data: ratings } = await admin
     .from("ref_ratings")
-    .select("ref_member_id, score, skipped")
+    .select("ref_member_id, score, skipped, comment, created_at")
     .in("ref_member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("skipped", false)
-    .not("score", "is", null);
+    .not("score", "is", null)
+    .order("created_at", { ascending: false });
 
-  const ratingByRef = new Map<string, { total: number; count: number }>();
+  const ratingByRef = new Map<
+    string,
+    { total: number; count: number; reviews: Array<{ score: number; comment: string | null; createdAt: string }> }
+  >();
   for (const rating of ratings ?? []) {
     if (typeof rating.score !== "number") continue;
-    const next = ratingByRef.get(rating.ref_member_id) ?? { total: 0, count: 0 };
+    const next = ratingByRef.get(rating.ref_member_id) ?? { total: 0, count: 0, reviews: [] };
     next.total += rating.score;
     next.count += 1;
+    if (next.reviews.length < 3) {
+      next.reviews.push({
+        score: rating.score,
+        comment: rating.comment ?? null,
+        createdAt: rating.created_at,
+      });
+    }
     ratingByRef.set(rating.ref_member_id, next);
   }
 
@@ -114,9 +129,10 @@ export async function GET() {
     const { data: authUser } = await admin.auth.admin.getUserById(m.id);
     const email = authUser?.user?.email ?? "";
     const gotrefsId =
-      typeof authUser?.user?.user_metadata?.gotrefs_id === "string"
+      (typeof rp?.gotrefs_id === "string" && rp.gotrefs_id) ||
+      (typeof authUser?.user?.user_metadata?.gotrefs_id === "string"
         ? authUser.user.user_metadata.gotrefs_id
-        : `GR-${m.id.slice(0, 8).toUpperCase()}`;
+        : `GR-${m.id.slice(0, 8).toUpperCase()}`);
     const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
     const rating = ratingByRef.get(m.id);
 
@@ -130,11 +146,13 @@ export async function GET() {
       rateType: rp?.rate_type === "range" ? "range" : "exact",
       rateMin: rp?.rate_min ?? null,
       rateMax: rp?.rate_max ?? null,
+      rateUnit: rp?.rate_unit === "game" ? "game" : "hour",
       homeZip: m.home_zip,
       availability: availByRef.get(m.id) ?? [],
       maskedEmail,
       ratingAverage: rating?.count ? Number((rating.total / rating.count).toFixed(1)) : null,
       ratingCount: rating?.count ?? 0,
+      reviews: rating?.reviews ?? [],
     });
   }
 

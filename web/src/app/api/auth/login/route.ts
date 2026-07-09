@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmUserEmail, findUserByEmail } from "@/lib/auth/admin-users";
 import { gotrefsAdminDashboardPath, isGotrefsAdminEmail } from "@/lib/auth/admin-access";
+import { resolveAuthenticatedHomePath } from "@/lib/auth/onboarding-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
-import { dashboardPathForRole } from "@/lib/member-role";
 import { validateEmail } from "@/lib/auth/validation";
 import { serverEnv } from "@/lib/env/server";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
@@ -101,20 +101,34 @@ export async function POST(request: NextRequest) {
   }
 
   let role: "ref" | "organizer" = "ref";
+  let member: { is_onboarded: boolean; role: string } | null = null;
   try {
     const admin = createServiceClient();
     if (data.user) {
       const sync = await syncMemberAccount(admin, data.user);
       role = sync.role;
+      const { data: memberRow } = await admin
+        .from("members")
+        .select("is_onboarded, role")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      member = memberRow;
     }
   } catch {
     role = data.user?.user_metadata?.role === "organizer" ? "organizer" : "ref";
   }
 
+  const redirect = isGotrefsAdminEmail(email)
+    ? gotrefsAdminDashboardPath()
+    : resolveAuthenticatedHomePath({
+        member,
+        email,
+      });
+
   return jsonWithSessionCookies(sessionResponse, {
     ok: true,
     userId: data.user?.id ?? null,
     role,
-    redirect: isGotrefsAdminEmail(email) ? gotrefsAdminDashboardPath() : dashboardPathForRole(role),
+    redirect,
   });
 }

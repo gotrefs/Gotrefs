@@ -1,73 +1,72 @@
 # OAuth Authentication Setup
 
-GotREFS uses Next.js App Router with Supabase Auth. Google, Facebook, and Apple OAuth codes are exchanged by Supabase, which verifies provider tokens and issues the secure Supabase session cookies used by the app.
+GotREFS uses Next.js App Router with Supabase Auth. Google, Facebook, and Apple OAuth codes are exchanged by Supabase, which verifies provider tokens and issues secure HTTP-only session cookies.
 
 ## Routes
 
-- Start OAuth:
+- **Start OAuth** (server action — preferred for PKCE cookies):
+  - `signInWithOAuthAction` in `src/lib/auth/oauth-actions.ts`
+- **Start OAuth** (API fallback):
   - `/api/auth/oauth/google`
   - `/api/auth/oauth/facebook`
   - `/api/auth/oauth/apple`
-- Provider callbacks:
-  - `/api/auth/callback/google`
-  - `/api/auth/callback/facebook`
-  - `/api/auth/callback/apple`
+- **Single callback** (email confirmation + all OAuth providers):
+  - `/auth/callback`
 
 After the callback succeeds, the server:
 
-- Exchanges the provider code for a Supabase session.
-- Reads the verified Supabase user.
-- Upserts `public.members` metadata.
-- Sets `is_onboarded = false` for new users.
-- Updates `last_login_at` for existing users.
-- Redirects to `/dashboard` with secure HTTP-only Supabase cookies.
+1. Exchanges the provider code (or email OTP) for a Supabase session.
+2. Upserts `public.members` metadata.
+3. Leaves `is_onboarded = false` for brand-new users.
+4. Redirects new users to `/auth/signup?oauth=1&step=role` to finish profile setup.
+5. Redirects returning onboarded users to their role dashboard (`/dashboard/referee`, `/dashboard/organizer`, or `/dashboard/admin`).
 
-## Supabase Provider Configuration
+## Supabase Dashboard Configuration
 
-In Supabase Dashboard -> Authentication -> Providers, enable each provider and set:
+### URL configuration (required)
 
-### Google
+**Authentication → URL configuration**
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- Callback URL:
-  - `https://YOUR_DOMAIN.com/api/auth/callback/google`
-  - `http://localhost:3000/api/auth/callback/google`
+| Setting | Value |
+|--------|--------|
+| Site URL | `https://YOUR_DOMAIN` (or `http://localhost:3000` locally) |
+| Redirect URLs | `http://localhost:3000/auth/callback` |
+| | `https://YOUR_DOMAIN/auth/callback` |
+| | Optional wildcards: `http://localhost:3000/**`, `https://YOUR_DOMAIN/**` |
 
-### Facebook
+`NEXT_PUBLIC_SITE_URL` in `.env.local` must match the Site URL.
 
-- `FACEBOOK_CLIENT_ID`
-- `FACEBOOK_CLIENT_SECRET`
-- Callback URL:
-  - `https://YOUR_DOMAIN.com/api/auth/callback/facebook`
-  - `http://localhost:3000/api/auth/callback/facebook`
+### Google provider
 
-### Apple
+**Authentication → Providers → Google**
 
-- `APPLE_CLIENT_ID` (Services ID)
-- `APPLE_TEAM_ID`
-- `APPLE_KEY_ID`
-- `APPLE_PRIVATE_KEY`
-- Callback URL:
-  - `https://YOUR_DOMAIN.com/api/auth/callback/apple`
-  - `http://localhost:3000/api/auth/callback/apple`
+- Enable Google.
+- Paste `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from Google Cloud Console.
+- In Google Cloud, authorized redirect URI is Supabase’s callback:
+  - `https://<project-ref>.supabase.co/auth/v1/callback`
 
-Apple only sends the name payload on the first sign-in. The callback service uses Apple’s first sign-in name when present, otherwise falls back to Supabase metadata or the email prefix.
+The app uses `prompt: "select_account"` so users can pick the correct Google account.
 
-## Database Migration
+### Facebook / Apple
 
-Run the migration:
+Same pattern: enable in Supabase, set secrets, use Supabase’s `/auth/v1/callback` in the provider console.
 
-`supabase/migrations/20260623132000_oauth_member_metadata.sql`
+## Database
 
-It adds:
+Run in Supabase SQL Editor:
 
-- `members.email`
-- `members.profile_picture_url`
-- `members.auth_provider`
-- `members.is_onboarded`
-- `members.last_login_at`
+- `supabase/RUN_OAUTH_AUTH_SETUP.sql` (columns + `handle_new_user` trigger)
+- Or migration: `supabase/migrations/20260623132000_oauth_member_metadata.sql`
 
-## Frontend Routing
+Key column: `members.is_onboarded` — `false` until the signup wizard completes (email register API or `POST /api/auth/complete-oauth-signup`).
 
-Landing-page social buttons now link to the backend OAuth start endpoints. Email signup still uses `/auth/signup`.
+## First-login flow
+
+| Path | First visit | After wizard |
+|------|-------------|--------------|
+| Google OAuth | `/auth/signup?oauth=1&step=role` | Role dashboard |
+| Email signup | Full wizard in one session → `is_onboarded: true` | Role dashboard |
+| Email login (incomplete) | Middleware → signup wizard | Role dashboard |
+| Returning user | Role dashboard directly | — |
+
+Middleware (`src/lib/supabase/middleware.ts`) blocks `/dashboard/*` until `is_onboarded` is true and sends `/dashboard` to the correct role path.
