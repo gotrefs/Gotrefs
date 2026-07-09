@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { dashboardPathForRole } from "@/lib/member-role";
+import { isGotrefsAdminEmail, isGotrefsAdminUser, gotrefsAdminDashboardPath } from "@/lib/auth/admin-access";
+import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
+import { resolvePostOAuthRedirect } from "@/lib/auth/oauth-redirect";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -156,7 +158,7 @@ async function insertOAuthMember(
     email: profile.email || null,
     profile_picture_url: profile.profilePicture,
     auth_provider: provider,
-    is_onboarded: false,
+    is_onboarded: isGotrefsAdminEmail(profile.email),
     last_login_at: now,
   };
 
@@ -240,13 +242,17 @@ export async function upsertOAuthMember(
 
   const { data: byId } = await admin
     .from("members")
-    .select("id, role")
+    .select("id, role, is_onboarded")
     .eq("id", user.id)
     .maybeSingle();
 
   if (byId) {
     await updateMemberOAuthMetadata(admin, user.id, profile, provider, now, true);
-    return { ...profile, isOnboarded: false, role: byId.role ?? null };
+    if (isGotrefsAdminEmail(profile.email)) {
+      await updateMemberWithOptionalColumns(admin, user.id, { is_onboarded: true });
+      return { ...profile, isOnboarded: true, role: byId.role ?? "ref" };
+    }
+    return { ...profile, isOnboarded: Boolean(byId.is_onboarded), role: byId.role ?? null };
   }
 
   const currentByEmail = profile.email ? await findMemberByEmail(admin, profile.email) : null;
@@ -265,10 +271,16 @@ export async function upsertOAuthMember(
 
   await insertOAuthMember(admin, user, profile, provider, now);
 
-  await admin.from("ref_profiles").upsert({ member_id: user.id }, { onConflict: "member_id" });
-  await admin.from("screening_checks").upsert({ ref_member_id: user.id }, { onConflict: "ref_member_id" });
+  if (!isGotrefsAdminEmail(profile.email)) {
+    await admin.from("ref_profiles").upsert({ member_id: user.id }, { onConflict: "member_id" });
+    await admin.from("screening_checks").upsert({ ref_member_id: user.id }, { onConflict: "ref_member_id" });
+  }
 
-  return { ...profile, isOnboarded: false, role: "ref" };
+  return {
+    ...profile,
+    isOnboarded: isGotrefsAdminEmail(profile.email),
+    role: "ref",
+  };
 }
 
 export async function handleOAuthCallback(
@@ -303,16 +315,19 @@ export async function handleOAuthCallback(
   try {
     const admin = createServiceClient();
     const appleIdentity = provider === "apple" ? parseAppleIdentity(appleUserPayload ?? null) : null;
+
+    if (isGotrefsAdminUser(user)) {
+      await ensureAdminOAuthMember(admin, user);
+      const redirect = NextResponse.redirect(new URL(gotrefsAdminDashboardPath(), requestUrl.origin));
+      sessionResponse.cookies.getAll().forEach((cookie) => {
+        redirect.cookies.set(cookie.name, cookie.value, cookie);
+      });
+      return redirect;
+    }
+
     const member = await upsertOAuthMember(admin, user, provider, appleIdentity);
 
-    const nextPath = next.startsWith("/") ? next : "/dashboard";
-    const destination = new URL(
-      nextPath === "/dashboard" && (member.role === "ref" || member.role === "organizer")
-        ? dashboardPathForRole(member.role)
-        : nextPath,
-      requestUrl.origin
-    );
-    destination.searchParams.set("isOnboarded", String(member.isOnboarded));
+    const destination = resolvePostOAuthRedirect(requestUrl.origin, member, next, user.email);
 
     const redirect = NextResponse.redirect(destination);
     sessionResponse.cookies.getAll().forEach((cookie) => {

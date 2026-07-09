@@ -222,6 +222,24 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
+  } else if (role === "ref" && userId) {
+    try {
+      const admin = createServiceClient();
+      await admin
+        .from("ref_profiles")
+        .upsert(
+          {
+            member_id: userId,
+            primary_sport: primarySport || "Basketball",
+            additional_sports: additionalSports,
+            certification_level: certificationLevel || "Youth / Recreational",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "member_id" }
+        );
+    } catch {
+      // Profile row is created by trigger; non-fatal if upsert fails.
+    }
   }
 
   return jsonWithSessionCookies(sessionResponse, {

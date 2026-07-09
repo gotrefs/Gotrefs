@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { BRAND_NAME } from "@/lib/brand";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/client";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
 import { OAuthContinueButton } from "@/components/auth/OAuthContinueButton";
+import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
 
 type AuthStep = "email" | "password" | "role" | "onboarding";
 type AudienceRole = "ref" | "organizer" | "assignor";
@@ -69,7 +71,9 @@ export function AuthFlow() {
   const [customPrimarySport, setCustomPrimarySport] = useState("");
   const [selectedSports, setSelectedSports] = useState<string[]>(["Basketball"]);
   const [certificationLevel, setCertificationLevel] = useState("");
-  const [certifiedBy, setCertifiedBy] = useState("");
+  const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
+  const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
+  const [certDocFile, setCertDocFile] = useState<File | null>(null);
   const [baseCity, setBaseCity] = useState("");
   const [travelRadius, setTravelRadius] = useState("25");
   const [workRegions, setWorkRegions] = useState<string[]>(["Local city"]);
@@ -86,10 +90,55 @@ export function AuthFlow() {
   const [notice, setNotice] = useState<string | null>(null);
   const [existingProviders, setExistingProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const oauthMode = searchParams.get("oauth") === "1";
+
+  useEffect(() => {
+    if (!oauthMode) return;
+
+    async function bootOAuthSignup() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setError("Google sign-in session expired. Please try Continue with Google again.");
+        setStep("email");
+        return;
+      }
+
+      setEmail(user.email ?? "");
+      const nameFromMeta =
+        String(user.user_metadata?.full_name ?? "").trim() ||
+        `${String(user.user_metadata?.first_name ?? "").trim()} ${String(user.user_metadata?.last_name ?? "").trim()}`.trim();
+      if (nameFromMeta) setFullName(nameFromMeta);
+
+      try {
+        const adminCheck = await fetch("/api/auth/admin-check");
+        const adminJson = (await adminCheck.json()) as { isAdmin?: boolean };
+        if (adminJson.isAdmin) {
+          window.location.assign("/dashboard/admin");
+          return;
+        }
+      } catch {
+        // Continue with normal OAuth onboarding if admin check fails.
+      }
+
+      const stepParam = searchParams.get("step");
+      setStep(stepParam === "onboarding" ? "onboarding" : "role");
+    }
+
+    void bootOAuthSignup();
+  }, [oauthMode, searchParams]);
 
   const gotrefsId = useMemo(() => buildGotrefsId(email || fullName), [email, fullName]);
   const roleCard = ROLE_CARDS.find((item) => item.role === role) ?? ROLE_CARDS[0];
-  const progress = role === "ref" ? ["Profile", "Sports", "Location"] : role === "organizer" ? ["Organization", "Payments", "Account"] : ["Authority", "Crew", "Account"];
+  const progress =
+    role === "ref"
+      ? ["Profile", "Sports", "Government ID", "Certification", "Location"]
+      : role === "organizer"
+        ? ["Organization", "Payments", "Account"]
+        : ["Authority", "Crew", "Account"];
   const resolvedPrimarySport = sportPickerToStored(primarySport, customPrimarySport);
 
   function toggleSport(sport: string) {
@@ -201,6 +250,18 @@ export function AuthFlow() {
       setError("Enter at least one league, association, or governing body.");
       return;
     }
+    if (role === "ref" && wizardStep === 1 && primarySport === OTHER_SPORT_VALUE && !customPrimarySport.trim()) {
+      setError("Enter the sport you officiate.");
+      return;
+    }
+    if (role === "ref" && wizardStep === 2 && (!govIdFrontFile || !govIdBackFile)) {
+      setError("Upload the front and back of your government ID to continue.");
+      return;
+    }
+    if (role === "ref" && wizardStep === 3 && !certDocFile) {
+      setError("Upload your certification or license document to continue.");
+      return;
+    }
     setWizardStep((current) => Math.min(current + 1, progress.length - 1));
   }
 
@@ -208,12 +269,6 @@ export function AuthFlow() {
     e.preventDefault();
     setError(null);
     setNotice(null);
-
-    const pwErr = validatePasswordStrength(password);
-    if (pwErr) {
-      setError(pwErr);
-      return;
-    }
 
     const { firstName, lastName } = splitName(fullName);
     if (!firstName || !lastName) {
@@ -225,41 +280,83 @@ export function AuthFlow() {
       return;
     }
 
+    if (!oauthMode) {
+      const pwErr = validatePasswordStrength(password);
+      if (pwErr) {
+        setError(pwErr);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const isOrganizer = role === "organizer";
-      const res = await fetch("/api/auth/register", {
+      const payload = {
+        email,
+        firstName,
+        lastName,
+        role: isOrganizer ? "organizer" : "ref",
+        isAssignor: role === "assignor",
+        organizationName: isOrganizer ? organizationName.trim() : undefined,
+        phone: isOrganizer ? phone.trim() : undefined,
+        primarySport: resolvedPrimarySport,
+        additionalSports: selectedSports.filter((sport) => sport !== primarySport),
+        certificationLevel: certificationLevel.trim() || undefined,
+        gotrefsId,
+        baseCity: baseCity.trim() || undefined,
+        workRegions,
+        travelRadius: Number(travelRadius) || null,
+        governingBodies: governingBodies.trim() || undefined,
+        crewInvite: crewInvite.trim() || undefined,
+        verificationSkipped: role === "ref" ? !(govIdFrontFile && govIdBackFile && certDocFile) : undefined,
+        termsAccepted,
+        acceptedTermsSlug: role === "organizer" ? "event-organizer-terms" : "referee-official-terms",
+        ...(oauthMode ? {} : { password }),
+      };
+
+      const res = await fetch(oauthMode ? "/api/auth/complete-oauth-signup" : "/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          firstName,
-          lastName,
-          role: isOrganizer ? "organizer" : "ref",
-          isAssignor: role === "assignor",
-          organizationName: isOrganizer ? organizationName.trim() : undefined,
-          phone: isOrganizer ? phone.trim() : undefined,
-          primarySport: resolvedPrimarySport,
-          additionalSports: selectedSports.filter((sport) => sport !== primarySport),
-          certificationLevel: certificationLevel.trim() || undefined,
-          certifiedBy: certifiedBy.trim() || undefined,
-          gotrefsId,
-          baseCity: baseCity.trim() || undefined,
-          workRegions,
-          travelRadius: Number(travelRadius) || null,
-          governingBodies: governingBodies.trim() || undefined,
-          crewInvite: crewInvite.trim() || undefined,
-          verificationSkipped: true,
-          termsAccepted,
-          acceptedTermsSlug: role === "organizer" ? "event-organizer-terms" : "referee-official-terms",
-        }),
+        body: JSON.stringify(payload),
       });
-      const json = (await res.json()) as { error?: string; redirect?: string };
+      const json = (await res.json()) as { error?: string; redirect?: string; userId?: string | null };
       if (!res.ok) {
         setError(json.error || "Could not create your account.");
         return;
       }
+
+      const userId = json.userId;
+      if (role === "ref" && govIdFrontFile && govIdBackFile && certDocFile) {
+        try {
+          let memberId = userId;
+          if (!memberId) {
+            const supabase = createClient();
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            memberId = user?.id ?? null;
+          }
+          if (memberId) {
+            await uploadRefSignupDocuments(
+              memberId,
+              {
+                govIdFront: govIdFrontFile,
+                govIdBack: govIdBackFile,
+                certificationDocument: certDocFile,
+              },
+              {
+                primarySport: resolvedPrimarySport,
+                additionalSports: selectedSports.filter((sport) => sport !== resolvedPrimarySport),
+                certificationLevel: certificationLevel.trim() || "Youth / Recreational",
+              }
+            );
+            await submitRefVerificationForReview();
+          }
+        } catch {
+          setNotice("Account created, but verification could not be submitted automatically. You can finish from your dashboard.");
+        }
+      }
+
       const next = searchParams.get("next");
       const destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
       window.location.assign(destination);
@@ -379,9 +476,16 @@ export function AuthFlow() {
 
         {step === "role" && (
           <div className="space-y-4">
-            <button type="button" onClick={() => setStep("email")} className="text-sm font-bold text-[var(--muted)]">
-              Back to email
-            </button>
+            {!oauthMode && (
+              <button type="button" onClick={() => setStep("email")} className="text-sm font-bold text-[var(--muted)]">
+                Back to email
+              </button>
+            )}
+            {oauthMode && (
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+                Signed in with Google as {email}. Choose how you will use {BRAND_NAME}.
+              </p>
+            )}
             <div>
               <h2 className="text-xl font-black text-[var(--navy)]">What is your primary role today?</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">We will tailor setup around how you use {BRAND_NAME}.</p>
@@ -461,16 +565,47 @@ export function AuthFlow() {
               <SportsAndCerts
                 selectedSports={selectedSports}
                 primarySport={primarySport}
+                customPrimarySport={customPrimarySport}
                 certificationLevel={certificationLevel}
-                certifiedBy={certifiedBy}
                 onToggleSport={toggleSport}
                 onPrimarySport={setPrimarySport}
+                onCustomPrimarySport={setCustomPrimarySport}
                 onCertificationLevel={setCertificationLevel}
-                onCertifiedBy={setCertifiedBy}
               />
             )}
 
             {role === "ref" && wizardStep === 2 && (
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-[var(--muted)]">
+                  Upload a clear photo or scan of your government-issued ID. We need both the front and back.
+                </p>
+                <SignupFileUpload
+                  label="Government ID — front"
+                  file={govIdFrontFile}
+                  onFile={setGovIdFrontFile}
+                />
+                <SignupFileUpload
+                  label="Government ID — back"
+                  file={govIdBackFile}
+                  onFile={setGovIdBackFile}
+                />
+              </div>
+            )}
+
+            {role === "ref" && wizardStep === 3 && (
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-[var(--muted)]">
+                  Upload your referee certification, license, or training credential (NFHS card, state license, USSF, etc.).
+                </p>
+                <SignupFileUpload
+                  label="Certification / license document"
+                  file={certDocFile}
+                  onFile={setCertDocFile}
+                />
+              </div>
+            )}
+
+            {role === "ref" && wizardStep === 4 && (
               <LocationAndAccount
                 email={email}
                 baseCity={baseCity}
@@ -482,6 +617,7 @@ export function AuthFlow() {
                 onTravelRadius={setTravelRadius}
                 onToggleRegion={toggleRegion}
                 onPassword={setPassword}
+                oauthMode={oauthMode}
               />
             )}
 
@@ -526,7 +662,17 @@ export function AuthFlow() {
             )}
 
             {role === "organizer" && wizardStep === 2 && (
-              <AccountFields fullName={fullName} email={email} phone={phone} password={password} onFullName={setFullName} onEmail={setEmail} onPhone={setPhone} onPassword={setPassword} />
+              <AccountFields
+                fullName={fullName}
+                email={email}
+                phone={phone}
+                password={password}
+                onFullName={setFullName}
+                onEmail={setEmail}
+                onPhone={setPhone}
+                onPassword={setPassword}
+                oauthMode={oauthMode}
+              />
             )}
 
             {role === "assignor" && wizardStep === 0 && (
@@ -550,7 +696,17 @@ export function AuthFlow() {
             )}
 
             {role === "assignor" && wizardStep === 2 && (
-              <AccountFields fullName={fullName} email={email} phone={phone} password={password} onFullName={setFullName} onEmail={setEmail} onPhone={setPhone} onPassword={setPassword} />
+              <AccountFields
+                fullName={fullName}
+                email={email}
+                phone={phone}
+                password={password}
+                onFullName={setFullName}
+                onEmail={setEmail}
+                onPhone={setPhone}
+                onPassword={setPassword}
+                oauthMode={oauthMode}
+              />
             )}
 
             {wizardStep < progress.length - 1 ? (
@@ -593,7 +749,7 @@ export function AuthFlow() {
                   </span>
                 </label>
                 <button type="submit" disabled={loading || !termsAccepted} className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">
-                  {loading ? "Creating account..." : "Create account"}
+                  {loading ? "Saving..." : oauthMode ? "Finish setup" : "Create account"}
                 </button>
               </>
             )}
@@ -607,33 +763,77 @@ export function AuthFlow() {
   );
 }
 
+function SignupFileUpload({
+  label,
+  file,
+  onFile,
+}: {
+  label: string;
+  file: File | null;
+  onFile: (file: File | null) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer flex-col rounded-2xl border-2 border-dashed border-[var(--blue)]/35 bg-[var(--blue)]/5 p-4 text-sm transition hover:border-[var(--blue)]">
+      <span className="font-bold text-[var(--navy)]">{label}</span>
+      <span className="mt-1 text-xs text-[var(--muted)]">JPG, PNG, or PDF</span>
+      {file ? (
+        <span className="mt-2 font-semibold text-green-700">{file.name}</span>
+      ) : (
+        <span className="mt-2 font-semibold text-[var(--blue)]">Choose file to upload</span>
+      )}
+      <input
+        type="file"
+        accept=".jpg,.jpeg,.png,.pdf,.webp"
+        className="sr-only"
+        onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+      />
+    </label>
+  );
+}
+
 function SportsAndCerts({
   selectedSports,
   primarySport,
+  customPrimarySport,
   certificationLevel,
-  certifiedBy,
   onToggleSport,
   onPrimarySport,
+  onCustomPrimarySport,
   onCertificationLevel,
-  onCertifiedBy,
 }: {
   selectedSports: string[];
   primarySport: string;
+  customPrimarySport: string;
   certificationLevel: string;
-  certifiedBy: string;
   onToggleSport: (sport: string) => void;
   onPrimarySport: (sport: string) => void;
+  onCustomPrimarySport: (value: string) => void;
   onCertificationLevel: (value: string) => void;
-  onCertifiedBy: (value: string) => void;
 }) {
   return (
     <div className="space-y-4">
       <label className="block text-sm font-bold text-[var(--navy)]">
         Primary sport
         <select value={primarySport} onChange={(event) => onPrimarySport(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3">
-          {ALL_SPORTS.map((sport) => <option key={sport} value={sport}>{sport}</option>)}
+          {ALL_SPORTS.map((sport) => (
+            <option key={sport} value={sport}>
+              {sport}
+            </option>
+          ))}
+          <option value={OTHER_SPORT_VALUE}>Other</option>
         </select>
       </label>
+      {primarySport === OTHER_SPORT_VALUE && (
+        <label className="block text-sm font-bold text-[var(--navy)]">
+          Type your sport
+          <input
+            value={customPrimarySport}
+            onChange={(event) => onCustomPrimarySport(event.target.value)}
+            placeholder="e.g. Dodgeball, Boxing, Pickleball"
+            className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+          />
+        </label>
+      )}
       <div>
         <p className="text-sm font-bold text-[var(--navy)]">Sports you officiate</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -655,10 +855,6 @@ function SportsAndCerts({
         Certification level
         <input value={certificationLevel} onChange={(event) => onCertificationLevel(event.target.value)} placeholder="Youth, varsity, NFHS, USSF, etc." className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
       </label>
-      <label className="block text-sm font-bold text-[var(--navy)]">
-        Certified by
-        <input value={certifiedBy} onChange={(event) => onCertifiedBy(event.target.value)} placeholder="NFHS, state association, local association" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-      </label>
     </div>
   );
 }
@@ -674,6 +870,7 @@ function LocationAndAccount({
   onTravelRadius,
   onToggleRegion,
   onPassword,
+  oauthMode = false,
 }: {
   email: string;
   baseCity: string;
@@ -685,12 +882,22 @@ function LocationAndAccount({
   onTravelRadius: (value: string) => void;
   onToggleRegion: (value: string) => void;
   onPassword: (value: string) => void;
+  oauthMode?: boolean;
 }) {
   return (
     <div className="space-y-4">
       <label className="block text-sm font-bold text-[var(--navy)]">
         Email
-        <input type="email" required value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+        <input
+          type="email"
+          required
+          readOnly={oauthMode}
+          value={email}
+          onChange={(event) => onEmail(event.target.value)}
+          autoComplete="email"
+          placeholder="you@example.com"
+          className={`mt-2 w-full rounded-xl border border-slate-200 px-4 py-3${oauthMode ? " bg-slate-50 text-[var(--muted)]" : ""}`}
+        />
       </label>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Base city
@@ -717,10 +924,12 @@ function LocationAndAccount({
           ))}
         </div>
       </div>
-      <label className="block text-sm font-bold text-[var(--navy)]">
-        Create password
-        <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-      </label>
+      {!oauthMode && (
+        <label className="block text-sm font-bold text-[var(--navy)]">
+          Create password
+          <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+        </label>
+      )}
     </div>
   );
 }
@@ -734,6 +943,7 @@ function AccountFields({
   onEmail,
   onPhone,
   onPassword,
+  oauthMode = false,
 }: {
   fullName: string;
   email: string;
@@ -743,6 +953,7 @@ function AccountFields({
   onEmail: (value: string) => void;
   onPhone: (value: string) => void;
   onPassword: (value: string) => void;
+  oauthMode?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -752,16 +963,27 @@ function AccountFields({
       </label>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Email
-        <input type="email" required value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+        <input
+          type="email"
+          required
+          readOnly={oauthMode}
+          value={email}
+          onChange={(event) => onEmail(event.target.value)}
+          autoComplete="email"
+          placeholder="you@example.com"
+          className={`mt-2 w-full rounded-xl border border-slate-200 px-4 py-3${oauthMode ? " bg-slate-50 text-[var(--muted)]" : ""}`}
+        />
       </label>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Phone number
         <input type="tel" value={phone} onChange={(event) => onPhone(event.target.value)} placeholder="(555) 123-4567" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
       </label>
-      <label className="block text-sm font-bold text-[var(--navy)]">
-        Create password
-        <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-      </label>
+      {!oauthMode && (
+        <label className="block text-sm font-bold text-[var(--navy)]">
+          Create password
+          <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+        </label>
+      )}
     </div>
   );
 }

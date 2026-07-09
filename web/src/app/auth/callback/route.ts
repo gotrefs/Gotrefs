@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { gotrefsAdminDashboardPath, isGotrefsAdminUser } from "@/lib/auth/admin-access";
+import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { upsertOAuthMember } from "@/lib/auth/oauth";
 import { parseOAuthProvider, type OAuthProvider } from "@/lib/auth/oauth-providers";
+import { resolvePostOAuthRedirect } from "@/lib/auth/oauth-redirect";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { dashboardPathForRole } from "@/lib/member-role";
 import { createRouteHandlerClient, safeRedirectPath } from "@/lib/supabase/route-handler";
@@ -86,13 +89,15 @@ export async function GET(request: NextRequest) {
     if (provider) {
       try {
         const admin = createServiceClient();
+        if (isGotrefsAdminUser(user)) {
+          await ensureAdminOAuthMember(admin, user);
+          return redirectWithCookies(
+            sessionResponse,
+            new URL(gotrefsAdminDashboardPath(), requestUrl.origin)
+          );
+        }
         const member = await upsertOAuthMember(admin, user, provider);
-        redirectPath =
-          next === "/dashboard" && (member.role === "ref" || member.role === "organizer")
-            ? dashboardPathForRole(member.role)
-            : next;
-        const destination = new URL(redirectPath, requestUrl.origin);
-        destination.searchParams.set("isOnboarded", String(member.isOnboarded));
+        const destination = resolvePostOAuthRedirect(requestUrl.origin, member, next, user.email);
         return redirectWithCookies(sessionResponse, destination);
       } catch (error) {
         const reason = error instanceof Error ? error.message : "oauth_callback_failed";
@@ -102,13 +107,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (redirectPath === "/dashboard") {
-      try {
-        const admin = createServiceClient();
-        const sync = await syncMemberAccount(admin, user);
-        redirectPath = dashboardPathForRole(sync.role);
-      } catch {
-        redirectPath =
-          user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
+      if (isGotrefsAdminUser(user)) {
+        redirectPath = gotrefsAdminDashboardPath();
+      } else {
+        try {
+          const admin = createServiceClient();
+          const sync = await syncMemberAccount(admin, user);
+          redirectPath = dashboardPathForRole(sync.role);
+        } catch {
+          redirectPath =
+            user.user_metadata?.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
+        }
       }
     }
 

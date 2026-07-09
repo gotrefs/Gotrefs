@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
+import { refOfferEligible } from "@/lib/ref-eligibility";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -38,6 +39,35 @@ export async function POST(request: Request) {
   const sync = await syncMemberAccount(admin, user);
   if (sync.role !== "ref") {
     return NextResponse.json({ error: "Only referees can apply to work events." }, { status: 403 });
+  }
+
+  const [{ data: profile }, { data: submission }, { data: screening }] = await Promise.all([
+    admin
+      .from("ref_profiles")
+      .select("verification_method, external_verification_proof_path")
+      .eq("member_id", user.id)
+      .maybeSingle(),
+    admin.from("ref_verification_submissions").select("status").eq("ref_member_id", user.id).maybeSingle(),
+    admin.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
+  ]);
+
+  const eligible = refOfferEligible({
+    screeningStatus: screening?.status,
+    verificationMethod: profile?.verification_method,
+    externalProofPath: profile?.external_verification_proof_path,
+    verificationSubmissionStatus: submission?.status,
+  });
+
+  if (!eligible) {
+    const pending = ["submitted", "under_review"].includes(submission?.status ?? "");
+    return NextResponse.json(
+      {
+        error: pending
+          ? "Application Pending — you'll be able to request games once GotREFS approves your verification."
+          : "Your verification must be approved before you can request to work games.",
+      },
+      { status: 403 }
+    );
   }
 
   const { data: event, error: eventError } = await admin

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { signInWithOAuthAction } from "@/lib/auth/oauth-actions";
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 
 type OAuthContinueButtonProps = {
@@ -12,6 +11,7 @@ type OAuthContinueButtonProps = {
   disabled?: boolean;
 };
 
+/** Full-page navigation so PKCE cookies are set reliably by the OAuth API route. */
 export function OAuthContinueButton({
   provider,
   className,
@@ -19,35 +19,12 @@ export function OAuthContinueButton({
   disabled = false,
 }: OAuthContinueButtonProps) {
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  function handleClick() {
-    setError(null);
-    startTransition(async () => {
-      try {
-        const next = searchParams.get("next") || "/dashboard";
-        await signInWithOAuthAction(provider, next);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "OAuth sign-in failed.";
-        if (!message.includes("NEXT_REDIRECT")) {
-          setError(message);
-        }
-      }
-    });
-  }
+  const next = searchParams.get("next") || "/dashboard";
+  const href = `/api/auth/oauth/${provider}?next=${encodeURIComponent(next)}`;
 
   return (
-    <div className="grid gap-2">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={disabled || pending}
-        className={className}
-      >
-        {pending ? "Redirecting…" : children}
-      </button>
-      {error ? <p className="text-center text-xs font-semibold text-red-600">{error}</p> : null}
-    </div>
+    <Link href={href} className={`${className}${disabled ? " pointer-events-none opacity-60" : ""}`}>
+      {children}
+    </Link>
   );
 }

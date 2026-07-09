@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
+import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { SportsFields } from "@/components/SportsFields";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { BRAND_NAME } from "@/lib/brand";
-import { refOfferEligible, refProfilePackageComplete } from "@/lib/ref-eligibility";
+import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
+import { normalizeFixRequiredSteps, REF_VERIFICATION_STEPS, type RefVerificationStepKey } from "@/lib/ref-verification-steps";
 
 type InquiryRow = {
   id: string;
@@ -53,6 +55,10 @@ type OfferRow = {
 type AvailabilitySlot = { id: string; start_at: string; end_at: string };
 type VerificationStep = "id" | "certification" | "external" | "submit";
 
+function refVerificationNeedsFix(status: string, fixSteps: RefVerificationStepKey[]): boolean {
+  return (status === "rejected" || status === "under_review") && fixSteps.length > 0;
+}
+
 function isMissingRateRangeColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
   return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
@@ -84,7 +90,7 @@ export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   const editorRef = useRef<HTMLElement | null>(null);
-  const gamesRef = useRef<HTMLElement | null>(null);
+  const gamesRef = useRef<HTMLDivElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,6 +125,16 @@ export default function RefereeDashboardClient() {
   const [govIdPath, setGovIdPath] = useState<string | null>(null);
   const [certDocPath, setCertDocPath] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
+  const [verificationAdminNotes, setVerificationAdminNotes] = useState<string | null>(null);
+  const [verificationNotesUpdatedAt, setVerificationNotesUpdatedAt] = useState<string | null>(null);
+  const [verificationReviewedAt, setVerificationReviewedAt] = useState<string | null>(null);
+  const [verificationFixRequiredSteps, setVerificationFixRequiredSteps] = useState<RefVerificationStepKey[]>([]);
+  const [showResubmitFlow, setShowResubmitFlow] = useState(false);
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [verificationNotice, setVerificationNotice] = useState<{
+    type: "approved" | "fix_required" | "rejected";
+    message: string;
+  } | null>(null);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [isAssignor, setIsAssignor] = useState(false);
   const [assignorSaving, setAssignorSaving] = useState(false);
@@ -131,6 +147,7 @@ export default function RefereeDashboardClient() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    setMemberId(user.id);
     const meta = user.user_metadata ?? {};
     setDisplayName(
       String(meta.full_name ?? "").trim() ||
@@ -213,12 +230,34 @@ export default function RefereeDashboardClient() {
       setCertDocPath(rp.certification_document_path || null);
     }
 
-    const { data: vs } = await supabase
+    const { data: vs, error: vsError } = await supabase
       .from("ref_verification_submissions")
-      .select("status")
+      .select("status, admin_notes, updated_at, reviewed_at, fix_required_steps, resubmitted_at")
       .eq("ref_member_id", user.id)
       .maybeSingle();
-    setVerificationStatus(vs?.status || "draft");
+
+    let submission: {
+      status?: string | null;
+      admin_notes?: string | null;
+      updated_at?: string | null;
+      reviewed_at?: string | null;
+      fix_required_steps?: unknown;
+      resubmitted_at?: string | null;
+    } | null = vs;
+    if (vsError?.message.includes("fix_required_steps")) {
+      const fallback = await supabase
+        .from("ref_verification_submissions")
+        .select("status, admin_notes, updated_at, reviewed_at")
+        .eq("ref_member_id", user.id)
+        .maybeSingle();
+      submission = fallback.data;
+    }
+
+    setVerificationStatus(submission?.status || "draft");
+    setVerificationAdminNotes(submission?.admin_notes?.trim() || null);
+    setVerificationNotesUpdatedAt(submission?.updated_at || null);
+    setVerificationReviewedAt(submission?.reviewed_at || null);
+    setVerificationFixRequiredSteps(normalizeFixRequiredSteps(submission?.fix_required_steps));
 
     const { data: inq } = await supabase
       .from("ref_inquiries")
@@ -265,7 +304,91 @@ export default function RefereeDashboardClient() {
     setSport,
     setVerificationMethod,
     setVerificationStatus,
+    setVerificationAdminNotes,
+    setVerificationNotesUpdatedAt,
+    setVerificationReviewedAt,
+    setVerificationFixRequiredSteps,
+    setMemberId,
   ]);
+
+  useEffect(() => {
+    if (loading || !memberId) return;
+
+    const fixFingerprint = verificationFixRequiredSteps.join(",");
+    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}:${fixFingerprint}`;
+    const storageKey = `gotrefs-ref-verification-notice-seen:${memberId}`;
+    if (window.localStorage.getItem(storageKey) === fingerprint) return;
+
+    if (refVerificationApproved(verificationStatus)) {
+      setVerificationNotice({
+        type: "approved",
+        message:
+          verificationAdminNotes ||
+          "Application Approved — you can now request to work games and browse the calendar below.",
+      });
+      return;
+    }
+
+    if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
+      setVerificationNotice({
+        type: "fix_required",
+        message:
+          verificationAdminNotes ||
+          "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
+      });
+      return;
+    }
+
+    if (refVerificationRejected(verificationStatus)) {
+      setVerificationNotice({
+        type: "rejected",
+        message:
+          verificationAdminNotes ||
+          "Your verification was not approved. Please contact GotREFS support if you have questions.",
+      });
+    }
+  }, [
+    loading,
+    memberId,
+    verificationStatus,
+    verificationReviewedAt,
+    verificationNotesUpdatedAt,
+    verificationAdminNotes,
+    verificationFixRequiredSteps,
+  ]);
+
+  function dismissVerificationNotice() {
+    if (!memberId) {
+      setVerificationNotice(null);
+      return;
+    }
+    const fixFingerprint = verificationFixRequiredSteps.join(",");
+    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}:${fixFingerprint}`;
+    window.localStorage.setItem(`gotrefs-ref-verification-notice-seen:${memberId}`, fingerprint);
+
+    const noticeType = verificationNotice?.type;
+    setVerificationNotice(null);
+
+    if (noticeType === "approved") {
+      window.requestAnimationFrame(() => {
+        gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+
+    if (verificationFixRequiredSteps.length > 0) {
+      setShowResubmitFlow(true);
+    }
+  }
+
+  async function handleResubmitComplete() {
+    setShowResubmitFlow(false);
+    setMsg("Application successfully submitted — we'll review your updates within 1-2 business days.");
+    await load();
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
 
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -660,45 +783,57 @@ export default function RefereeDashboardClient() {
   const profileReady = Boolean(bio.trim() && sport.trim() && cert.trim());
   const idReady = Boolean(govIdPath);
   const certificationReady = Boolean(certDocPath);
-  const verificationSubmitted = ["submitted", "under_review", "approved"].includes(verificationStatus);
+  const verificationApproved = refVerificationApproved(verificationStatus);
+  const verificationRejected = refVerificationRejected(verificationStatus);
+  const verificationNeedsFix = refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps);
+  const verificationPending = refVerificationPendingReview(verificationStatus) && !verificationNeedsFix;
+  const verificationSubmitted = verificationPending || verificationApproved || verificationRejected;
+  const showPendingReviewView = verificationPending;
+  const canApplyToGames = canAcceptOffers;
   const backgroundReady = screening?.status === "clear" || verificationSubmitted;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
-  const refNotificationCount = pendingOffers.length + inquiries.length;
+  const hasVerificationMailboxMessage = Boolean(verificationAdminNotes);
+  const hasVerificationStatusNotice =
+    verificationApproved || verificationRejected || verificationNeedsFix;
+  const refNotificationCount =
+    pendingOffers.length + inquiries.length + (hasVerificationMailboxMessage || hasVerificationStatusNotice ? 1 : 0);
   const missingActions: {
     label: string;
     description: string;
     field: EditableRefCardField;
     step?: VerificationStep;
-  }[] = [
-    !profileReady && {
-      label: "Profile",
-      description: "Add sport, certification level, rate, and bio.",
-      field: "profile" as const,
-    },
-    !idReady && {
-      label: "Government ID",
-      description: "Upload a driver license, passport, or state ID.",
-      field: "verification" as const,
-      step: "id" as const,
-    },
-    !certificationReady && {
-      label: "Certification",
-      description: "Upload NFHS, state association, or league credentials.",
-      field: "verification" as const,
-      step: "certification" as const,
-    },
-    !backgroundReady && {
-      label: "Submit for review",
-      description: "Submit your verification package or upload proof if you were verified elsewhere.",
-      field: "verification" as const,
-      step: "submit" as const,
-    },
-  ].filter(Boolean) as {
-    label: string;
-    description: string;
-    field: EditableRefCardField;
-    step?: VerificationStep;
-  }[];
+  }[] = showPendingReviewView || verificationApproved
+    ? []
+    : ([
+        !profileReady && {
+          label: "Profile",
+          description: "Add sport, certification level, rate, and bio.",
+          field: "profile" as const,
+        },
+        !idReady && {
+          label: "Government ID",
+          description: "Upload a driver license, passport, or state ID.",
+          field: "verification" as const,
+          step: "id" as const,
+        },
+        !certificationReady && {
+          label: "Certification",
+          description: "Upload NFHS, state association, or league credentials.",
+          field: "verification" as const,
+          step: "certification" as const,
+        },
+        !verificationSubmitted && {
+          label: "Submit for review",
+          description: "Submit your verification package or upload proof if you were verified elsewhere.",
+          field: "verification" as const,
+          step: "submit" as const,
+        },
+      ].filter(Boolean) as {
+        label: string;
+        description: string;
+        field: EditableRefCardField;
+        step?: VerificationStep;
+      }[]);
   const availabilitySummary = formatAvailabilityForCard(slots);
   const avatarLabel = displayName
     .split(" ")
@@ -721,77 +856,179 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="grid gap-6 rounded-[2rem] border border-[var(--red)]/20 bg-gradient-to-br from-[var(--red)]/10 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">
-            {canAcceptOffers ? "Verified profile" : "Pending verification"}
-          </p>
-          <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
-            Browse games now. Finish badges to accept.
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
-            Your profile is live as a pending ref, so you can see available games in your area immediately.
-            Complete the ID, certification, and background badges when you are ready to accept paid assignments.
-          </p>
-          <div className="mt-5 rounded-2xl border border-[var(--border)] bg-white/80 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)]">
-              Missing info
+      {verificationNotice && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className={`w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ${
+              verificationNotice.type === "approved"
+                ? "border border-green-200"
+                : verificationNotice.type === "fix_required"
+                  ? "border border-amber-200"
+                  : "border border-red-200"
+            }`}
+          >
+            <p
+              className={`text-xs font-black uppercase tracking-[0.18em] ${
+                verificationNotice.type === "approved"
+                  ? "text-green-700"
+                  : verificationNotice.type === "fix_required"
+                    ? "text-amber-700"
+                    : "text-[var(--red)]"
+              }`}
+            >
+              {verificationNotice.type === "approved"
+                ? "Application Approved"
+                : verificationNotice.type === "fix_required"
+                  ? "Updates needed"
+                  : "Verification update"}
             </p>
-            {missingActions.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {missingActions.map((action) => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    onClick={() => openEditor(action.field, action.step)}
-                    className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-bold text-[var(--navy)] shadow-sm transition hover:border-[var(--red)] hover:bg-[var(--red)] hover:text-white"
-                    title={action.description}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-                All profile badges are complete.
+            <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
+              {verificationNotice.type === "approved"
+                ? "You're approved to request games!"
+                : verificationNotice.type === "fix_required"
+                  ? "Please fix and resubmit your application"
+                  : "Verification not approved"}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
+            {verificationNotice.type === "fix_required" && verificationFixRequiredSteps.length > 0 && (
+              <p className="mt-3 text-sm font-semibold text-[var(--navy)]">
+                Steps to complete:{" "}
+                {REF_VERIFICATION_STEPS.filter((step) => verificationFixRequiredSteps.includes(step.key))
+                  .map((step) => step.number)
+                  .join(", ")}
               </p>
             )}
+            <button
+              type="button"
+              onClick={dismissVerificationNotice}
+              className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
+                verificationNotice.type === "approved"
+                  ? "bg-green-600"
+                  : verificationNotice.type === "fix_required"
+                    ? "bg-amber-600"
+                    : "bg-[var(--red)]"
+              }`}
+            >
+              {verificationNotice.type === "approved" ? "Go to calendar" : "Got it"}
+            </button>
           </div>
         </div>
-        <RefereeIdCard
-          fullName={displayName}
-          gotrefsId={cardMeta.gotrefsId}
-          primarySport={sport}
-          additionalSports={additionalSports}
-          certificationLevel={cert}
-          certifiedBy={cardMeta.certifiedBy}
-          rate={rateLabel()}
-          avatarLabel={avatarLabel}
-          baseCity={cardMeta.baseCity}
-          workRegions={cardMeta.workRegions}
-          travelRadius={cardMeta.travelRadius}
-          availabilitySummary={availabilitySummary}
-          govIdUploaded={Boolean(govIdPath)}
-          certUploaded={Boolean(certDocPath)}
-          backgroundStatus={screening?.status}
-          verificationStatus={verificationStatus}
-          verificationSkipped={cardMeta.verificationSkipped}
-          profileComplete={profileComplete}
-          onEditField={(field) => openEditor(field)}
-        />
-      </div>
+      )}
+
+      {showResubmitFlow && memberId && verificationFixRequiredSteps.length > 0 && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/55 p-4">
+          <div className="mx-auto flex min-h-full max-w-2xl items-start py-6">
+            <RefVerificationResubmitFlow
+              memberId={memberId}
+              steps={verificationFixRequiredSteps}
+              adminMessage={verificationAdminNotes || "GotREFS requested updates to your application."}
+              displayName={displayName}
+              primarySport={sport}
+              additionalSports={additionalSports}
+              certificationLevel={cert}
+              baseCity={cardMeta.baseCity ?? ""}
+              travelRadius={cardMeta.travelRadius ?? ""}
+              workRegions={cardMeta.workRegions ?? []}
+              onComplete={() => void handleResubmitComplete()}
+            />
+          </div>
+        </div>
+      )}
+
+      {!showResubmitFlow && !canAcceptOffers ? (
+        <div
+          ref={gamesRef}
+          className="grid gap-6 rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_1.15fr] lg:p-7"
+        >
+          <div>
+            {verificationNeedsFix && (
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">Fixes requested</p>
+            )}
+            {showPendingReviewView && (
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">
+                Pending Verification (1-2 Business Days)
+              </p>
+            )}
+            {verificationRejected && !verificationNeedsFix && (
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Not approved</p>
+            )}
+            <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
+              Browse games now. Get Paid Quickly.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
+              {verificationNeedsFix
+                ? "GotREFS flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games while you wait."
+                : verificationRejected
+                  ? "You can still browse open games, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotREFS."
+                  : "Once approved, you will be able to request to work at any games. Approvals take 1-2 business days."}
+            </p>
+            {verificationNeedsFix && !showResubmitFlow && (
+              <button
+                type="button"
+                onClick={() => setShowResubmitFlow(true)}
+                className="mt-4 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-black text-white"
+              >
+                Fix & resubmit application
+              </button>
+            )}
+          </div>
+          <RefEventCalendar
+            embedded
+            canApplyToEvents={canApplyToGames}
+            applicationPending={showPendingReviewView}
+            applicationRejected={verificationRejected}
+            onRequireProfile={() => {
+              if (showPendingReviewView) return;
+              const next = missingActions[0];
+              if (next) openEditor(next.field, next.step);
+            }}
+          />
+        </div>
+      ) : !showResubmitFlow ? (
+        <div className="grid gap-6 rounded-[2rem] border border-green-200 bg-gradient-to-br from-green-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-green-700">Approved</p>
+            <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
+              Browse games now. Get Paid Quickly.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
+              Your verification is approved. Request to work open games, accept organizer invites, and manage your
+              schedule.
+            </p>
+          </div>
+          <RefereeIdCard
+            fullName={displayName}
+            gotrefsId={cardMeta.gotrefsId}
+            primarySport={sport}
+            additionalSports={additionalSports}
+            certificationLevel={cert}
+            certifiedBy={cardMeta.certifiedBy}
+            rate={rateLabel()}
+            avatarLabel={avatarLabel}
+            baseCity={cardMeta.baseCity}
+            workRegions={cardMeta.workRegions}
+            travelRadius={cardMeta.travelRadius}
+            availabilitySummary={availabilitySummary}
+            govIdUploaded={Boolean(govIdPath)}
+            certUploaded={Boolean(certDocPath)}
+            backgroundStatus={screening?.status}
+            verificationStatus={verificationStatus}
+            verificationSkipped={cardMeta.verificationSkipped}
+            profileComplete={profileComplete}
+            onEditField={(field) => openEditor(field)}
+          />
+        </div>
+      ) : null}
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
-      <section ref={gamesRef}>
-        <RefEventCalendar
-          canApplyToEvents={missingActions.length === 0}
-          onRequireProfile={() => {
-            const next = missingActions[0];
-            if (next) openEditor(next.field, next.step);
-          }}
-        />
-      </section>
+      {canAcceptOffers && !showResubmitFlow && (
+        <section ref={gamesRef}>
+          <RefEventCalendar canApplyToEvents={canApplyToGames} />
+        </section>
+      )}
 
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -805,11 +1042,74 @@ export default function RefereeDashboardClient() {
               )}
             </div>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Organizer invites and messages show up here the moment they reach out.
+              Organizer invites, verification updates, and messages show up here.
             </p>
           </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {verificationApproved && (
+            <article className="rounded-2xl border border-green-200 bg-green-50 p-4 md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-wide text-green-700">Verification approved</p>
+              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                {verificationAdminNotes ||
+                  "Your verification has been approved! You can now request to work games on GotREFS."}
+              </p>
+              {verificationReviewedAt && (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
+                </p>
+              )}
+            </article>
+          )}
+          {verificationNeedsFix && (
+            <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-wide text-amber-700">Fixes requested</p>
+              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                {verificationAdminNotes ||
+                  "GotREFS needs updates to your application before we can approve you."}
+              </p>
+              {verificationReviewedAt && (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowResubmitFlow(true)}
+                className="mt-3 rounded-full bg-amber-600 px-4 py-2 text-xs font-black text-white"
+              >
+                Fix & resubmit
+              </button>
+            </article>
+          )}
+          {verificationRejected && !verificationNeedsFix && (
+            <article className="rounded-2xl border border-red-200 bg-red-50 p-4 md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">Verification not approved</p>
+              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
+                {verificationAdminNotes ||
+                  "Your verification was not approved. Please contact GotREFS support if you have questions."}
+              </p>
+              {verificationReviewedAt && (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
+                </p>
+              )}
+            </article>
+          )}
+          {hasVerificationMailboxMessage &&
+            !verificationApproved &&
+            !verificationRejected &&
+            !verificationNeedsFix && (
+            <article className="rounded-2xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-wide text-[var(--blue)]">Verification update</p>
+              <p className="mt-1 text-sm font-bold text-[var(--navy)]">{verificationAdminNotes}</p>
+              {verificationNotesUpdatedAt && (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  From GotREFS · {new Date(verificationNotesUpdatedAt).toLocaleString()}
+                </p>
+              )}
+            </article>
+          )}
           {pendingOffers.slice(0, 4).map((offer) => {
             const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
             return (
@@ -838,7 +1138,7 @@ export default function RefereeDashboardClient() {
           })}
           {refNotificationCount === 0 && (
             <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)] md:col-span-2">
-              No organizer invites yet. When an organizer messages or invites you, you&apos;ll see it here.
+              No messages yet. Organizer invites and verification updates will show up here.
             </div>
           )}
         </div>

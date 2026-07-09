@@ -64,12 +64,16 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged-in users should not stay on login/signup (unless ?error= is present).
+  // Logged-in users should not stay on login/signup (unless finishing OAuth onboarding).
   if (user && isAuthPage && !request.nextUrl.searchParams.get("error")) {
-    const dashUrl = request.nextUrl.clone();
-    dashUrl.pathname = "/dashboard";
-    dashUrl.search = "";
-    return NextResponse.redirect(dashUrl);
+    const finishingOAuthSignup =
+      pathname === "/auth/signup" && request.nextUrl.searchParams.get("oauth") === "1";
+    if (!finishingOAuthSignup) {
+      const dashUrl = request.nextUrl.clone();
+      dashUrl.pathname = "/dashboard";
+      dashUrl.search = "";
+      return NextResponse.redirect(dashUrl);
+    }
   }
 
   return supabaseResponse;

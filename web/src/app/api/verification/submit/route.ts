@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { refProfilePackageComplete } from "@/lib/ref-eligibility";
+import { refProfilePackageComplete, refVerificationDocsComplete } from "@/lib/ref-eligibility";
 
 export async function POST() {
   const supabase = await createClient();
@@ -25,13 +25,16 @@ export async function POST() {
     .eq("member_id", user.id)
     .maybeSingle();
 
-  if (!refProfilePackageComplete(profile)) {
+  const docsReady = refVerificationDocsComplete(profile);
+  const fullPackage = refProfilePackageComplete(profile);
+
+  if (!docsReady && !fullPackage) {
     const missing: string[] = [];
     if (!profile?.government_id_path && !profile?.verification_doc_path) missing.push("government ID");
     if (!profile?.certification_document_path) missing.push("certification document");
-    if (!profile?.bio?.trim() || !profile?.primary_sport || !profile?.certification_level?.trim()) {
-      missing.push("profile (sport, certification level, bio)");
-    }
+    if (!profile?.primary_sport?.trim()) missing.push("primary sport");
+    if (!profile?.certification_level?.trim()) missing.push("certification level");
+    if (!fullPackage && profile?.bio && !profile.bio.trim()) missing.push("bio");
     return NextResponse.json(
       { error: `Complete before submitting: ${missing.join(", ")}.` },
       { status: 400 }
@@ -55,8 +58,8 @@ export async function POST() {
   await supabase
     .from("screening_checks")
     .update({
-      status: "clear",
-      summary: "Verification package submitted — eligible for offers pending admin review",
+      status: "pending",
+      summary: "Verification package submitted — pending admin review (1-2 business days)",
       updated_at: new Date().toISOString(),
     })
     .eq("ref_member_id", user.id);

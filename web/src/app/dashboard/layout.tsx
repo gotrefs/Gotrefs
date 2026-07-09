@@ -1,6 +1,8 @@
 import { BrandLogo } from "@/components/BrandLogo";
+import { isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
+import { AdminDashboardLink } from "./AdminDashboardLink";
 import { DashboardRoleSwitcher } from "./DashboardRoleSwitcher";
 import { DashboardRoleProvider, type DashboardRole } from "./RoleContext";
 import { DashboardNotificationCenter } from "./DashboardNotificationCenter";
@@ -15,6 +17,7 @@ export default async function DashboardLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const isAdmin = isGotrefsAdminUser(user);
   const memberRole = user ? await resolveMemberRole(supabase, user) : "ref";
   const initialRole: DashboardRole = memberRole === "organizer" ? "organizer" : "referee";
 
@@ -25,8 +28,9 @@ export default async function DashboardLayout({
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
             <BrandLogo href="/" imageClassName="h-9 w-auto" />
             <nav className="flex items-center gap-3 text-sm">
-              {user && <DashboardRoleSwitcher />}
-              {user && <DashboardNotificationCenter />}
+              {user && !isAdmin && <DashboardRoleSwitcher />}
+              {user && isAdmin && <AdminDashboardLink />}
+              {user && !isAdmin && <DashboardNotificationCenter />}
               {user && <SignOutButton />}
             </nav>
           </div>
