@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    return jsonWithSessionCookies(sessionResponse, {
       ok: true,
       needsEmailConfirmation: true,
       email,

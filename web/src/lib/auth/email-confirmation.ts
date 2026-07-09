@@ -43,3 +43,18 @@ export function signupDashboardLabel(path: SignupDashboardPath): string {
   if (path === "/dashboard/assignor") return "assignor";
   return "referee";
 }
+
+/** When email templates use next=/dashboard, resolve the role-specific destination from signup metadata. */
+export function resolveEmailCallbackRedirect(
+  user: { user_metadata?: Record<string, unknown> | null },
+  next: string
+): string {
+  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  if (safeNext !== "/dashboard") {
+    return safeSignupRedirectPath(safeNext);
+  }
+  const meta = user.user_metadata ?? {};
+  const role = meta.role === "organizer" ? "organizer" : "ref";
+  const isAssignor = meta.is_assignor === true;
+  return signupDashboardPath(role, isAssignor);
+}

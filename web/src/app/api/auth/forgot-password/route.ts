@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { buildAuthCallbackUrl } from "@/lib/auth/email-confirmation";
 import { validateEmail } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
-import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 
 type ForgotPasswordBody = {
   email?: string;
@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
     "/auth/update-password"
   );
 
-  const supabase = createRouteHandlerClient(request, NextResponse.next());
+  const sessionResponse = NextResponse.next();
+  const supabase = createRouteHandlerClient(request, sessionResponse);
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
   if (error) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({
+  return jsonWithSessionCookies(sessionResponse, {
     ok: true,
     message: "If an account exists for that email, we sent a link to set or reset your password.",
   });

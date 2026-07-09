@@ -5,7 +5,7 @@ import {
 } from "@/lib/auth/email-confirmation";
 import { validateEmail } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
-import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 
 type ResendBody = {
   email?: string;
@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
   const siteUrl = resolveSiteUrlFromRequest(request);
   const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
 
-  const supabase = createRouteHandlerClient(request, NextResponse.next());
+  const sessionResponse = NextResponse.next();
+  const supabase = createRouteHandlerClient(request, sessionResponse);
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({
+  return jsonWithSessionCookies(sessionResponse, {
     ok: true,
     message: "Verification email sent. Check your inbox and spam folder.",
   });

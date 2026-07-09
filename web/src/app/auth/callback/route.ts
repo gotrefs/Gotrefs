@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { resolveEmailCallbackRedirect } from "@/lib/auth/email-confirmation";
 import { gotrefsAdminDashboardPath, isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { ensureAdminOAuthMember } from "@/lib/auth/bootstrap-admin-oauth";
 import { upsertOAuthMember } from "@/lib/auth/oauth";
@@ -145,6 +146,8 @@ export async function GET(request: NextRequest) {
           email: user.email,
           next,
         });
+      } else if (redirectPath.startsWith("/dashboard")) {
+        redirectPath = resolveEmailCallbackRedirect(user, redirectPath);
       }
     } catch {
       if (redirectPath === "/dashboard") {
