@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const HERO_VIDEO_SRC = "/gotrefs-home-hero.mov";
+const HERO_VIDEO_SRC = "/gotrefs-home-hero.mp4";
 
 type HeroVideoShowcaseProps = {
   showCaption?: boolean;
