@@ -18,7 +18,13 @@ export function isGotrefsAdminEmail(email: string | null | undefined): boolean {
   return adminEmailAllowlist().includes(normalizeAdminEmail(email));
 }
 
-type AdminUserLike = Pick<User, "email" | "app_metadata"> | null | undefined;
+type AdminUserLike =
+  | {
+      email?: string | null;
+      app_metadata?: User["app_metadata"] | null;
+    }
+  | null
+  | undefined;
 
 export function isGotrefsAdminUser(user: AdminUserLike): boolean {
   if (!user) return false;
