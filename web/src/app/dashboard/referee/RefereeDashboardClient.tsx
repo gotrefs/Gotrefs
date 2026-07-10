@@ -13,9 +13,11 @@ import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
+  formatFixRequiredStepLabels,
   mapCardFieldToVerificationStep,
   normalizeFixRequiredSteps,
   REF_VERIFICATION_STEPS,
+  resubmitNoticeTitle,
   type RefVerificationStepKey,
 } from "@/lib/ref-verification-steps";
 
@@ -143,7 +145,9 @@ export default function RefereeDashboardClient() {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [verificationNotice, setVerificationNotice] = useState<{
     type: "approved" | "fix_required" | "rejected";
+    title?: string;
     message: string;
+    items?: string[];
   } | null>(null);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [isAssignor, setIsAssignor] = useState(false);
@@ -342,10 +346,24 @@ export default function RefereeDashboardClient() {
   ]);
 
   useEffect(() => {
-    if (loading || !memberId) return;
+    if (loading || !memberId || profileWizard) return;
 
-    const fixFingerprint = verificationFixRequiredSteps.join(",");
-    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}:${fixFingerprint}`;
+    // Always re-prompt when GotREFS asked for fixes — don't hide after dismiss until they resubmit.
+    if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
+      setVerificationNotice({
+        type: "fix_required",
+        title: resubmitNoticeTitle(verificationFixRequiredSteps),
+        message:
+          verificationAdminNotes ||
+          "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
+        items: REF_VERIFICATION_STEPS.filter((step) =>
+          verificationFixRequiredSteps.includes(step.key)
+        ).map((step) => `${step.number}. ${step.shortLabel}`),
+      });
+      return;
+    }
+
+    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}`;
     const storageKey = `gotrefs-ref-verification-notice-seen:${memberId}`;
     if (window.localStorage.getItem(storageKey) === fingerprint) return;
 
@@ -355,16 +373,6 @@ export default function RefereeDashboardClient() {
         message:
           verificationAdminNotes ||
           "Application Approved — you can now request to work games and browse the calendar below.",
-      });
-      return;
-    }
-
-    if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
-      setVerificationNotice({
-        type: "fix_required",
-        message:
-          verificationAdminNotes ||
-          "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
       });
       return;
     }
@@ -380,6 +388,7 @@ export default function RefereeDashboardClient() {
   }, [
     loading,
     memberId,
+    profileWizard,
     verificationStatus,
     verificationReviewedAt,
     verificationNotesUpdatedAt,
@@ -392,26 +401,26 @@ export default function RefereeDashboardClient() {
       setVerificationNotice(null);
       return;
     }
-    const fixFingerprint = verificationFixRequiredSteps.join(",");
-    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}:${fixFingerprint}`;
-    window.localStorage.setItem(`gotrefs-ref-verification-notice-seen:${memberId}`, fingerprint);
 
     const noticeType = verificationNotice?.type;
     setVerificationNotice(null);
 
-    if (noticeType === "approved") {
-      window.requestAnimationFrame(() => {
-        gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-      return;
-    }
-
-    if (verificationFixRequiredSteps.length > 0) {
+    if (noticeType === "fix_required" && verificationFixRequiredSteps.length > 0) {
       setProfileWizard({
         mode: "resubmit",
         initialStep: verificationFixRequiredSteps[0],
         steps: verificationFixRequiredSteps,
         adminMessage: verificationAdminNotes || "GotREFS requested updates to your application.",
+      });
+      return;
+    }
+
+    const fingerprint = `${verificationStatus}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}:${verificationAdminNotes ?? ""}`;
+    window.localStorage.setItem(`gotrefs-ref-verification-notice-seen:${memberId}`, fingerprint);
+
+    if (noticeType === "approved") {
+      window.requestAnimationFrame(() => {
+        gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
   }
@@ -744,17 +753,21 @@ export default function RefereeDashboardClient() {
               {verificationNotice.type === "approved"
                 ? "You're approved to request games!"
                 : verificationNotice.type === "fix_required"
-                  ? "Please fix and resubmit your application"
+                  ? verificationNotice.title || "Please fix and resubmit your application"
                   : "Verification not approved"}
             </h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
-            {verificationNotice.type === "fix_required" && verificationFixRequiredSteps.length > 0 && (
-              <p className="mt-3 text-sm font-semibold text-[var(--navy)]">
-                Steps to complete:{" "}
-                {REF_VERIFICATION_STEPS.filter((step) => verificationFixRequiredSteps.includes(step.key))
-                  .map((step) => step.number)
-                  .join(", ")}
+            {verificationNotice.type === "fix_required" && (
+              <p className="mt-2 text-sm font-semibold text-amber-900">
+                From GotREFS review:
               </p>
+            )}
+            <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
+            {verificationNotice.type === "fix_required" && verificationNotice.items && verificationNotice.items.length > 0 && (
+              <ul className="mt-3 space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-[var(--navy)]">
+                {verificationNotice.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
             )}
             <button
               type="button"
@@ -767,7 +780,11 @@ export default function RefereeDashboardClient() {
                     : "bg-[var(--red)]"
               }`}
             >
-              {verificationNotice.type === "approved" ? "Go to calendar" : "Got it"}
+              {verificationNotice.type === "approved"
+                ? "Go to calendar"
+                : verificationNotice.type === "fix_required"
+                  ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
+                  : "Got it"}
             </button>
           </div>
         </div>
@@ -793,7 +810,21 @@ export default function RefereeDashboardClient() {
               travelRadius={cardMeta.travelRadius ?? ""}
               workRegions={cardMeta.workRegions ?? []}
               onComplete={() => void handleProfileWizardComplete()}
-              onClose={() => setProfileWizard(null)}
+              onClose={() => {
+                setProfileWizard(null);
+                if (verificationFixRequiredSteps.length > 0) {
+                  setVerificationNotice({
+                    type: "fix_required",
+                    title: resubmitNoticeTitle(verificationFixRequiredSteps),
+                    message:
+                      verificationAdminNotes ||
+                      "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
+                    items: REF_VERIFICATION_STEPS.filter((step) =>
+                      verificationFixRequiredSteps.includes(step.key)
+                    ).map((step) => `${step.number}. ${step.shortLabel}`),
+                  });
+                }
+              }}
             />
           </div>
         </div>

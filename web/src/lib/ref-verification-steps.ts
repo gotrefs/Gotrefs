@@ -34,6 +34,25 @@ export function stepLabelForKey(key: RefVerificationStepKey): string {
   return REF_VERIFICATION_STEPS.find((step) => step.key === key)?.label ?? key;
 }
 
+export function stepShortLabelForKey(key: RefVerificationStepKey): string {
+  return REF_VERIFICATION_STEPS.find((step) => step.key === key)?.shortLabel ?? key;
+}
+
+/** e.g. "Profile photo" or "Profile photo, ID pictures" */
+export function formatFixRequiredStepLabels(steps: RefVerificationStepKey[]): string {
+  const labels = REF_VERIFICATION_STEPS.filter((step) => steps.includes(step.key)).map(
+    (step) => step.shortLabel
+  );
+  if (labels.length === 0) return "your application";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+export function resubmitNoticeTitle(steps: RefVerificationStepKey[]): string {
+  return `Resubmit ${formatFixRequiredStepLabels(steps)}`;
+}
+
 export const ALL_REF_VERIFICATION_STEP_KEYS: RefVerificationStepKey[] = REF_VERIFICATION_STEPS.map(
   (step) => step.key
 );

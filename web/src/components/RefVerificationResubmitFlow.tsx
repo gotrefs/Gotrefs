@@ -292,10 +292,13 @@ export function RefVerificationResubmitFlow({
         {isEditMode ? "Update your profile" : "Fix & resubmit"}
       </p>
       <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">
-        Step {currentMeta?.number ?? wizardIndex + 1} of {REF_VERIFICATION_STEPS.length}: {currentMeta?.label ?? ""}
+        {isEditMode
+          ? `Step ${currentMeta?.number ?? wizardIndex + 1} of ${REF_VERIFICATION_STEPS.length}: ${currentMeta?.label ?? ""}`
+          : `Resubmit ${currentMeta?.shortLabel ?? "item"} (${wizardIndex + 1} of ${orderedSteps.length})`}
       </h2>
       {!isEditMode && adminMessage && (
         <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span className="font-bold">From GotREFS: </span>
           {adminMessage}
         </p>
       )}
@@ -306,14 +309,20 @@ export function RefVerificationResubmitFlow({
       ) : (
         <p className="mt-2 text-sm text-[var(--muted)]">
           Complete only the items GotREFS requested:{" "}
-          {orderedSteps.map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.number).join(", ")}
+          {orderedSteps
+            .map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.shortLabel)
+            .filter(Boolean)
+            .join(", ")}
+          .
         </p>
       )}
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[var(--navy)] to-emerald-600 transition-all"
-          style={{ width: `${((currentMeta?.number ?? wizardIndex + 1) / REF_VERIFICATION_STEPS.length) * 100}%` }}
+          style={{
+            width: `${((wizardIndex + 1) / Math.max(orderedSteps.length, 1)) * 100}%`,
+          }}
         />
       </div>
 
