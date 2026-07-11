@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 type SearchField = {
   id: string;
   label: string;
@@ -9,6 +11,8 @@ type SearchField = {
   options?: { value: string; label: string }[];
   onChange: (value: string) => void;
   className?: string;
+  /** Optional custom control (e.g. Places autocomplete). */
+  renderInput?: () => ReactNode;
 };
 
 export function AirbnbMarketplaceSearch({
@@ -34,7 +38,9 @@ export function AirbnbMarketplaceSearch({
           <label htmlFor={field.id} className="block text-[10px] font-semibold uppercase tracking-wide text-neutral-800">
             {field.label}
           </label>
-          {field.type === "select" ? (
+          {field.renderInput ? (
+            field.renderInput()
+          ) : field.type === "select" ? (
             <select
               id={field.id}
               value={field.value}
@@ -75,46 +81,6 @@ export function AirbnbMarketplaceSearch({
           </svg>
         </button>
       </div>
-    </div>
-  );
-}
-
-export function AirbnbFilterChips({
-  chips,
-  activeId,
-  onSelect,
-}: {
-  chips: { id: string; label: string }[];
-  activeId?: string | null;
-  onSelect: (id: string | null) => void;
-}) {
-  return (
-    <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-      <button
-        type="button"
-        onClick={() => onSelect(null)}
-        className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-          !activeId
-            ? "border-neutral-900 bg-neutral-900 text-white"
-            : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900"
-        }`}
-      >
-        All
-      </button>
-      {chips.map((chip) => (
-        <button
-          key={chip.id}
-          type="button"
-          onClick={() => onSelect(activeId === chip.id ? null : chip.id)}
-          className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-            activeId === chip.id
-              ? "border-neutral-900 bg-neutral-900 text-white"
-              : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-900"
-          }`}
-        >
-          {chip.label}
-        </button>
-      ))}
     </div>
   );
 }
