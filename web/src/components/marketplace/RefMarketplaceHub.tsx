@@ -77,19 +77,30 @@ export function RefMarketplaceHub({
         </div>
 
         {tab === "find-games" && (
-          <div className="flex rounded-full border border-neutral-300 p-0.5 text-xs font-semibold">
-            {(["list", "map", "calendar"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setFindView(mode)}
-                className={`rounded-full px-3 py-1.5 capitalize transition ${
-                  findView === mode ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs font-medium text-neutral-500 sm:inline">View</span>
+            <div className="flex rounded-full border border-neutral-300 bg-white p-0.5 text-sm font-semibold shadow-sm">
+              {(
+                [
+                  { id: "list", label: "List" },
+                  { id: "map", label: "Map" },
+                  { id: "calendar", label: "Calendar" },
+                ] as const
+              ).map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setFindView(mode.id)}
+                  className={`rounded-full px-3.5 py-1.5 transition ${
+                    findView === mode.id
+                      ? "bg-neutral-900 text-white"
+                      : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
-import { RefEventCalendar } from "@/components/RefEventCalendar";
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
@@ -833,51 +832,38 @@ export default function RefereeDashboardClient() {
       {!profileWizard && !canAcceptOffers ? (
         <div
           ref={gamesRef}
-          className="grid gap-6 rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_1.15fr] lg:p-7"
+          className="rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:p-7"
         >
-          <div>
-            {verificationNeedsFix && (
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">Fixes requested</p>
-            )}
-            {showPendingReviewView && (
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">
-                Pending Verification (1-2 Business Days)
-              </p>
-            )}
-            {verificationRejected && !verificationNeedsFix && (
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Not approved</p>
-            )}
-            <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
-              Browse games now. Get Paid Quickly.
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
-              {verificationNeedsFix
-                ? "GotREFS flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games while you wait."
-                : verificationRejected
-                  ? "You can still browse open games, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotREFS."
-                  : "Once approved, you will be able to request to work at any games. Approvals take 1-2 business days."}
+          {verificationNeedsFix && (
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">Fixes requested</p>
+          )}
+          {showPendingReviewView && (
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">
+              Pending Verification (1-2 Business Days)
             </p>
-            {verificationNeedsFix && !profileWizard && (
-              <button
-                type="button"
-                onClick={openResubmitWizard}
-                className="mt-4 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-black text-white"
-              >
-                Fix & resubmit application
-              </button>
-            )}
-          </div>
-          <RefEventCalendar
-            embedded
-            canApplyToEvents={canApplyToGames}
-            applicationPending={showPendingReviewView}
-            applicationRejected={verificationRejected}
-            onRequireProfile={() => {
-              if (showPendingReviewView) return;
-              const next = missingActions[0];
-              if (next) openProfileWizard(next.field);
-            }}
-          />
+          )}
+          {verificationRejected && !verificationNeedsFix && (
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Not approved</p>
+          )}
+          <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
+            Browse games now. Get Paid Quickly.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
+            {verificationNeedsFix
+              ? "GotREFS flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games on the map while you wait."
+              : verificationRejected
+                ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotREFS."
+                : "Browse open games on the map below. Once approved, you will be able to request to work. Approvals take 1-2 business days."}
+          </p>
+          {verificationNeedsFix && !profileWizard && (
+            <button
+              type="button"
+              onClick={openResubmitWizard}
+              className="mt-4 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-black text-white"
+            >
+              Fix & resubmit application
+            </button>
+          )}
         </div>
       ) : !profileWizard ? (
         <div className="grid gap-6 rounded-[2rem] border border-green-200 bg-gradient-to-br from-green-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
@@ -917,13 +903,14 @@ export default function RefereeDashboardClient() {
 
       {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
 
-      {canAcceptOffers && !profileWizard && (
+      {!profileWizard && (
         <section ref={marketplaceRef}>
           <RefMarketplaceHub
             canApplyToEvents={canApplyToGames}
             applicationPending={showPendingReviewView}
             applicationRejected={verificationRejected}
             onRequireProfile={() => {
+              if (showPendingReviewView) return;
               const next = missingActions[0];
               if (next) openProfileWizard(next.field);
             }}
