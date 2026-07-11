@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
 import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/maps/google-maps-loader";
@@ -39,9 +39,11 @@ export function GoogleMarketplaceMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isGoogleMapsConfigured() || !mapElRef.current) return;
+    if (!isGoogleMapsConfigured()) return;
     let cancelled = false;
 
     void loadGoogleMaps()
@@ -58,9 +60,13 @@ export function GoogleMarketplaceMap({
           });
           infoRef.current = new google.maps.InfoWindow();
         }
+        setReady(true);
+        setError(null);
       })
-      .catch(() => {
-        // Handled by parent empty state when key missing.
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Google Maps failed to load.";
+        setError(message);
+        setReady(false);
       });
 
     return () => {
@@ -69,20 +75,12 @@ export function GoogleMarketplaceMap({
   }, [center]);
 
   useEffect(() => {
+    if (!ready) return;
     const map = mapRef.current;
     if (!map || !window.google?.maps) return;
 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
-
-    const targetCenter =
-      center ??
-      (pins.length > 0
-        ? {
-            lat: pins.reduce((sum, pin) => sum + pin.coords.lat, 0) / pins.length,
-            lng: pins.reduce((sum, pin) => sum + pin.coords.lng, 0) / pins.length,
-          }
-        : DEFAULT_CENTER);
 
     if (center) {
       map.panTo(center);
@@ -95,7 +93,7 @@ export function GoogleMarketplaceMap({
       pins.forEach((pin) => bounds.extend(pin.coords));
       map.fitBounds(bounds, 48);
     } else {
-      map.panTo(targetCenter);
+      map.panTo(DEFAULT_CENTER);
       map.setZoom(9);
     }
 
@@ -136,7 +134,7 @@ export function GoogleMarketplaceMap({
       });
       markersRef.current.push(marker);
     }
-  }, [pins, selectedId, center, onSelect, onRequest]);
+  }, [ready, pins, selectedId, center, onSelect, onRequest]);
 
   if (!isGoogleMapsConfigured()) {
     return (
@@ -150,5 +148,28 @@ export function GoogleMarketplaceMap({
     );
   }
 
-  return <div ref={mapElRef} className={`overflow-hidden bg-neutral-100 ${className}`} />;
+  if (error) {
+    return (
+      <div
+        className={`flex items-center justify-center rounded-2xl border border-dashed border-red-200 bg-red-50 ${className}`}
+      >
+        <p className="max-w-md px-4 text-center text-sm text-red-800">
+          Map could not load. Check your API key restrictions include this site
+          (<code className="text-xs">https://gotrefs.org/*</code> and{" "}
+          <code className="text-xs">http://localhost:3000/*</code>).
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative overflow-hidden bg-neutral-100 ${className}`}>
+      {!ready && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-neutral-500">
+          Loading map…
+        </div>
+      )}
+      <div ref={mapElRef} className="h-full w-full" />
+    </div>
+  );
 }

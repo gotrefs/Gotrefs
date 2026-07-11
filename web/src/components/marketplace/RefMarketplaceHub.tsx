@@ -36,7 +36,7 @@ export function RefMarketplaceHub({
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "my-work" ? "my-work" : "find-games";
   const [tab, setTab] = useState<HubTab>(initialTab);
-  const [findView, setFindView] = useState<FindView>("list");
+  const [findView, setFindView] = useState<FindView>("map");
 
   useEffect(() => {
     if (searchParams.get("panel") === "offers" || searchParams.get("tab") === "my-work") {
