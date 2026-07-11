@@ -5,8 +5,8 @@ import { MarketingNavLink } from "./MarketingNavLink";
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#1b2132]">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
+    <header className="sticky top-0 z-50 h-[var(--marketing-header-height)] shrink-0 border-b border-white/10 bg-[var(--blue-hero)]">
+      <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4">
         <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-10 w-auto sm:h-14" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
           <MarketingNavLink href="#features" className="hover:text-white">

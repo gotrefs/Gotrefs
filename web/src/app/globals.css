@@ -133,17 +133,30 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* One full screen below the sticky header */
+/* Sticky marketing header height (logo + padding) */
+:root {
+  --marketing-header-height: 4.25rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --marketing-header-height: 5.5rem;
+  }
+}
+
+/* Full-viewport sections below the first screen (equal screen height when scrolling) */
 .hero-fullscreen,
 .viewport-screen {
-  min-height: calc(100svh - 4.25rem);
-  overflow: visible;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   scroll-snap-align: start;
 }
 
 .viewport-screen {
-  padding-top: 2.5rem;
-  padding-bottom: 2.5rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 
 .section-padding {
@@ -152,13 +165,6 @@ body {
 }
 
 @media (min-width: 1024px) {
-  .hero-fullscreen,
-  .viewport-screen {
-    min-height: calc(100svh - 4.25rem);
-    height: calc(100svh - 4.25rem);
-    overflow: hidden;
-  }
-
   .viewport-screen {
     padding-top: 0;
     padding-bottom: 0;

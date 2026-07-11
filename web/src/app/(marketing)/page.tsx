@@ -40,35 +40,37 @@ export default async function HomePage({
 
   return (
     <>
-      <MarketingHeader />
+      {/* First viewport: header + hero share one full-height blue panel (no white strip) */}
+      <div className="hero-arbiter-bg flex min-h-dvh flex-col">
+        <MarketingHeader />
 
-      {/* Screen 1 — marketplace hero with original video */}
-      <section className="hero-arbiter-bg hero-fullscreen flex items-center py-8 text-white sm:py-10 lg:py-0">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-6 px-4 sm:gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-sm sm:tracking-[0.22em]">
-              <BrandName /> Marketplace
-            </p>
-            <h1 className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-tight sm:mt-4 sm:text-5xl md:text-6xl">
-              The Referee Marketplace For Every Sport
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/85 sm:mt-5 md:text-lg md:leading-7">
-              {hero.subtext}
-            </p>
-            <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
-              <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
-                Get verified as a ref
-              </Link>
-              <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
-                I need refs
-              </Link>
+        <section className="flex min-h-0 flex-1 items-center text-white">
+          <div className="mx-auto grid h-full w-full max-w-6xl grid-cols-1 items-center gap-4 px-4 py-4 sm:gap-6 sm:py-6 lg:grid-cols-2 lg:gap-12 lg:py-0">
+            <div className="min-h-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-sm sm:tracking-[0.22em]">
+                <BrandName /> Marketplace
+              </p>
+              <h1 className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-tight sm:mt-4 sm:text-5xl md:text-6xl">
+                The Referee Marketplace For Every Sport
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/85 sm:mt-5 md:text-lg md:leading-7">
+                {hero.subtext}
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+                <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
+                  Get verified as a ref
+                </Link>
+                <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
+                  I need refs
+                </Link>
+              </div>
+            </div>
+            <div className="flex h-[min(32svh,240px)] min-h-0 items-center justify-center sm:h-[min(40vh,320px)] lg:h-full lg:max-h-[min(70vh,520px)]">
+              <HeroVideoShowcase fitContainer className="h-full w-full" />
             </div>
           </div>
-          <div className="flex h-[30svh] min-h-[210px] items-center justify-center sm:h-[min(44vh,360px)] lg:h-[min(72vh,calc(100svh-10rem))]">
-            <HeroVideoShowcase fitContainer className="h-full w-full" />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <VerifiedRefCardSection />
       <RefereeDigitalCardSection />
