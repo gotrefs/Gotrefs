@@ -129,7 +129,7 @@ export function loadGoogleMaps(): Promise<typeof google> {
     script.async = true;
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}` +
-      `&v=weekly&loading=async&libraries=maps,places&callback=__gotrefsInitMaps`;
+      `&v=weekly&loading=async&libraries=places&callback=__gotrefsInitMaps`;
     script.onerror = () => fail("Google Maps failed to load.");
     document.head.appendChild(script);
   });
