@@ -7,7 +7,6 @@ import { GameListingCard } from "@/components/marketplace/GameListingCard";
 import { MarketplaceMapView } from "@/components/marketplace/MarketplaceMapView";
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
-import { StickyMarketplaceSearch } from "@/components/marketplace/StickyMarketplaceSearch";
 import {
   payMatchLabel,
   type OpenEventRecord,
@@ -167,8 +166,7 @@ export function FindGamesExplorer({
 
   return (
     <div className="space-y-6">
-      <StickyMarketplaceSearch>
-        <AirbnbMarketplaceSearch
+      <AirbnbMarketplaceSearch
           onSearch={() => void load()}
           searchLabel="Search"
           fields={[
@@ -212,7 +210,6 @@ export function FindGamesExplorer({
             },
           ]}
         />
-      </StickyMarketplaceSearch>
 
       {!isGoogleMapsConfigured() && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
