@@ -7,10 +7,13 @@ export function isGoogleMapsConfigured(): boolean {
   return Boolean(getGoogleMapsApiKey());
 }
 
+export type GooglePlacesLib = google.maps.PlacesLibrary;
+
 declare global {
   interface Window {
     google?: typeof google;
     __gotrefsGoogleMapsPromise?: Promise<typeof google>;
+    __gotrefsPlacesLib?: GooglePlacesLib;
     gm_authFailure?: () => void;
   }
 }
@@ -27,8 +30,23 @@ async function importMapsLibraries(): Promise<typeof google> {
     throw new Error("Google Maps importLibrary is unavailable.");
   }
   await window.google.maps.importLibrary("maps");
-  await window.google.maps.importLibrary("places");
+  const places = (await window.google.maps.importLibrary("places")) as GooglePlacesLib;
+  if (!places?.AutocompleteSuggestion || !places?.AutocompleteSessionToken) {
+    throw new Error("Places library loaded without AutocompleteSuggestion.");
+  }
+  window.__gotrefsPlacesLib = places;
   return window.google;
+}
+
+/** Places library exports from importLibrary("places"). */
+export async function loadGooglePlaces(): Promise<GooglePlacesLib> {
+  await loadGoogleMaps();
+  if (window.__gotrefsPlacesLib?.AutocompleteSuggestion) {
+    return window.__gotrefsPlacesLib;
+  }
+  const places = (await google.maps.importLibrary("places")) as GooglePlacesLib;
+  window.__gotrefsPlacesLib = places;
+  return places;
 }
 
 /** Load Maps JS + Places once via importLibrary (required with loading=async). */
@@ -36,7 +54,7 @@ export function loadGoogleMaps(): Promise<typeof google> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Google Maps can only load in the browser."));
   }
-  if (window.google?.maps?.places?.AutocompleteSuggestion) {
+  if (window.__gotrefsPlacesLib?.AutocompleteSuggestion && window.google?.maps) {
     return Promise.resolve(window.google);
   }
   if (window.__gotrefsGoogleMapsPromise) {
@@ -80,7 +98,6 @@ export function loadGoogleMaps(): Promise<typeof google> {
     const script = document.createElement("script");
     script.dataset.gotrefsGoogleMaps = "1";
     script.async = true;
-    // Dynamic import style — do not rely on legacy libraries= query param alone
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
     script.onload = finish;
     script.onerror = () => fail("Google Maps failed to load.");

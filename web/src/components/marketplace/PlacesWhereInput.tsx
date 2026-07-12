@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/maps/google-maps-loader";
+import {
+  isGoogleMapsConfigured,
+  loadGooglePlaces,
+  type GooglePlacesLib,
+} from "@/lib/maps/google-maps-loader";
 
 export type PlaceSelection = {
   label: string;
@@ -37,6 +41,7 @@ export function PlacesWhereInput({
   const [mapsError, setMapsError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [open, setOpen] = useState(false);
+  const placesRef = useRef<GooglePlacesLib | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const requestIdRef = useRef(0);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -45,10 +50,11 @@ export function PlacesWhereInput({
     if (!isGoogleMapsConfigured()) return;
     let cancelled = false;
 
-    void loadGoogleMaps()
-      .then(() => {
+    void loadGooglePlaces()
+      .then((places) => {
         if (cancelled) return;
-        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+        placesRef.current = places;
+        sessionTokenRef.current = new places.AutocompleteSessionToken();
         setReady(true);
         setMapsError(null);
       })
@@ -78,22 +84,24 @@ export function PlacesWhereInput({
       return;
     }
 
+    const places = placesRef.current;
+    if (!places) return;
+
     const requestId = ++requestIdRef.current;
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
           if (!sessionTokenRef.current) {
-            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+            sessionTokenRef.current = new places.AutocompleteSessionToken();
           }
-          const { suggestions: next } =
-            await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-              input: value.trim(),
-              includedPrimaryTypes: ["locality", "administrative_area_level_1", "postal_code"],
-              includedRegionCodes: ["us"],
-              language: "en-US",
-              region: "us",
-              sessionToken: sessionTokenRef.current,
-            });
+          const { suggestions: next } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: value.trim(),
+            includedPrimaryTypes: ["locality", "sublocality", "postal_code", "administrative_area_level_3"],
+            includedRegionCodes: ["us"],
+            language: "en-US",
+            region: "us",
+            sessionToken: sessionTokenRef.current,
+          });
 
           if (requestId !== requestIdRef.current) return;
 
@@ -113,11 +121,39 @@ export function PlacesWhereInput({
         } catch (err) {
           if (requestId !== requestIdRef.current) return;
           setSuggestions([]);
-          setMapsError(
-            err instanceof Error
-              ? err.message
-              : "Place search failed. Check Places API (New) + billing on this project."
-          );
+          // Retry once without type filters — some keys reject certain primary types
+          try {
+            const { suggestions: fallback } =
+              await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                input: value.trim(),
+                includedRegionCodes: ["us"],
+                language: "en-US",
+                region: "us",
+                sessionToken: sessionTokenRef.current ?? new places.AutocompleteSessionToken(),
+              });
+            if (requestId !== requestIdRef.current) return;
+            const items: SuggestionItem[] = [];
+            for (const suggestion of fallback) {
+              const prediction = suggestion.placePrediction;
+              if (!prediction) continue;
+              items.push({
+                id: prediction.placeId || prediction.text.toString(),
+                label: prediction.text.toString(),
+                prediction,
+              });
+            }
+            setSuggestions(items);
+            setOpen(items.length > 0);
+            setMapsError(null);
+          } catch (fallbackErr) {
+            setMapsError(
+              fallbackErr instanceof Error
+                ? fallbackErr.message
+                : err instanceof Error
+                  ? err.message
+                  : "Place search failed."
+            );
+          }
         }
       })();
     }, 220);
@@ -126,6 +162,7 @@ export function PlacesWhereInput({
   }, [ready, value]);
 
   async function selectSuggestion(item: SuggestionItem) {
+    const places = placesRef.current;
     try {
       const place = item.prediction.toPlace();
       await place.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
@@ -143,7 +180,9 @@ export function PlacesWhereInput({
       onPlaceSelect({ label, lat: loc.lat(), lng: loc.lng() });
       setSuggestions([]);
       setOpen(false);
-      sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+      if (places) {
+        sessionTokenRef.current = new places.AutocompleteSessionToken();
+      }
       setMapsError(null);
     } catch (err) {
       setMapsError(err instanceof Error ? err.message : "Could not load that place.");
@@ -172,9 +211,7 @@ export function PlacesWhereInput({
         }
       />
       {mapsError ? (
-        <p className="mt-1 text-[11px] leading-snug text-amber-700" title={mapsError}>
-          Maps/Places issue — confirm Vercel has the same key and this site is in referrer list.
-        </p>
+        <p className="mt-1 text-[11px] leading-snug text-amber-700">{mapsError}</p>
       ) : null}
       {open && suggestions.length > 0 ? (
         <ul className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-56 overflow-auto rounded-2xl border border-neutral-200 bg-white py-1 shadow-lg">
