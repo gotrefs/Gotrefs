@@ -39,6 +39,10 @@ type OfferRow = {
   status: string;
   offered_pay: number | null;
   message: string | null;
+  organizer?: {
+    displayName: string | null;
+    profilePictureUrl: string | null;
+  } | null;
   scheduled_events:
     | {
         title: string;
@@ -47,6 +51,7 @@ type OfferRow = {
         zip_code: string;
         city: string | null;
         state: string | null;
+        organizer_member_id?: string;
       }
     | {
         title: string;
@@ -55,6 +60,7 @@ type OfferRow = {
         zip_code: string;
         city: string | null;
         state: string | null;
+        organizer_member_id?: string;
       }[]
     | null;
 };
@@ -192,11 +198,58 @@ export default function RefereeDashboardClient() {
     const { data: o } = await supabase
       .from("assignment_offers")
       .select(
-        "id, status, offered_pay, message, scheduled_events ( title, sport, starts_at, zip_code, city, state )"
+        "id, status, offered_pay, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
-    setOffers((o as unknown as OfferRow[]) || []);
+
+    const offerRows = (o as unknown as OfferRow[]) || [];
+    const organizerIds = Array.from(
+      new Set(
+        offerRows
+          .map((offer) => {
+            const ev = Array.isArray(offer.scheduled_events)
+              ? offer.scheduled_events[0]
+              : offer.scheduled_events;
+            return (ev as { organizer_member_id?: string } | null | undefined)?.organizer_member_id;
+          })
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    let organizerById = new Map<string, { display_name: string | null; profile_picture_url: string | null }>();
+    if (organizerIds.length > 0) {
+      const { data: organizers } = await supabase
+        .from("members")
+        .select("id, display_name, profile_picture_url")
+        .in("id", organizerIds);
+      organizerById = new Map(
+        (organizers ?? []).map((row) => [
+          row.id,
+          {
+            display_name: row.display_name ?? null,
+            profile_picture_url: (row as { profile_picture_url?: string | null }).profile_picture_url ?? null,
+          },
+        ])
+      );
+    }
+
+    setOffers(
+      offerRows.map((offer) => {
+        const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+        const organizerId = (ev as { organizer_member_id?: string } | null | undefined)?.organizer_member_id;
+        const organizer = organizerId ? organizerById.get(organizerId) : null;
+        return {
+          ...offer,
+          organizer: organizer
+            ? {
+                displayName: organizer.display_name,
+                profilePictureUrl: organizer.profile_picture_url,
+              }
+            : null,
+        };
+      }) as unknown as OfferRow[]
+    );
 
     const { data: apps } = await supabase
       .from("event_signup_requests")

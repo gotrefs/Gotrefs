@@ -23,6 +23,8 @@ export function FindGamesExplorer({
   applicationRejected,
   onRequireProfile,
   onApplied,
+  pendingInviteCount = 0,
+  onOpenTrips,
 }: {
   view: "list" | "map" | "split";
   canApplyToEvents?: boolean;
@@ -30,6 +32,8 @@ export function FindGamesExplorer({
   applicationRejected?: boolean;
   onRequireProfile?: () => void;
   onApplied?: () => void;
+  pendingInviteCount?: number;
+  onOpenTrips?: () => void;
 }) {
   const [sport, setSport] = useState("");
   const [whereLabel, setWhereLabel] = useState("");
@@ -233,7 +237,12 @@ export function FindGamesExplorer({
               }`}
         </h3>
         {showSplit && !mapLoading && (
-          <p className="text-sm text-neutral-500">{mapPins.length} on map</p>
+          <p className="text-sm text-neutral-500">
+            {mapPins.length} on map
+            {displayEvents.length > mapPins.length
+              ? ` · ${displayEvents.length - mapPins.length} without map location`
+              : ""}
+          </p>
         )}
       </div>
 
@@ -264,8 +273,18 @@ export function FindGamesExplorer({
               <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-16 text-center">
                 <p className="mt-3 text-lg font-semibold text-neutral-900">No games match your search</p>
                 <p className="mt-1 text-sm text-neutral-500">
-                  Try another destination, date, or sport.
+                  Try another destination, date, or sport
+                  {wherePlace ? ", or clear the destination filter" : ""}.
                 </p>
+                {pendingInviteCount > 0 && onOpenTrips ? (
+                  <button
+                    type="button"
+                    onClick={onOpenTrips}
+                    className="mt-5 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    You have {pendingInviteCount} invite{pendingInviteCount === 1 ? "" : "s"} in Trips
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div

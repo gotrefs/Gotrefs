@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventStaffingPanel } from "@/components/marketplace/EventStaffingPanel";
+import { AirbnbAcceptProfile, acceptPhotosForSport } from "@/components/marketplace/AirbnbAcceptProfile";
 import { AirbnbMarketplaceSearch } from "@/components/marketplace/AirbnbMarketplaceSearch";
-import { StickyMarketplaceSearch } from "@/components/marketplace/StickyMarketplaceSearch";
 import { RefListingCard } from "@/components/marketplace/RefListingCard";
 import { SportsFields } from "@/components/SportsFields";
 import { ALL_SPORTS, formatEventLocation, formatPayOffer } from "@/data/sports";
@@ -392,6 +391,15 @@ export default function OrganizerDashboardClient() {
       setIdDocPath(op.id_document_path);
       setLogoPath(op.logo_path);
       setEventsListPath(op.events_list_path);
+
+      const payConfigured =
+        (op.rate_type === "range" && (op.rate_min != null || op.rate_max != null)) ||
+        (op.rate_per_official != null && Number(op.rate_per_official) > 0) ||
+        (op.rate_min != null && Number(op.rate_min) > 0);
+      if (!(op.primary_sport || "").trim()) setSetupStep("sport");
+      else if (!payConfigured) setSetupStep("pay");
+      else if (!(op.bio || "").trim()) setSetupStep("bio");
+      else if (!op.id_document_path || !op.logo_path) setSetupStep("identity");
     }
 
     const eventResult = await supabase
@@ -496,23 +504,15 @@ export default function OrganizerDashboardClient() {
     return rateType === "range" ? Boolean(rateMin.trim()) : Boolean(ratePerOfficial.trim());
   }
 
-  function organizerPayLabel() {
-    if (rateType === "range") {
-      if (rateMin.trim() && rateMax.trim()) return `${rateMin}-${rateMax}`;
-      if (rateMin.trim()) return `${rateMin}+`;
-    }
-    return ratePerOfficial;
-  }
-
   function isOrganizerProfileComplete() {
-    return Boolean(sport.trim() && hasOrganizerPay() && bio.trim());
+    return Boolean(sport.trim() && hasOrganizerPay() && bio.trim() && idDocPath && logoPath);
   }
 
   function firstIncompleteOrganizerSetupStep(): OrganizerSetupStep {
     if (!sport.trim()) return "sport";
     if (!hasOrganizerPay()) return "pay";
     if (!bio.trim()) return "bio";
-    if (!idDocPath) return "identity";
+    if (!idDocPath || !logoPath) return "identity";
     return "events";
   }
 
@@ -522,6 +522,15 @@ export default function OrganizerDashboardClient() {
     setSetupModalOpen(true);
     setMsg("Finish your organizer profile first so refs know who they are working with.");
     return false;
+  }
+
+  function finishOrganizerSetup() {
+    if (!idDocPath || !logoPath) {
+      setMsg("Upload your government ID and organization logo to finish.");
+      return;
+    }
+    setSetupModalOpen(false);
+    setMsg("Organizer profile ready.");
   }
 
   function openSetup(step: OrganizerSetupStep) {
@@ -604,12 +613,7 @@ export default function OrganizerDashboardClient() {
       setMsg(text);
       if (savedOrSafeToAdvance) {
         if (res.ok) await load();
-        const nextMissing = firstIncompleteOrganizerSetupStep();
-        if (nextMissing !== current) {
-          setSetupStep(nextMissing);
-        } else {
-          goToNextSetupStep(current);
-        }
+        goToNextSetupStep(current);
       }
     } catch {
       const text = "Could not reach the server. Refresh and try again.";
@@ -637,8 +641,11 @@ export default function OrganizerDashboardClient() {
     }
     await supabase.from("organizer_profiles").update({ id_document_path: path }).eq("member_id", user.id);
     setIdDocPath(path);
-    setMsg("ID document uploaded.");
-    if (setupStep === "identity" && logoPath) setMsg("Organization ID and logo complete.");
+    if (setupStep === "identity" && logoPath) {
+      setMsg("Organization ID and logo complete.");
+    } else {
+      setMsg("ID document uploaded.");
+    }
   }
 
   async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -658,8 +665,11 @@ export default function OrganizerDashboardClient() {
     }
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
-    setMsg("Organization logo uploaded.");
-    if (setupStep === "identity" && idDocPath) setMsg("Organization ID and logo complete.");
+    if (setupStep === "identity" && idDocPath) {
+      setMsg("Organization ID and logo complete.");
+    } else {
+      setMsg("Organization logo uploaded.");
+    }
   }
 
   async function uploadEventsList(e: React.ChangeEvent<HTMLInputElement>) {
@@ -807,20 +817,32 @@ export default function OrganizerDashboardClient() {
   }
 
   async function sendOfferFromRequest(applicant: ApplicantRow) {
-    const res = await fetch("/api/offers", {
-      method: "POST",
+    const res = await fetch(`/api/organizer/applicants/${applicant.id}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventId: applicant.eventId,
-        refMemberId: applicant.refMemberId,
-      }),
+      body: JSON.stringify({ action: "accept" }),
     });
     const j = (await res.json()) as { error?: string };
     if (!res.ok) {
-      setMsg(j.error || "Could not send request.");
+      setMsg(j.error || "Could not accept this application.");
       return;
     }
     setMsg("Invite sent — waiting for the ref to accept.");
+    await load();
+  }
+
+  async function declineApplicant(applicant: ApplicantRow) {
+    const res = await fetch(`/api/organizer/applicants/${applicant.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "decline" }),
+    });
+    const j = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      setMsg(j.error || "Could not decline this application.");
+      return;
+    }
+    setMsg("Application declined.");
     await load();
   }
 
@@ -1023,9 +1045,7 @@ export default function OrganizerDashboardClient() {
     ? filteredEvents.filter((event) => sameDay(new Date(event.starts_at), selectedManageDate))
     : filteredEvents;
   const zipIsValid = /^\d{5}(-\d{4})?$/.test(zip.trim());
-  const pendingSentOffers = sentOffers.filter((offer) => offer.status === "pending");
   const respondedSentOffers = sentOffers.filter((offer) => offer.status === "accepted" || offer.status === "declined");
-  const organizerNotificationCount = signupRequests.length + respondedSentOffers.length;
   const acceptedOffersByEvent = sentOffers.reduce<Record<string, number>>((acc, offer) => {
     if (offer.status === "accepted") acc[offer.event_id] = (acc[offer.event_id] || 0) + 1;
     return acc;
@@ -1058,183 +1078,51 @@ export default function OrganizerDashboardClient() {
     );
   });
 
+  const needsSetup = !isOrganizerProfileComplete();
+
   return (
     <div className="flex flex-col gap-8">
-      <div className="grid gap-6 rounded-[2rem] border border-[var(--blue)]/20 bg-gradient-to-br from-[var(--blue)]/10 via-white to-[var(--red)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--red)]">Organizer dashboard</p>
-          <h1 className="mt-2 font-display text-4xl font-black tracking-tight text-[var(--navy)]">
-            Explore your staffing marketplace.
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
-            Browse your schedule, discover verified referees, and finish your organizer profile only when you are ready
-            to post or invite.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {!isOrganizerProfileComplete() ? (
-              <button
-                type="button"
-                onClick={() => openSetup(firstIncompleteOrganizerSetupStep())}
-                className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-bold text-[var(--navy)] shadow-sm transition-all duration-200 hover:border-[var(--red)] hover:bg-[var(--red)] hover:text-white"
-              >
-                Complete organizer profile
-              </button>
-            ) : (
-              <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-                Organizer profile ready.
-              </p>
-            )}
-          </div>
-        </div>
-        <OrganizerIdCard
-          contactName={displayName}
-          organizationName={organizationName}
-          email={accountEmail}
-          primarySport={sport}
-          additionalSports={additionalSports}
-          typicalPay={organizerPayLabel()}
-          bio={bio}
-          eventsCount={events.length}
-          idUploaded={Boolean(idDocPath)}
-          logoUploaded={Boolean(logoPath)}
-        />
-      </div>
-
-      <section className="py-2">
-        <StickyMarketplaceSearch>
-          <AirbnbMarketplaceSearch
-            searchLabel="Search refs"
-            fields={[
-              {
-                id: "organizer-ref-search",
-                label: "Search refs",
-                value: magicSearch,
-                placeholder: "Basketball officials near 91322",
-                onChange: setMagicSearch,
-              },
-            ]}
-          />
-        </StickyMarketplaceSearch>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {["Basketball", "Near 91322", "Tonight"].map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              onClick={() => setMagicSearch((current) => `${current} ${chip}`.trim())}
-              className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition hover:border-neutral-900"
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {msg && (
-        <div className="fixed right-4 top-20 z-40 max-w-sm rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--navy)] shadow-xl">
-          <span className="mr-2" aria-hidden="true">✓</span>
-          {msg}
-        </div>
-      )}
-
-      <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
-              {organizerNotificationCount > 0 && (
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
-                  {organizerNotificationCount}!
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Ref requests and invite responses from the backend show up here.
-            </p>
-          </div>
-          {pendingSentOffers.length > 0 && (
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-              {pendingSentOffers.length} invite{pendingSentOffers.length === 1 ? "" : "s"} awaiting response
-            </span>
-          )}
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {signupRequests.slice(0, 4).map((sr) => (
-              <button
-                key={sr.id}
-                type="button"
-                onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                className="rounded-2xl border border-red-100 bg-red-50 p-4 text-left transition-all duration-200 hover:border-[var(--red)]"
-              >
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">New ref application</p>
-                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  Official {sr.gotrefsId} applied to ref {sr.eventTitle}.
-                </p>
-                {sr.ratingAverage != null && sr.ratingCount > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-amber-700">
-                    {renderStarScore(Math.round(sr.ratingAverage))} {sr.ratingAverage.toFixed(1)} ({sr.ratingCount} review
-                    {sr.ratingCount === 1 ? "" : "s"})
-                  </p>
-                )}
-              </button>
-            ))}
-          {respondedSentOffers.slice(0, 4).map((offer) => {
-            const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
-            const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
-            const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
-            const accepted = offer.status === "accepted";
-            return (
-              <article
-                key={offer.id}
-                className={`rounded-2xl border p-4 ${
-                  accepted ? "border-green-100 bg-green-50" : "border-slate-200 bg-slate-50"
-                }`}
-              >
-                <p className={`text-xs font-black uppercase tracking-wide ${accepted ? "text-green-700" : "text-slate-600"}`}>
-                  Invite {offer.status}
-                </p>
-                <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                  Official {officialId} {accepted ? "accepted" : "declined"} {ev?.title ?? "your event"}.
-                </p>
-              </article>
-            );
-          })}
-          {organizerNotificationCount === 0 && (
-            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)] md:col-span-2">
-              No new requests yet. When refs apply or respond to your invite, you&apos;ll see it here.
-            </div>
-          )}
-        </div>
-      </section>
-
-      {setupModalOpen && (
+      {(needsSetup || setupModalOpen) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className={
+            needsSetup
+              ? "fixed inset-0 z-50 overflow-y-auto bg-[#f7f7f7] p-4 sm:p-8"
+              : "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          }
           role="presentation"
-          onClick={() => setSetupModalOpen(false)}
+          onClick={needsSetup ? undefined : () => setSetupModalOpen(false)}
         >
           <section
-            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-white p-6 shadow-2xl"
+            className={
+              needsSetup
+                ? "mx-auto w-full max-w-3xl rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8"
+                : "max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-white p-6 shadow-2xl"
+            }
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Organizer setup</p>
-            <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Organizer setup</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
               Step {ORGANIZER_SETUP_ORDER.indexOf(setupStep) + 1} of {ORGANIZER_SETUP_ORDER.length}: {currentSetup.label}
             </h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Complete only what is needed now. You can come back and polish the rest later.
+            <p className="mt-1 text-sm text-neutral-500">
+              {needsSetup
+                ? "Finish these steps to unlock your organizer dashboard."
+                : "Add an event or update your organizer details."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSetupModalOpen(false)}
-            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-bold text-[var(--navy)] transition-all duration-200 hover:bg-slate-50"
-          >
-            Close
-          </button>
+          {!needsSetup && (
+            <button
+              type="button"
+              onClick={() => setSetupModalOpen(false)}
+              className="rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              Close
+            </button>
+          )}
         </div>
         <div className="mt-5 flex items-center gap-2">
           {setupActions.map((action, index) => {
@@ -1551,19 +1439,41 @@ export default function OrganizerDashboardClient() {
         )}
 
         {setupStep === "identity" && (
-          <div className="mt-5 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
-              <p className="font-display text-lg font-bold text-[var(--navy)]">Government ID or league credential</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">JPG, PNG, or PDF</p>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-4 text-sm" onChange={(e) => void uploadId(e)} />
-              {idDocPath && <p className="mt-2 text-sm text-green-700">ID on file.</p>}
+          <div className="mt-5 space-y-5">
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
+                <p className="text-lg font-semibold text-neutral-900">Government ID or league credential</p>
+                <p className="mt-1 text-sm text-neutral-500">JPG, PNG, or PDF</p>
+                <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-4 text-sm" onChange={(e) => void uploadId(e)} />
+                {idDocPath && <p className="mt-2 text-sm text-emerald-700">ID on file.</p>}
+              </div>
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
+                <p className="text-lg font-semibold text-neutral-900">Organization logo</p>
+                <p className="mt-1 text-sm text-neutral-500">PNG, JPG, SVG, or WEBP</p>
+                <input type="file" accept=".jpg,.jpeg,.png,.svg,.webp" className="mt-4 text-sm" onChange={(e) => void uploadLogo(e)} />
+                {logoPath && <p className="mt-2 text-sm text-emerald-700">Logo on file.</p>}
+              </div>
             </div>
-            <div className="rounded-xl border-2 border-[var(--blue)]/25 bg-[var(--grey-light)]/40 p-5">
-              <p className="font-display text-lg font-bold text-[var(--navy)]">Organization logo</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">PNG, JPG, SVG, or WEBP</p>
-              <input type="file" accept=".jpg,.jpeg,.png,.svg,.webp" className="mt-4 text-sm" onChange={(e) => void uploadLogo(e)} />
-              {logoPath && <p className="mt-2 text-sm text-green-700">Logo on file.</p>}
-            </div>
+            <button
+              type="button"
+              disabled={!idDocPath || !logoPath}
+              onClick={finishOrganizerSetup}
+              className="w-full rounded-xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
+            >
+              Finish setup
+            </button>
+          </div>
+        )}
+
+        {setupStep === "events" && needsSetup && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setSetupStep("identity")}
+              className="text-sm font-semibold text-neutral-600 underline"
+            >
+              Skip for now — continue to ID & logo
+            </button>
           </div>
         )}
 
@@ -1583,42 +1493,77 @@ export default function OrganizerDashboardClient() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+      {!needsSetup && (
+        <>
+      {msg && (
+        <div className="fixed right-4 top-20 z-40 max-w-sm rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-xl">
+          {msg}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Your events</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            {organizationName || displayName || accountEmail || "Organizer"} · Post games and hire verified refs.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => openSetup("events")}
+          className="rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
+        >
+          Add event
+        </button>
+      </div>
+
+      {(signupRequests.length > 0 || respondedSentOffers.length > 0) && (
+        <section ref={notificationsRef} className="rounded-2xl border border-neutral-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-neutral-900">Inbox</h2>
+          <div className="mt-3 space-y-2">
+            {signupRequests.slice(0, 3).map((sr) => (
+              <button
+                key={sr.id}
+                type="button"
+                onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="block w-full rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm hover:bg-neutral-50"
+              >
+                Official {sr.gotrefsId} requested {sr.eventTitle}
+              </button>
+            ))}
+            {respondedSentOffers.slice(0, 3).map((offer) => {
+              const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+              const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+              const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
+              return (
+                <p key={offer.id} className="rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700">
+                  Official {officialId} {offer.status} {ev?.title ?? "your event"}
+                </p>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Manage events</p>
-            <h2 className="mt-1 font-display text-2xl font-bold text-[var(--blue)]">Your upcoming events</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Track staffing, review applicants, and invite available referees for each game.
-            </p>
+            <h2 className="text-xl font-semibold text-neutral-900">Upcoming</h2>
+            <p className="mt-1 text-sm text-neutral-500">Staff games and review applicants.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full border border-[var(--border)] bg-[var(--grey-light)] p-1">
-              {(["list", "calendar"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setManageViewMode(mode)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-black capitalize transition-all duration-200 ${
-                    manageViewMode === mode
-                      ? "bg-white text-[var(--navy)] shadow-sm"
-                      : "text-[var(--muted)] hover:text-[var(--navy)]"
-                  }`}
-                >
-                  {mode} View
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!requireOrganizerOnboarding()) return;
-                openSetup("events");
-              }}
-              className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
-            >
-              Add event
-            </button>
+          <div className="rounded-full border border-neutral-200 bg-neutral-50 p-1">
+            {(["list", "calendar"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setManageViewMode(mode)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${
+                  manageViewMode === mode ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
         </div>
         {manageViewMode === "calendar" && (
@@ -2009,56 +1954,43 @@ export default function OrganizerDashboardClient() {
       )}
 
       {signupRequests.length > 0 && (
-        <section ref={applicantsRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-          <h2 className="font-display text-xl font-bold text-[var(--red)]">Ref applications on your events</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Referees who applied to work one of your events. You only see their GotREFS ID, star rating, and past reviews — not their name.
-          </p>
-          <ul className="mt-3 space-y-3 text-sm">
+        <section ref={applicantsRef} className="space-y-5">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Requests</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Review each official like a host profile — photo, reviews, then accept or decline.
+            </p>
+          </div>
+          <div className="space-y-5">
             {signupRequests.map((sr) => (
-              <li key={sr.id} className="rounded-2xl border px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-black text-[var(--navy)]">Official {sr.gotrefsId}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      Requested to work <strong>{sr.eventTitle}</strong>
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-[var(--blue)]">
-                      {sr.ratingAverage != null && sr.ratingCount > 0
-                        ? `${renderStarScore(Math.round(sr.ratingAverage))} ${sr.ratingAverage.toFixed(1)} · ${sr.ratingCount} past review${sr.ratingCount === 1 ? "" : "s"}`
-                        : "No reviews yet"}
-                    </p>
-                    {sr.refRateLabel && (
-                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Ref rate: {sr.refRateLabel}</p>
-                    )}
-                    {sr.eventPayLabel && (
-                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Your event pay: {sr.eventPayLabel}</p>
-                    )}
-                    {sr.reviews.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        {sr.reviews.map((review) => (
-                          <blockquote
-                            key={`${review.createdAt}-${review.score}`}
-                            className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-[var(--slate)]"
-                          >
-                            <p className="font-bold text-amber-700">{renderStarScore(review.score)}</p>
-                            <p className="mt-1">{review.comment?.trim() || "No written comment."}</p>
-                          </blockquote>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-full bg-[var(--blue)] px-4 py-2 text-xs font-bold text-white"
-                    onClick={() => void sendOfferFromRequest(sr)}
-                  >
-                    Request this ref
-                  </button>
-                </div>
-              </li>
+              <AirbnbAcceptProfile
+                key={sr.id}
+                photoUrls={acceptPhotosForSport("Basketball")}
+                photoAlt={`Official ${sr.gotrefsId}`}
+                sportForVisual="Basketball"
+                eyebrow="Ref application"
+                title={`Official ${sr.gotrefsId}`}
+                subtitle={`Requested to work ${sr.eventTitle}`}
+                ratingAverage={sr.ratingAverage}
+                ratingCount={sr.ratingCount}
+                reviewsTitle="Reviews from hosts"
+                reviews={sr.reviews.map((review) => ({
+                  score: review.score,
+                  comment: review.comment,
+                  createdAt: review.createdAt,
+                  authorLabel: "Host",
+                }))}
+                metaRows={[
+                  sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
+                  sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
+                ].filter(Boolean) as string[]}
+                primaryLabel="Accept"
+                secondaryLabel="Decline"
+                onPrimary={() => void sendOfferFromRequest(sr)}
+                onSecondary={() => void declineApplicant(sr)}
+              />
             ))}
-          </ul>
+          </div>
         </section>
       )}
 
@@ -2066,9 +1998,7 @@ export default function OrganizerDashboardClient() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Hire verified refs</h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              Browse by GotREFS ID, rating, and pay fit — like finding the right stay on Airbnb.
-            </p>
+            <p className="mt-1 text-sm text-neutral-500">Browse by ID, rating, and pay fit.</p>
           </div>
           {selectedOfferEvent && (
             <button
@@ -2077,12 +2007,24 @@ export default function OrganizerDashboardClient() {
                 setOfferEvent("");
                 setOfferRef("");
               }}
-              className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
             >
               Clear event filter
             </button>
           )}
         </div>
+        <AirbnbMarketplaceSearch
+          searchLabel="Search refs"
+          fields={[
+            {
+              id: "organizer-ref-search",
+              label: "Search refs",
+              value: magicSearch,
+              placeholder: "Basketball officials near 91322",
+              onChange: setMagicSearch,
+            },
+          ]}
+        />
         {!canContactRefs && (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Sign up and log in as a registered event organizer to browse ref availability and contact refs.
@@ -2271,6 +2213,8 @@ export default function OrganizerDashboardClient() {
             await sendOffer(refId, staffingEvent.id);
           }}
         />
+      )}
+        </>
       )}
     </div>
   );

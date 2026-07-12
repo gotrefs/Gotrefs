@@ -125,6 +125,8 @@ export function RefMarketplaceHub({
               applicationRejected={applicationRejected}
               onRequireProfile={onRequireProfile}
               onApplied={() => void onReload()}
+              pendingInviteCount={pendingInviteCount}
+              onOpenTrips={() => setTab("my-work")}
             />
           )}
         </div>

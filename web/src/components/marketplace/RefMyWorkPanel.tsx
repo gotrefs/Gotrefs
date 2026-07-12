@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import { formatEventLocation } from "@/data/sports";
+import {
+  AirbnbAcceptProfile,
+  acceptPhotosForSport,
+} from "@/components/marketplace/AirbnbAcceptProfile";
 
 export type RefWorkOffer = {
   id: string;
   status: string;
   offered_pay: number | null;
   message: string | null;
+  organizer?: {
+    displayName: string | null;
+    profilePictureUrl: string | null;
+  } | null;
   scheduled_events:
     | {
         title: string;
@@ -16,6 +24,7 @@ export type RefWorkOffer = {
         zip_code: string;
         city: string | null;
         state: string | null;
+        organizer_member_id?: string;
       }
     | {
         title: string;
@@ -24,6 +33,7 @@ export type RefWorkOffer = {
         zip_code: string;
         city: string | null;
         state: string | null;
+        organizer_member_id?: string;
       }[]
     | null;
 };
@@ -137,25 +147,22 @@ export function RefMyWorkPanel({
   ];
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <section className="space-y-2">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">My work</p>
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-neutral-900">Trips & requests</h2>
-        <p className="text-sm text-neutral-500">
-          Organizer invites, your applications, and confirmed games — like Airbnb Trips.
-        </p>
+        <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Trips</h2>
+        <p className="text-sm text-neutral-500">Invites, applications, and confirmed games.</p>
       </section>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-b border-neutral-200 pb-3">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setSubTab(tab.id)}
-            className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
               subTab === tab.id
-                ? "bg-[var(--navy)] text-white"
-                : "border border-[var(--border)] text-[var(--navy)] hover:bg-slate-50"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
             }`}
           >
             {tab.label}
@@ -165,75 +172,67 @@ export function RefMyWorkPanel({
       </div>
 
       {msg && (
-        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-[var(--navy)]">
+        <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800">
           {msg}
         </p>
       )}
 
-      <div className="mt-4 space-y-3">
+      <div className="space-y-5">
         {subTab === "invites" &&
           (pendingInvites.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
+            <p className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-500">
               No pending organizer invites. Browse open games and apply, or wait for organizers to reach out.
             </p>
           ) : (
             pendingInvites.map((offer) => {
               const ev = eventFromJoin(offer.scheduled_events);
               const loc = ev ? formatEventLocation(ev.city, ev.state, ev.zip_code) : "";
+              const hostName = offer.organizer?.displayName?.trim() || "your host";
+              const sport = ev?.sport || "Game";
               return (
-                <article key={offer.id} className="rounded-2xl border border-red-100 bg-red-50/60 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">Organizer invite</p>
-                  <p className="mt-1 text-lg font-black text-[var(--navy)]">{ev?.title ?? "Game"}</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {ev?.sport}
-                    {ev?.starts_at ? ` · ${new Date(ev.starts_at).toLocaleString()}` : ""}
-                    {loc ? ` · ${loc}` : ""}
-                  </p>
-                  {offer.offered_pay != null && (
-                    <p className="mt-2 text-sm font-bold text-emerald-700">Offered pay: ${offer.offered_pay}</p>
-                  )}
-                  {offer.message?.trim() && <p className="mt-2 text-sm text-[var(--slate)]">{offer.message}</p>}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busyId === offer.id}
-                      onClick={() => void respondToOffer(offer.id, "accept")}
-                      className="rounded-full bg-[var(--navy)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-                    >
-                      {busyId === offer.id ? "Saving…" : "Accept invite"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === offer.id}
-                      onClick={() => void respondToOffer(offer.id, "decline")}
-                      className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-bold text-[var(--navy)] disabled:opacity-60"
-                    >
-                      Decline
-                    </button>
-                  </div>
-                </article>
+                <AirbnbAcceptProfile
+                  key={offer.id}
+                  photoUrls={acceptPhotosForSport(sport, offer.organizer?.profilePictureUrl)}
+                  photoAlt={`${hostName} game invite`}
+                  sportForVisual={sport}
+                  eyebrow="Organizer invite"
+                  title={`Hey, I'm ${hostName.split(" ")[0] || hostName}`}
+                  subtitle={ev?.title ? `Invited you to ${ev.title}` : "Invited you to referee a game"}
+                  emptyReviewsLabel="New host"
+                  reviewsTitle="About this host"
+                  reviews={[]}
+                  metaRows={[
+                    [sport, ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : null, loc]
+                      .filter(Boolean)
+                      .join(" · "),
+                    offer.offered_pay != null ? `Offered pay $${offer.offered_pay}` : null,
+                  ].filter(Boolean) as string[]}
+                  message={offer.message}
+                  primaryLabel="Accept"
+                  secondaryLabel="Decline"
+                  busy={busyId === offer.id}
+                  onPrimary={() => void respondToOffer(offer.id, "accept")}
+                  onSecondary={() => void respondToOffer(offer.id, "decline")}
+                />
               );
             })
           ))}
 
         {subTab === "applied" &&
           (pendingApplications.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-              You have not applied to any open games yet. Use Find Games to request work.
+            <p className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-500">
+              You have not applied to any open games yet. Use Explore to request work.
             </p>
           ) : (
             pendingApplications.map((app) => {
               const ev = eventFromJoin(app.scheduled_events);
               return (
-                <article key={app.id} className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-indigo-700">Application pending</p>
-                  <p className="mt-1 text-lg font-black text-[var(--navy)]">{ev?.title ?? "Game"}</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                <article key={app.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Application pending</p>
+                  <p className="mt-1 text-lg font-semibold text-neutral-900">{ev?.title ?? "Game"}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
                     {ev?.sport}
                     {ev?.starts_at ? ` · ${new Date(ev.starts_at).toLocaleString()}` : ""}
-                  </p>
-                  <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                    Applied {new Date(app.created_at).toLocaleString()}
                   </p>
                 </article>
               );
@@ -242,21 +241,19 @@ export function RefMyWorkPanel({
 
         {subTab === "confirmed" &&
           (confirmedBookings.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
+            <p className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-500">
               No confirmed games yet. Accept an organizer invite to add games to your schedule.
             </p>
           ) : (
             confirmedBookings.map((booking) => {
               const ev = eventFromJoin(booking.scheduled_events);
-              const loc = ev ? formatEventLocation(ev.city, ev.state, ev.zip_code) : "";
               return (
-                <article key={booking.id} className="rounded-2xl border border-green-200 bg-green-50/60 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-green-700">Confirmed</p>
-                  <p className="mt-1 text-lg font-black text-[var(--navy)]">{ev?.title ?? "Game"}</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                <article key={booking.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Confirmed</p>
+                  <p className="mt-1 text-lg font-semibold text-neutral-900">{ev?.title ?? "Game"}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
                     {ev?.sport}
                     {ev?.starts_at ? ` · ${new Date(ev.starts_at).toLocaleString()}` : ""}
-                    {loc ? ` · ${loc}` : ""}
                   </p>
                 </article>
               );

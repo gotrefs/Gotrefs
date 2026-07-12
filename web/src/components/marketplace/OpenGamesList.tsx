@@ -9,6 +9,8 @@ export function OpenGamesList({
   applicationRejected,
   onRequireProfile,
   onApplied,
+  pendingInviteCount,
+  onOpenTrips,
 }: {
   view?: "list" | "map" | "split";
   canApplyToEvents?: boolean;
@@ -16,6 +18,8 @@ export function OpenGamesList({
   applicationRejected?: boolean;
   onRequireProfile?: () => void;
   onApplied?: () => void;
+  pendingInviteCount?: number;
+  onOpenTrips?: () => void;
 }) {
   return (
     <FindGamesExplorer
@@ -25,6 +29,8 @@ export function OpenGamesList({
       applicationRejected={applicationRejected}
       onRequireProfile={onRequireProfile}
       onApplied={onApplied}
+      pendingInviteCount={pendingInviteCount}
+      onOpenTrips={onOpenTrips}
     />
   );
 }

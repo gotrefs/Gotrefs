@@ -62,6 +62,14 @@ export function refOfficiatesSport(profile: RefProfileForMatch, sport: string): 
   return extras.some((item) => item.trim().toLowerCase() === normalized);
 }
 
+/** True when the ref has configured at least one sport to match against. */
+export function refHasSportsConfigured(profile: RefProfileForMatch | null | undefined): boolean {
+  if (!profile) return false;
+  if ((profile.primary_sport ?? "").trim()) return true;
+  const extras = Array.isArray(profile.additional_sports) ? profile.additional_sports : [];
+  return extras.some((item) => Boolean(item?.trim()));
+}
+
 export type OpenEventFilters = {
   sport?: string | null;
   zip?: string | null;
@@ -77,6 +85,7 @@ export function filterOpenEvents(events: OpenEventRecord[], filters: OpenEventFi
   const startsAfter = filters.startsAfter ? new Date(filters.startsAfter) : null;
   const startsBefore = filters.startsBefore ? new Date(filters.startsBefore) : null;
   const refProfile = filters.refProfile;
+  const matchRefSports = refHasSportsConfigured(refProfile);
 
   return events.filter((event) => {
     const start = new Date(event.starts_at);
@@ -84,7 +93,8 @@ export function filterOpenEvents(events: OpenEventRecord[], filters: OpenEventFi
     if (startsBefore && !Number.isNaN(startsBefore.getTime()) && start > startsBefore) return false;
     if (sport && event.sport.trim().toLowerCase() !== sport.toLowerCase()) return false;
     if (zip && event.zip_code.trim() !== zip) return false;
-    if (refProfile && !refOfficiatesSport(refProfile, event.sport)) return false;
+    // Only apply profile sport matching when the ref has sports configured.
+    if (matchRefSports && refProfile && !refOfficiatesSport(refProfile, event.sport)) return false;
     if (filters.payMatchesRef && refProfile) {
       if (!payRangesOverlap(refPayInput(refProfile), eventPayInput(event))) return false;
     }
