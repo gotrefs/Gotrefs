@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,6 +9,44 @@ export default function UpdatePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureSession() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      if (code || (tokenHash && type)) {
+        const callback = new URL("/auth/callback", window.location.origin);
+        if (code) callback.searchParams.set("code", code);
+        if (tokenHash) callback.searchParams.set("token_hash", tokenHash);
+        if (type) callback.searchParams.set("type", type);
+        callback.searchParams.set("next", "/auth/update-password");
+        window.location.replace(callback.toString());
+        return;
+      }
+
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!cancelled && !user) {
+        setError(
+          "Your reset link expired or was opened incorrectly. Request a new password reset from the login page, then open the newest email."
+        );
+      }
+      if (!cancelled) setCheckingSession(false);
+    }
+
+    void ensureSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,39 +99,51 @@ export default function UpdatePasswordPage() {
           Choose a password for your GotREFS account. After saving, you can log in with email and password.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <label className="block text-sm font-bold text-[var(--navy)]">
-            New password
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="At least 8 characters, with a letter and number"
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-            />
-          </label>
-          <label className="block text-sm font-bold text-[var(--navy)]">
-            Confirm password
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-            />
-          </label>
-          {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60"
-          >
-            {loading ? "Saving…" : "Save password"}
-          </button>
-        </form>
+        {checkingSession ? (
+          <p className="mt-6 text-sm text-[var(--muted)]">Checking your reset link…</p>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <label className="block text-sm font-bold text-[var(--navy)]">
+              New password
+              <input
+                type="password"
+                required
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 8 characters, with a letter and number"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            <label className="block text-sm font-bold text-[var(--navy)]">
+              Confirm password
+              <input
+                type="password"
+                required
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+            {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+            >
+              {loading ? "Saving…" : "Save password"}
+            </button>
+          </form>
+        )}
+        {!checkingSession && error ? (
+          <p className="mt-4 text-sm text-[var(--muted)]">
+            <a href="/auth/login" className="font-semibold text-[var(--red)] underline">
+              Back to login
+            </a>{" "}
+            and use Forgot password again if needed.
+          </p>
+        ) : null}
       </section>
     </main>
   );

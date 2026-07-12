@@ -23,12 +23,21 @@ export async function updateSession(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
-  const canForwardAuthCode = pathname === "/" || pathname === "/auth/login" || pathname === "/auth/signup";
+  const canForwardAuthCode =
+    pathname === "/" ||
+    pathname === "/auth/login" ||
+    pathname === "/auth/signup" ||
+    pathname === "/auth/update-password";
   if (canForwardAuthCode && (code || (tokenHash && type))) {
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = "/auth/callback";
     if (!callbackUrl.searchParams.get("next")) {
-      callbackUrl.searchParams.set("next", "/dashboard");
+      callbackUrl.searchParams.set(
+        "next",
+        type === "recovery" || pathname === "/auth/update-password"
+          ? "/auth/update-password"
+          : "/dashboard"
+      );
     }
     return NextResponse.redirect(callbackUrl);
   }

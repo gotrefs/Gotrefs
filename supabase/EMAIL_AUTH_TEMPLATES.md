@@ -14,13 +14,17 @@ Update these templates in **Supabase Dashboard → Authentication → Email Temp
 
 ## Reset password (Recovery)
 
-Replace the link in the **Reset password** template with:
+Replace the **entire link** in the **Reset password** template with:
 
 ```html
-<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=%2Fauth%2Fupdate-password">Reset your password</a></p>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=%2Fauth%2Fupdate-password">Set your password</a></p>
 ```
 
+Do **not** use `{{ .ConfirmationURL }}` — that PKCE link fails when opened from Gmail/Outlook/iPhone (looks like “expired” immediately).
+
 This uses `token_hash` + `verifyOtp` in `/auth/callback` — works from any device.
+
+If `RESEND_API_KEY` is set on Vercel, GotREFS also sends its own reset email with a token_hash link (preferred).
 
 ---
 

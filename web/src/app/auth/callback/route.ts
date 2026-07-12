@@ -50,7 +50,10 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
-  const next = safeRedirectPath(requestUrl.searchParams.get("next"));
+  const nextParam = requestUrl.searchParams.get("next");
+  const next = safeRedirectPath(
+    type === "recovery" ? nextParam || "/auth/update-password" : nextParam
+  );
   const oauthFlow = Boolean(requestUrl.searchParams.get("provider"));
 
   if (!code && !(tokenHash && type)) {
@@ -66,7 +69,10 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) {
         console.error("[auth/callback] exchangeCodeForSession:", error.message);
-        return authErrorRedirect(requestUrl.origin, oauthFlow, error.message);
+        const reason = error.message.toLowerCase().includes("pkce")
+          ? "pkce_failed"
+          : error.message;
+        return authErrorRedirect(requestUrl.origin, oauthFlow, reason);
       }
     } else {
       const { error } = await supabase.auth.verifyOtp({
@@ -79,6 +85,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Password recovery must land on the set-password screen.
+    let redirectPath = type === "recovery" ? "/auth/update-password" : next;
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -87,7 +96,9 @@ export async function GET(request: NextRequest) {
       return authErrorRedirect(requestUrl.origin, oauthFlow, "missing_user");
     }
 
-    let redirectPath = next;
+    if (type === "recovery" || redirectPath === "/auth/update-password") {
+      return redirectWithAuthCookies(requestUrl.origin, cookieBuffer, "/auth/update-password");
+    }
 
     const provider =
       oauthProviderFromRequest(requestUrl, user.app_metadata?.provider as string | undefined) ??

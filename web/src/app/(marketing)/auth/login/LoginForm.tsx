@@ -11,11 +11,15 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(() => {
     if (searchParams.get("error") !== "confirmation_failed") return null;
-    const reason = searchParams.get("reason");
-    if (reason && reason !== "missing_code") {
-      return `Email confirmation failed: ${decodeURIComponent(reason)}. Try logging in — your email may already be confirmed.`;
+    const reason = searchParams.get("reason") || "";
+    const decoded = decodeURIComponent(reason);
+    if (decoded === "pkce_failed" || decoded.toLowerCase().includes("pkce")) {
+      return "That email link can’t be verified in this browser (common when opening from a mail app). Request a new password reset, then open the newest email — or update the Supabase Reset password template to use token_hash (see docs).";
     }
-    return "Email confirmation link expired or could not be verified. Try logging in, or sign up again.";
+    if (decoded && decoded !== "missing_code") {
+      return `Email link failed: ${decoded}. Request a new password reset from Forgot password and open the newest email.`;
+    }
+    return "Email link expired or could not be verified. Request a new password reset and open the newest email right away.";
   });
   const [loading, setLoading] = useState(false);
 
