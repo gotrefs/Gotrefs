@@ -102,6 +102,16 @@ left join public.ref_profiles rp on rp.member_id = s.ref_member_id
 left join public.screening_checks sc on sc.ref_member_id = s.ref_member_id
 where m.role = 'ref';
 
+revoke all on table public.ref_verification_review_queue from public;
+revoke all on table public.ref_verification_review_queue from anon;
+revoke all on table public.ref_verification_review_queue from authenticated;
+grant select on table public.ref_verification_review_queue to postgres;
+grant select on table public.ref_verification_review_queue to service_role;
+alter view public.ref_verification_review_queue set (security_invoker = on);
+
+comment on view public.ref_verification_review_queue is
+  'Admin-only referee verification queue. Not granted to anon/authenticated; service_role only.';
+
 -- Backfill: refs who already uploaded docs during signup but have no submission row yet
 insert into public.ref_verification_submissions (ref_member_id, status, submitted_at, updated_at)
 select
