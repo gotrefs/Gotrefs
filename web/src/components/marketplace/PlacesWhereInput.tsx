@@ -9,6 +9,12 @@ export type PlaceSelection = {
   lng: number;
 };
 
+type SuggestionItem = {
+  id: string;
+  label: string;
+  prediction: google.maps.places.PlacePrediction;
+};
+
 type PlacesWhereInputProps = {
   id?: string;
   value: string;
@@ -18,7 +24,7 @@ type PlacesWhereInputProps = {
   className?: string;
 };
 
-/** Google Places autocomplete for the Airbnb-style Where field. */
+/** Places Autocomplete (New) with our own dropdown — avoids legacy Autocomplete “Oops!” UI. */
 export function PlacesWhereInput({
   id = "marketplace-where",
   value,
@@ -27,13 +33,13 @@ export function PlacesWhereInput({
   onPlaceSelect,
   className = "",
 }: PlacesWhereInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const onChangeRef = useRef(onChange);
-  const onPlaceSelectRef = useRef(onPlaceSelect);
+  const [ready, setReady] = useState(false);
   const [mapsError, setMapsError] = useState<string | null>(null);
-  onChangeRef.current = onChange;
-  onPlaceSelectRef.current = onPlaceSelect;
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+  const [open, setOpen] = useState(false);
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  const requestIdRef = useRef(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isGoogleMapsConfigured()) return;
@@ -41,29 +47,10 @@ export function PlacesWhereInput({
 
     void loadGoogleMaps()
       .then(() => {
-        if (cancelled || !inputRef.current || autocompleteRef.current) return;
+        if (cancelled) return;
+        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+        setReady(true);
         setMapsError(null);
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-          fields: ["formatted_address", "geometry", "name"],
-          types: ["(cities)"],
-          componentRestrictions: { country: ["us"] },
-        });
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          const loc = place.geometry?.location;
-          if (!loc) {
-            onPlaceSelectRef.current(null);
-            return;
-          }
-          const label =
-            place.formatted_address?.trim() ||
-            place.name?.trim() ||
-            inputRef.current?.value.trim() ||
-            "Selected place";
-          onChangeRef.current(label);
-          onPlaceSelectRef.current({ label, lat: loc.lat(), lng: loc.lng() });
-        });
-        autocompleteRef.current = autocomplete;
       })
       .catch((err) => {
         if (cancelled) return;
@@ -75,10 +62,97 @@ export function PlacesWhereInput({
     };
   }, []);
 
+  useEffect(() => {
+    function onDocClick(event: MouseEvent) {
+      if (!wrapRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !value.trim() || value.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          if (!sessionTokenRef.current) {
+            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+          }
+          const { suggestions: next } =
+            await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+              input: value.trim(),
+              includedPrimaryTypes: ["locality", "administrative_area_level_1", "postal_code"],
+              includedRegionCodes: ["us"],
+              language: "en-US",
+              region: "us",
+              sessionToken: sessionTokenRef.current,
+            });
+
+          if (requestId !== requestIdRef.current) return;
+
+          const items: SuggestionItem[] = [];
+          for (const suggestion of next) {
+            const prediction = suggestion.placePrediction;
+            if (!prediction) continue;
+            items.push({
+              id: prediction.placeId || prediction.text.toString(),
+              label: prediction.text.toString(),
+              prediction,
+            });
+          }
+          setSuggestions(items);
+          setOpen(items.length > 0);
+          setMapsError(null);
+        } catch (err) {
+          if (requestId !== requestIdRef.current) return;
+          setSuggestions([]);
+          setMapsError(
+            err instanceof Error
+              ? err.message
+              : "Place search failed. Check Places API (New) + billing on this project."
+          );
+        }
+      })();
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [ready, value]);
+
+  async function selectSuggestion(item: SuggestionItem) {
+    try {
+      const place = item.prediction.toPlace();
+      await place.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+      const loc = place.location;
+      if (!loc) {
+        onPlaceSelect(null);
+        return;
+      }
+      const label =
+        place.formattedAddress?.trim() ||
+        place.displayName?.trim() ||
+        item.label ||
+        "Selected place";
+      onChange(label);
+      onPlaceSelect({ label, lat: loc.lat(), lng: loc.lng() });
+      setSuggestions([]);
+      setOpen(false);
+      sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+      setMapsError(null);
+    } catch (err) {
+      setMapsError(err instanceof Error ? err.message : "Could not load that place.");
+    }
+  }
+
   return (
-    <div className="min-w-0">
+    <div ref={wrapRef} className="relative min-w-0">
       <input
-        ref={inputRef}
         id={id}
         type="text"
         value={value}
@@ -87,6 +161,10 @@ export function PlacesWhereInput({
         onChange={(event) => {
           onChange(event.target.value);
           onPlaceSelect(null);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (suggestions.length > 0) setOpen(true);
         }}
         className={
           className ||
@@ -95,8 +173,24 @@ export function PlacesWhereInput({
       />
       {mapsError ? (
         <p className="mt-1 text-[11px] leading-snug text-amber-700" title={mapsError}>
-          Maps/Places API key issue — check Google Cloud billing, Places API, and referrer restrictions.
+          Maps/Places issue — confirm Vercel has the same key and this site is in referrer list.
         </p>
+      ) : null}
+      {open && suggestions.length > 0 ? (
+        <ul className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-56 overflow-auto rounded-2xl border border-neutral-200 bg-white py-1 shadow-lg">
+          {suggestions.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="block w-full truncate px-3 py-2 text-left text-sm text-neutral-800 hover:bg-neutral-100"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void selectSuggestion(item)}
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );
