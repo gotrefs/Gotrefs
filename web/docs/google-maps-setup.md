@@ -13,11 +13,18 @@ Used for:
 ## 2. Enable APIs
 
 1. **APIs & Services → Library**
-2. Enable:
+2. Enable **all** of these (missing any one causes the Where field “Oops!” and a blank grey map):
    - **Maps JavaScript API**
-   - **Places API** (for autocomplete)
+   - **Places API** (legacy — required for classic Autocomplete)
+   - **Places API (New)** (recommended; enable alongside legacy)
 
-## 3. Create an API key
+## 3. Billing (most common cause of “Oops!”)
+
+1. **Billing → Link a billing account** on the same Google Cloud project as the key
+2. Without billing, Places shows **“Oops! Something went wrong.”** and the map stays grey
+3. Maps still has a monthly free credit; you usually will not be charged for light use
+
+## 4. Create an API key
 
 1. **APIs & Services → Credentials → Create credentials → API key**
 2. Copy the key
@@ -26,22 +33,22 @@ Used for:
 **Application restrictions**
 
 - Choose **HTTP referrers (web sites)**
-- Add:
+- Add **exactly** (include `www` if you use it):
   - `http://localhost:3000/*`
   - `https://gotrefs.org/*`
+  - `https://www.gotrefs.org/*`
   - `https://*.vercel.app/*` (optional, for preview deploys)
+
+If referrers are wrong, production shows Oops + grey map while localhost may work (or the reverse).
 
 **API restrictions**
 
 - Restrict key to:
   - Maps JavaScript API
   - Places API
+  - Places API (New)
 
-4. Save
-
-## 4. Billing
-
-Google requires a billing account on the project (there is a monthly free credit for Maps). Without billing, the map/autocomplete may not load.
+4. Save — wait 1–5 minutes for restrictions to apply
 
 ## 5. Add the key to GotREFS
 

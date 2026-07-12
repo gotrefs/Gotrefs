@@ -11,10 +11,18 @@ declare global {
   interface Window {
     google?: typeof google;
     __gotrefsGoogleMapsPromise?: Promise<typeof google>;
+    gm_authFailure?: () => void;
   }
 }
 
-/** Load Maps JS + Places once. Rejects if the API key is missing. */
+function mapsAuthErrorMessage() {
+  return (
+    "Google Maps rejected this API key. Enable billing, turn on Maps JavaScript API + Places API, " +
+    "and allow this site under HTTP referrers (https://gotrefs.org/* and http://localhost:3000/*)."
+  );
+}
+
+/** Load Maps JS + Places once. Rejects if the API key is missing or auth fails. */
 export function loadGoogleMaps(): Promise<typeof google> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Google Maps can only load in the browser."));
@@ -32,13 +40,26 @@ export function loadGoogleMaps(): Promise<typeof google> {
   }
 
   window.__gotrefsGoogleMapsPromise = new Promise((resolve, reject) => {
+    const fail = (message: string) => {
+      window.__gotrefsGoogleMapsPromise = undefined;
+      reject(new Error(message));
+    };
+
+    window.gm_authFailure = () => {
+      fail(mapsAuthErrorMessage());
+    };
+
     const existing = document.querySelector<HTMLScriptElement>("script[data-gotrefs-google-maps]");
     if (existing) {
+      if (window.google?.maps?.places) {
+        resolve(window.google);
+        return;
+      }
       existing.addEventListener("load", () => {
-        if (window.google?.maps) resolve(window.google);
-        else reject(new Error("Google Maps failed to load."));
+        if (window.google?.maps?.places) resolve(window.google);
+        else fail("Google Maps failed to load Places.");
       });
-      existing.addEventListener("error", () => reject(new Error("Google Maps failed to load.")));
+      existing.addEventListener("error", () => fail("Google Maps failed to load."));
       return;
     }
 
@@ -46,12 +67,13 @@ export function loadGoogleMaps(): Promise<typeof google> {
     script.dataset.gotrefsGoogleMaps = "1";
     script.async = true;
     script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
+    // loading=async is required by current Maps JS best practices
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async&v=weekly`;
     script.onload = () => {
-      if (window.google?.maps) resolve(window.google);
-      else reject(new Error("Google Maps loaded without maps namespace."));
+      if (window.google?.maps?.places) resolve(window.google);
+      else fail("Google Maps loaded without Places library.");
     };
-    script.onerror = () => reject(new Error("Google Maps failed to load."));
+    script.onerror = () => fail("Google Maps failed to load.");
     document.head.appendChild(script);
   });
 
