@@ -14,6 +14,7 @@ declare global {
     google?: typeof google;
     __gotrefsGoogleMapsPromise?: Promise<typeof google>;
     __gotrefsPlacesLib?: GooglePlacesLib;
+    __gotrefsInitMaps?: () => void;
     gm_authFailure?: () => void;
   }
 }
@@ -25,16 +26,31 @@ function mapsAuthErrorMessage() {
   );
 }
 
-async function importMapsLibraries(): Promise<typeof google> {
-  if (!window.google?.maps?.importLibrary) {
-    throw new Error("Google Maps importLibrary is unavailable.");
+async function loadLibraries(): Promise<typeof google> {
+  if (!window.google?.maps) {
+    throw new Error("Google Maps namespace missing after script load.");
   }
-  await window.google.maps.importLibrary("maps");
-  const places = (await window.google.maps.importLibrary("places")) as GooglePlacesLib;
-  if (!places?.AutocompleteSuggestion || !places?.AutocompleteSessionToken) {
-    throw new Error("Places library loaded without AutocompleteSuggestion.");
+
+  // Prefer importLibrary when present (current Maps JS).
+  if (typeof window.google.maps.importLibrary === "function") {
+    await window.google.maps.importLibrary("maps");
+    const places = (await window.google.maps.importLibrary("places")) as GooglePlacesLib;
+    if (!places?.AutocompleteSuggestion || !places?.AutocompleteSessionToken) {
+      throw new Error("Places library loaded without AutocompleteSuggestion.");
+    }
+    window.__gotrefsPlacesLib = places;
+    return window.google;
   }
-  window.__gotrefsPlacesLib = places;
+
+  // Legacy fallback: libraries=places already on the script URL
+  if (!window.google.maps.Map) {
+    throw new Error("Google Maps failed to initialize.");
+  }
+  const placesNs = window.google.maps.places;
+  if (!placesNs?.AutocompleteSuggestion || !placesNs?.AutocompleteSessionToken) {
+    throw new Error("Places Autocomplete (New) is unavailable on this key/project.");
+  }
+  window.__gotrefsPlacesLib = placesNs as unknown as GooglePlacesLib;
   return window.google;
 }
 
@@ -44,12 +60,18 @@ export async function loadGooglePlaces(): Promise<GooglePlacesLib> {
   if (window.__gotrefsPlacesLib?.AutocompleteSuggestion) {
     return window.__gotrefsPlacesLib;
   }
-  const places = (await google.maps.importLibrary("places")) as GooglePlacesLib;
-  window.__gotrefsPlacesLib = places;
-  return places;
+  if (typeof google.maps.importLibrary === "function") {
+    const places = (await google.maps.importLibrary("places")) as GooglePlacesLib;
+    window.__gotrefsPlacesLib = places;
+    return places;
+  }
+  throw new Error("Google Places library is unavailable.");
 }
 
-/** Load Maps JS + Places once via importLibrary (required with loading=async). */
+/**
+ * Load Maps JS + Places once.
+ * Uses callback= (not script.onload) because loading=async does not fire a usable load event.
+ */
 export function loadGoogleMaps(): Promise<typeof google> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Google Maps can only load in the browser."));
@@ -67,39 +89,47 @@ export function loadGoogleMaps(): Promise<typeof google> {
   }
 
   window.__gotrefsGoogleMapsPromise = new Promise((resolve, reject) => {
+    let settled = false;
     const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
       window.__gotrefsGoogleMapsPromise = undefined;
       reject(new Error(message));
     };
-
-    window.gm_authFailure = () => {
-      fail(mapsAuthErrorMessage());
+    const ok = (g: typeof google) => {
+      if (settled) return;
+      settled = true;
+      resolve(g);
     };
+
+    window.gm_authFailure = () => fail(mapsAuthErrorMessage());
 
     const finish = () => {
-      void importMapsLibraries()
-        .then(resolve)
-        .catch((err) => {
-          fail(err instanceof Error ? err.message : mapsAuthErrorMessage());
-        });
+      void loadLibraries()
+        .then(ok)
+        .catch((err) => fail(err instanceof Error ? err.message : mapsAuthErrorMessage()));
     };
 
-    const existing = document.querySelector<HTMLScriptElement>("script[data-gotrefs-google-maps]");
-    if (existing) {
-      if (typeof window.google?.maps?.importLibrary === "function") {
-        finish();
-        return;
-      }
-      existing.addEventListener("load", finish);
-      existing.addEventListener("error", () => fail("Google Maps failed to load."));
+    if (window.google?.maps && (typeof window.google.maps.importLibrary === "function" || window.google.maps.Map)) {
+      finish();
       return;
     }
 
+    const existing = document.querySelector<HTMLScriptElement>("script[data-gotrefs-google-maps]");
+    if (existing) {
+      window.__gotrefsInitMaps = finish;
+      // If script already completed, google may already exist
+      if (window.google?.maps) finish();
+      return;
+    }
+
+    window.__gotrefsInitMaps = finish;
     const script = document.createElement("script");
     script.dataset.gotrefsGoogleMaps = "1";
     script.async = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
-    script.onload = finish;
+    script.src =
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}` +
+      `&v=weekly&loading=async&libraries=maps,places&callback=__gotrefsInitMaps`;
     script.onerror = () => fail("Google Maps failed to load.");
     document.head.appendChild(script);
   });
