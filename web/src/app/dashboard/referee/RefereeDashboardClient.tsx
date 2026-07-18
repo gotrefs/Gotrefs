@@ -8,6 +8,8 @@ import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmi
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
+import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
+import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import { BRAND_NAME } from "@/lib/brand";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
@@ -160,6 +162,9 @@ export default function RefereeDashboardClient() {
   const [rosterEntries, setRosterEntries] = useState<AssignorRosterEntry[]>([]);
   const [rosterSaving, setRosterSaving] = useState(false);
   const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
+  const [myRatingAverage, setMyRatingAverage] = useState<number | null>(null);
+  const [myRatingCount, setMyRatingCount] = useState(0);
+  const [myReviews, setMyReviews] = useState<PublicReview[]>([]);
 
   const load = useCallback(async () => {
     const {
@@ -360,6 +365,28 @@ export default function RefereeDashboardClient() {
       }
     } else {
       setRosterEntries([]);
+    }
+
+    try {
+      const ratingsRes = await fetch(`/api/ratings?refMemberId=${encodeURIComponent(user.id)}`);
+      const ratingsJson = (await ratingsRes.json()) as {
+        average?: number | null;
+        count?: number;
+        reviews?: PublicReview[];
+      };
+      if (ratingsRes.ok) {
+        setMyRatingAverage(ratingsJson.average ?? null);
+        setMyRatingCount(ratingsJson.count ?? 0);
+        setMyReviews(ratingsJson.reviews ?? []);
+      } else {
+        setMyRatingAverage(null);
+        setMyRatingCount(0);
+        setMyReviews([]);
+      }
+    } catch {
+      setMyRatingAverage(null);
+      setMyRatingCount(0);
+      setMyReviews([]);
     }
 
     setLoading(false);
@@ -929,6 +956,24 @@ export default function RefereeDashboardClient() {
               Your verification is approved. Request to work open games, accept organizer invites, and manage your
               schedule.
             </p>
+            {memberId ? (
+              <div className="mt-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-neutral-500">Your host reviews</p>
+                <div className="mt-1">
+                  <RefReviewsButton
+                    refMemberId={memberId}
+                    title={displayName || `Official ${cardMeta.gotrefsId ?? ""}`}
+                    average={myRatingAverage}
+                    count={myRatingCount}
+                    initialReviews={myReviews}
+                    emptyLabel="No reviews yet"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Organizers rate you after completed games. Tap your stars to read comments.
+                </p>
+              </div>
+            ) : null}
           </div>
           <RefereeIdCard
             fullName={displayName}

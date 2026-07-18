@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  notifyInBackground,
+  notifyOfferCanceledToRef,
+  notifyOfferResponseToOrganizer,
+} from "@/lib/email/notifications";
+import { emailSiteUrl } from "@/lib/email/resend";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
@@ -43,6 +49,7 @@ export async function PATCH(
   }
 
   const isRef = offer.ref_member_id === user.id;
+  let organizerMemberId: string | null = null;
   let isOrg = false;
   if (!isRef) {
     const { data: ev } = await supabase
@@ -50,7 +57,15 @@ export async function PATCH(
       .select("organizer_member_id")
       .eq("id", offer.event_id)
       .single();
-    isOrg = ev?.organizer_member_id === user.id;
+    organizerMemberId = ev?.organizer_member_id ?? null;
+    isOrg = organizerMemberId === user.id;
+  } else {
+    const { data: ev } = await supabase
+      .from("scheduled_events")
+      .select("organizer_member_id")
+      .eq("id", offer.event_id)
+      .maybeSingle();
+    organizerMemberId = ev?.organizer_member_id ?? null;
   }
 
   if (!isRef && !isOrg) {
@@ -165,6 +180,45 @@ export async function PATCH(
     } catch {
       // Non-fatal if application row cannot be updated.
     }
+  }
+
+  try {
+    const admin = createServiceClient();
+    const siteUrl = emailSiteUrl(request.url);
+    if (action === "accept" && isRef && organizerMemberId) {
+      notifyInBackground(() =>
+        notifyOfferResponseToOrganizer({
+          admin,
+          organizerMemberId,
+          refMemberId: offer.ref_member_id,
+          eventId: offer.event_id,
+          accepted: true,
+          siteUrl,
+        })
+      );
+    } else if (action === "decline" && isRef && organizerMemberId) {
+      notifyInBackground(() =>
+        notifyOfferResponseToOrganizer({
+          admin,
+          organizerMemberId,
+          refMemberId: offer.ref_member_id,
+          eventId: offer.event_id,
+          accepted: false,
+          siteUrl,
+        })
+      );
+    } else if (action === "cancel" && isOrg) {
+      notifyInBackground(() =>
+        notifyOfferCanceledToRef({
+          admin,
+          refMemberId: offer.ref_member_id,
+          eventId: offer.event_id,
+          siteUrl,
+        })
+      );
+    }
+  } catch {
+    // Email is best-effort.
   }
 
   return NextResponse.json({ ok: true, status: nextStatus });

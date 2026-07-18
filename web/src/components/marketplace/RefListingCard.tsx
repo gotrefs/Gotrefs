@@ -1,14 +1,18 @@
 "use client";
 
 import { ListingPhotoCarousel } from "@/components/marketplace/ListingPhotoCarousel";
+import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
+import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import { marketplaceCardShadow, refListingPhotos, sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 
 export function RefListingCard({
+  refMemberId,
   gotrefsId,
   primarySport,
   rateLabel,
   ratingAverage,
   ratingCount,
+  reviews,
   reviewSnippet,
   availabilityLabel,
   priceFits,
@@ -17,11 +21,13 @@ export function RefListingCard({
   inviteDisabled,
   inviteLabel = "Invite",
 }: {
+  refMemberId: string;
   gotrefsId: string;
   primarySport: string;
   rateLabel: string;
   ratingAverage: number | null;
   ratingCount: number;
+  reviews?: PublicReview[];
   reviewSnippet?: string | null;
   availabilityLabel: string;
   priceFits?: boolean;
@@ -32,8 +38,6 @@ export function RefListingCard({
 }) {
   const visual = sportListingVisual(primarySport);
   const photos = refListingPhotos(primarySport);
-  const stars =
-    ratingAverage != null && ratingCount > 0 ? `★ ${ratingAverage.toFixed(1)}` : "New";
 
   return (
     <article className={`overflow-hidden rounded-xl bg-white transition duration-300 ${marketplaceCardShadow}`}>
@@ -57,10 +61,16 @@ export function RefListingCard({
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-[15px] font-semibold text-neutral-900">{primarySport} official</p>
-            <p className="text-sm text-neutral-500">
-              {stars}
-              {ratingCount > 0 ? ` · ${ratingCount} review${ratingCount === 1 ? "" : "s"}` : ""}
-            </p>
+            <div className="mt-0.5">
+              <RefReviewsButton
+                refMemberId={refMemberId}
+                title={`Official ${gotrefsId}`}
+                average={ratingAverage}
+                count={ratingCount}
+                initialReviews={reviews}
+                emptyLabel="New"
+              />
+            </div>
           </div>
           <p className="shrink-0 text-[15px] font-semibold text-neutral-900">{rateLabel}</p>
         </div>

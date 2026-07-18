@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import { payRangesOverlap } from "@/lib/pay-range";
 
 type StaffingEvent = {
@@ -184,11 +185,15 @@ export function EventStaffingPanel({
               eventApplicants.map((applicant) => (
                 <article key={applicant.id} className="rounded-2xl border border-[var(--border)] p-4">
                   <p className="font-black text-[var(--navy)]">Official {applicant.gotrefsId}</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {applicant.ratingAverage != null
-                      ? `${applicant.ratingAverage.toFixed(1)} ★ · ${applicant.ratingCount} reviews`
-                      : "No reviews yet"}
-                  </p>
+                  <div className="mt-1">
+                    <RefReviewsButton
+                      refMemberId={applicant.refMemberId}
+                      title={`Official ${applicant.gotrefsId}`}
+                      average={applicant.ratingAverage}
+                      count={applicant.ratingCount}
+                      emptyLabel="No reviews yet"
+                    />
+                  </div>
                   {applicant.refRateLabel && (
                     <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Ref rate: {applicant.refRateLabel}</p>
                   )}
@@ -217,6 +222,15 @@ export function EventStaffingPanel({
                     {ref.primarySport}
                     {ref.rateLabel ? ` · ${ref.rateLabel}` : ""}
                   </p>
+                  <div className="mt-1">
+                    <RefReviewsButton
+                      refMemberId={ref.id}
+                      title={`Official ${ref.gotrefsId}`}
+                      average={ref.ratingAverage}
+                      count={ref.ratingCount}
+                      emptyLabel="No reviews yet"
+                    />
+                  </div>
                   <button
                     type="button"
                     disabled={busyId === ref.id}

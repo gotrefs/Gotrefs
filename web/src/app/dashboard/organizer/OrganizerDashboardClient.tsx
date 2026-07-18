@@ -6,15 +6,27 @@ import { createClient } from "@/lib/supabase/client";
 import { EventStaffingPanel } from "@/components/marketplace/EventStaffingPanel";
 import { AirbnbAcceptProfile, acceptPhotosForSport } from "@/components/marketplace/AirbnbAcceptProfile";
 import { AirbnbMarketplaceSearch } from "@/components/marketplace/AirbnbMarketplaceSearch";
+import {
+  OrganizerEventComposer,
+  type JustPublishedEvent,
+} from "@/components/marketplace/OrganizerEventComposer";
 import { RefListingCard } from "@/components/marketplace/RefListingCard";
+import {
+  OrganizerListingWizard,
+  type OrganizerWizardDraft,
+  type PayoutMethodPayload,
+} from "@/components/organizer/OrganizerListingWizard";
+import { LeaveReviewModal } from "@/components/reviews/LeaveReviewModal";
 import { SportsFields } from "@/components/SportsFields";
-import { ALL_SPORTS, formatEventLocation, formatPayOffer } from "@/data/sports";
+import { formatEventLocation, formatPayOffer } from "@/data/sports";
+import { marketplaceCardShadow, sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import { payRangesOverlap } from "@/lib/pay-range";
 
 type RefReview = {
   score: number;
   comment: string | null;
   createdAt: string;
+  authorLabel?: string;
 };
 
 type DirectoryRef = {
@@ -110,11 +122,6 @@ function refPriceFitsEvent(ref: DirectoryRef, event: EventRow) {
   return payRangesOverlap(refPayInput(ref), eventPayInput(event));
 }
 
-function renderStarScore(score: number) {
-  const safe = Math.max(1, Math.min(5, Math.round(score)));
-  return `${"★".repeat(safe)}${"☆".repeat(5 - safe)}`;
-}
-
 function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
   return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
@@ -138,6 +145,20 @@ function toDatetimeLocalValue(date: Date, hour: number, minute = 0) {
   next.setHours(hour, minute, 0, 0);
   const offset = next.getTimezoneOffset() * 60000;
   return new Date(next.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function toDatetimeLocalFromDate(date: Date) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+/** After publish, suggest the next slot (+2h) for Add another. */
+function bumpDatetimeLocal(value: string, hours = 2) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setHours(date.getHours() + hours);
+  return toDatetimeLocalFromDate(date);
 }
 
 function buildMonthWeeks(cursor: Date) {
@@ -307,6 +328,7 @@ export default function OrganizerDashboardClient() {
   const [idDocPath, setIdDocPath] = useState<string | null>(null);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [eventsListPath, setEventsListPath] = useState<string | null>(null);
+  const [justPublished, setJustPublished] = useState<JustPublishedEvent[]>([]);
 
   const [title, setTitle] = useState("");
   const [eventSport, setEventSport] = useState("Basketball");
@@ -336,7 +358,7 @@ export default function OrganizerDashboardClient() {
   const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
   const [submittedRatings, setSubmittedRatings] = useState<RefRatingRow[]>([]);
   const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
-  const [ratingDrafts, setRatingDrafts] = useState<Record<string, { score: number; comment: string }>>({});
+  const [leaveReviewOffer, setLeaveReviewOffer] = useState<OrganizerOfferRow | null>(null);
   const [ratingCutoffIso, setRatingCutoffIso] = useState("");
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
@@ -534,8 +556,24 @@ export default function OrganizerDashboardClient() {
   }
 
   function openSetup(step: OrganizerSetupStep) {
+    if (step === "events") {
+      setJustPublished([]);
+      setEventMsg(null);
+    }
     setSetupStep(step);
     setSetupModalOpen(true);
+  }
+
+  function finishEventsStep() {
+    const publishedCount = justPublished.length;
+    setJustPublished([]);
+    setEventMsg(null);
+    if (!isOrganizerProfileComplete()) {
+      goToNextSetupStep("events");
+      return;
+    }
+    setSetupModalOpen(false);
+    setMsg(publishedCount > 0 ? "Events ready — staff them from Upcoming." : null);
   }
 
   function browseRefsForEvent(eventId: string) {
@@ -626,7 +664,10 @@ export default function OrganizerDashboardClient() {
 
   async function uploadId(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) await uploadIdFile(file);
+  }
+
+  async function uploadIdFile(file: File) {
     setMsg(null);
     const {
       data: { user },
@@ -641,7 +682,7 @@ export default function OrganizerDashboardClient() {
     }
     await supabase.from("organizer_profiles").update({ id_document_path: path }).eq("member_id", user.id);
     setIdDocPath(path);
-    if (setupStep === "identity" && logoPath) {
+    if (logoPath) {
       setMsg("Organization ID and logo complete.");
     } else {
       setMsg("ID document uploaded.");
@@ -650,7 +691,10 @@ export default function OrganizerDashboardClient() {
 
   async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) await uploadLogoFile(file);
+  }
+
+  async function uploadLogoFile(file: File) {
     setMsg(null);
     const {
       data: { user },
@@ -665,17 +709,117 @@ export default function OrganizerDashboardClient() {
     }
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
-    if (setupStep === "identity" && idDocPath) {
+    if (idDocPath) {
       setMsg("Organization ID and logo complete.");
     } else {
       setMsg("Organization logo uploaded.");
     }
   }
 
-  async function uploadEventsList(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function uploadVenuePhotoFile(file: File) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const path = `${user.id}/venue_photo_${crypto.randomUUID()}_${sanitizeFilename(file.name)}`;
+    const { error: upErr } = await supabase.storage.from("verification_documents").upload(path, file);
+    if (upErr) setMsg(upErr.message);
+  }
+
+  async function savePayoutMethod(payload: PayoutMethodPayload): Promise<boolean> {
+    // Only store the method type, holder, and last 4 digits — never full account/routing numbers.
+    const { error: updateErr } = await supabase.auth.updateUser({
+      data: {
+        payout_method: {
+          method: payload.method,
+          account_holder: payload.accountHolder,
+          account_type: payload.accountType,
+          last4: payload.last4,
+          added_at: new Date().toISOString(),
+        },
+      },
+    });
+    if (updateErr) {
+      setMsg(updateErr.message);
+      return false;
+    }
+    return true;
+  }
+
+  function applyWizardDraft(draft: OrganizerWizardDraft) {
+    if (draft.sport) setSport(draft.sport);
+    setAdditionalSports(draft.additionalSports);
+    setBio(draft.bio);
+    setRateType(draft.rateType);
+    setRatePerOfficial(draft.ratePerOfficial);
+    setRateMin(draft.rateMin);
+    setRateMax(draft.rateMax);
+    setCity(draft.city);
+    setState(draft.state);
+    setZip(draft.zip);
+    setNeeded(draft.officialsNeeded);
+    const venueLabel =
+      draft.venueType || draft.accessType
+        ? `Venue: ${draft.venueType || "n/a"}; access: ${draft.accessType || "n/a"}; ${draft.street}${draft.unit ? ` ${draft.unit}` : ""}`
+        : "";
+    if (venueLabel) setNotes(venueLabel);
+  }
+
+  async function saveWizardProfile(draft: OrganizerWizardDraft): Promise<boolean> {
+    applyWizardDraft(draft);
+    setSavingProfile(true);
+    setMsg(null);
+    try {
+      const rateNum = draft.ratePerOfficial === "" ? null : Number(draft.ratePerOfficial);
+      const minNum = draft.rateMin === "" ? null : Number(draft.rateMin);
+      const maxNum = draft.rateMax === "" ? null : Number(draft.rateMax);
+      const res = await fetch("/api/organizer/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bio: draft.bio,
+          primary_sport: draft.sport,
+          additional_sports: draft.additionalSports,
+          rate_per_official:
+            draft.rateType === "range" && Number.isFinite(minNum as number)
+              ? minNum
+              : Number.isFinite(rateNum as number)
+                ? rateNum
+                : null,
+          rate_type: draft.rateType,
+          rate_min: draft.rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
+          rate_max: draft.rateType === "range" && Number.isFinite(maxNum as number) ? maxNum : null,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      const tolerated = !res.ok && isMissingOrganizerRateColumn({ message: json.error });
+      if (!res.ok && !tolerated) {
+        setMsg(json.error || "Could not save profile.");
+        return false;
+      }
+      setMsg("Progress saved.");
+      await load();
+      return true;
+    } catch {
+      setMsg("Could not reach the server.");
+      return false;
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function finishListingWizard(draft: OrganizerWizardDraft) {
+    applyWizardDraft(draft);
+    await saveWizardProfile(draft);
+    await load();
+    setMsg("Organizer profile ready. Add your first event anytime.");
+    setSetupModalOpen(false);
+  }
+
+  async function uploadEventsList(file: File) {
     if (!file) return;
     setMsg(null);
+    setEventMsg(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -686,6 +830,7 @@ export default function OrganizerDashboardClient() {
     const { error: upErr } = await supabase.storage.from("verification_documents").upload(path, file);
     if (upErr) {
       setMsg(upErr.message);
+      setEventMsg(upErr.message);
       return;
     }
     await supabase.from("organizer_profiles").update({ events_list_path: path }).eq("member_id", user.id);
@@ -698,6 +843,7 @@ export default function OrganizerDashboardClient() {
         await fetch("/api/auth/sync-member", { method: "POST" });
         let imported = 0;
         let lastErr: string | null = null;
+        const publishedRows: JustPublishedEvent[] = [];
         for (const row of parsed) {
           const res = await fetch("/api/events", {
             method: "POST",
@@ -714,23 +860,36 @@ export default function OrganizerDashboardClient() {
               pay_offer: row.pay_offer,
             }),
           });
-          const j = (await res.json()) as { error?: string };
-          if (res.ok) imported += 1;
-          else lastErr = j.error || "Import failed";
+          const j = (await res.json()) as { error?: string; id?: string };
+          if (res.ok) {
+            imported += 1;
+            publishedRows.push({
+              id: j.id,
+              title: row.title,
+              whenLabel: formatEventDateTime(row.starts_at),
+              whereLabel: formatEventLocation(row.city, row.state, row.zip_code) || `ZIP ${row.zip_code}`,
+            });
+          } else lastErr = j.error || "Import failed";
         }
         if (imported === 0) {
-          setMsg(`List saved. CSV import failed: ${lastErr ?? "Unknown error"}`);
+          const fail = `List saved. CSV import failed: ${lastErr ?? "Unknown error"}`;
+          setMsg(fail);
+          setEventMsg(fail);
         } else {
-          setMsg(`Uploaded list and imported ${imported} event(s) from CSV.`);
+          setJustPublished((current) => [...publishedRows, ...current]);
+          const ok = `Imported ${imported} event(s) from CSV. Add more below or tap Done.`;
+          setMsg(ok);
+          setEventMsg(null);
         }
         await load();
-        goToNextSetupStep("events");
         return;
       }
     }
-    setMsg("Events list uploaded. Use CSV (title,sport,starts_at,ends_at,zip,officials_needed,pay) to bulk-import.");
+    const saved =
+      "Events list uploaded. Use CSV (title,sport,starts_at,ends_at,zip,officials_needed,pay) to bulk-import.";
+    setMsg(saved);
+    setEventMsg(saved);
     await load();
-    goToNextSetupStep("events");
   }
 
   async function createEvent() {
@@ -760,11 +919,12 @@ export default function OrganizerDashboardClient() {
       const payNum = pay === "" ? null : Number(pay);
       const payMinNum = payMin === "" ? null : Number(payMin);
       const payMaxNum = payMax === "" ? null : Number(payMax);
+      const publishedTitle = title.trim() || "Event";
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title || "Event",
+          title: publishedTitle,
           sport: eventSport,
           starts_at: startVal,
           ends_at: endVal || startVal,
@@ -784,34 +944,40 @@ export default function OrganizerDashboardClient() {
           notes: notes || null,
         }),
       });
-      const json = (await res.json()) as { error?: string; ok?: boolean };
+      const json = (await res.json()) as { error?: string; ok?: boolean; id?: string };
       if (!res.ok) {
         const text = json.error || "Could not publish event.";
         setEventMsg(text);
         setMsg(text);
         return;
       }
+
+      const whereLabel = formatEventLocation(city.trim() || null, state.trim() || null, zipVal) || `ZIP ${zipVal}`;
+      setJustPublished((current) => [
+        {
+          id: json.id,
+          title: publishedTitle,
+          whenLabel: formatEventDateTime(startVal),
+          whereLabel,
+        },
+        ...current,
+      ]);
+
+      // Sticky venue/pay defaults; clear timing + title for the next game.
+      const nextStart = bumpDatetimeLocal(endVal || startVal, 2) || bumpDatetimeLocal(startVal, 2);
+      const nextEnd = nextStart ? bumpDatetimeLocal(nextStart, 2) : "";
       setTitle("");
       setNotes("");
-      setStarts("");
-      setEnds("");
-      setCity("");
-      setState("");
-      setZip("");
-      setPay("");
-      setPayType("exact");
-      setPayMin("");
-      setPayMax("");
-      const text = "Event published.";
-      setEventMsg(text);
-      setMsg(text);
+      setStarts(nextStart);
+      setEnds(nextEnd);
+      setEventMsg(null);
+      setMsg("Event published. Add another or tap Done.");
+      setPublishing(false);
       await load();
-      goToNextSetupStep("events");
     } catch {
       const text = "Could not reach the server. Refresh and try again.";
       setEventMsg(text);
       setMsg(text);
-    } finally {
       setPublishing(false);
     }
   }
@@ -954,11 +1120,7 @@ export default function OrganizerDashboardClient() {
         ...current.filter((rating) => ratingKey(rating.event_id, rating.ref_member_id) !== key),
         { event_id: offer.event_id, ref_member_id: offer.ref_member_id, score, skipped },
       ]);
-      setRatingDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
-      });
+      setLeaveReviewOffer(null);
       setMsg(
         skipped
           ? "Rating skipped for this completed game."
@@ -1044,7 +1206,6 @@ export default function OrganizerDashboardClient() {
   const visibleManageEvents = selectedManageDate
     ? filteredEvents.filter((event) => sameDay(new Date(event.starts_at), selectedManageDate))
     : filteredEvents;
-  const zipIsValid = /^\d{5}(-\d{4})?$/.test(zip.trim());
   const respondedSentOffers = sentOffers.filter((offer) => offer.status === "accepted" || offer.status === "declined");
   const acceptedOffersByEvent = sentOffers.reduce<Record<string, number>>((acc, offer) => {
     if (offer.status === "accepted") acc[offer.event_id] = (acc[offer.event_id] || 0) + 1;
@@ -1079,25 +1240,57 @@ export default function OrganizerDashboardClient() {
   });
 
   const needsSetup = !isOrganizerProfileComplete();
+  const forceWizard = searchParams.get("setup") === "1";
+
+  if (needsSetup || forceWizard) {
+    return (
+      <OrganizerListingWizard
+        organizationName={organizationName || displayName}
+        saving={savingProfile}
+        idDocPath={idDocPath}
+        logoPath={logoPath}
+        initialDraft={{
+          sport,
+          additionalSports,
+          bio,
+          rateType,
+          ratePerOfficial,
+          rateMin,
+          rateMax,
+          city,
+          state,
+          zip,
+          officialsNeeded: needed,
+        }}
+        onSaveProfile={saveWizardProfile}
+        onUploadId={uploadIdFile}
+        onUploadLogo={uploadLogoFile}
+        onUploadVenuePhoto={uploadVenuePhotoFile}
+        onSavePayoutMethod={savePayoutMethod}
+        onComplete={(draft) => {
+          if (forceWizard) {
+            applyWizardDraft(draft);
+            setMsg("Setup preview finished. Remove ?setup=1 from the URL to return to your dashboard.");
+            window.history.replaceState({}, "", "/dashboard/organizer");
+            void load();
+            return;
+          }
+          void finishListingWizard(draft);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
-      {(needsSetup || setupModalOpen) && (
+      {setupModalOpen && (
         <div
-          className={
-            needsSetup
-              ? "fixed inset-0 z-50 overflow-y-auto bg-[#f7f7f7] p-4 sm:p-8"
-              : "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          }
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="presentation"
-          onClick={needsSetup ? undefined : () => setSetupModalOpen(false)}
+          onClick={() => setSetupModalOpen(false)}
         >
           <section
-            className={
-              needsSetup
-                ? "mx-auto w-full max-w-3xl rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8"
-                : "max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-white p-6 shadow-2xl"
-            }
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-white p-6 shadow-2xl"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1109,20 +1302,16 @@ export default function OrganizerDashboardClient() {
               Step {ORGANIZER_SETUP_ORDER.indexOf(setupStep) + 1} of {ORGANIZER_SETUP_ORDER.length}: {currentSetup.label}
             </h2>
             <p className="mt-1 text-sm text-neutral-500">
-              {needsSetup
-                ? "Finish these steps to unlock your organizer dashboard."
-                : "Add an event or update your organizer details."}
+              Add an event or update your organizer details.
             </p>
           </div>
-          {!needsSetup && (
-            <button
-              type="button"
-              onClick={() => setSetupModalOpen(false)}
-              className="rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
-            >
-              Close
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setSetupModalOpen(false)}
+            className="rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            Close
+          </button>
         </div>
         <div className="mt-5 flex items-center gap-2">
           {setupActions.map((action, index) => {
@@ -1259,182 +1448,58 @@ export default function OrganizerDashboardClient() {
 
         {setupStep === "events" && (
           <div className="mt-5">
-        <form
-          className="mt-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void createEvent();
-          }}
-        >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            Title
-            <input className="rounded border px-2 py-1" value={title} onChange={(e) => { setTitle(e.target.value); clearEventFeedback(); }} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Sport
-            <select
-              className="rounded border px-2 py-1"
-              value={eventSport}
-              onChange={(e) => { setEventSport(e.target.value); clearEventFeedback(); }}
-            >
-              {ALL_SPORTS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Start <span className="text-[var(--red)]">*</span>
-            <input
-              type="datetime-local"
-              required
-              className="rounded border px-2 py-1"
-              value={starts}
-              onChange={(e) => { setStarts(e.target.value); clearEventFeedback(); }}
+            <OrganizerEventComposer
+              values={{
+                title,
+                sport: eventSport,
+                starts,
+                ends,
+                city,
+                state,
+                zip,
+                needed,
+                pay,
+                payType,
+                payMin,
+                payMax,
+                notes,
+              }}
+              onChange={(patch) => {
+                if (patch.title !== undefined) setTitle(patch.title);
+                if (patch.sport !== undefined) setEventSport(patch.sport);
+                if (patch.starts !== undefined) setStarts(patch.starts);
+                if (patch.ends !== undefined) setEnds(patch.ends);
+                if (patch.city !== undefined) setCity(patch.city);
+                if (patch.state !== undefined) setState(patch.state);
+                if (patch.zip !== undefined) setZip(patch.zip);
+                if (patch.needed !== undefined) setNeeded(patch.needed);
+                if (patch.pay !== undefined) setPay(patch.pay);
+                if (patch.payType !== undefined) setPayType(patch.payType);
+                if (patch.payMin !== undefined) setPayMin(patch.payMin);
+                if (patch.payMax !== undefined) setPayMax(patch.payMax);
+                if (patch.notes !== undefined) setNotes(patch.notes);
+              }}
+              onPublish={() => void createEvent()}
+              onDone={finishEventsStep}
+              publishing={publishing}
+              justPublished={justPublished}
+              error={eventMsg}
+              onClearError={clearEventFeedback}
+              onImportCsv={(file) => void uploadEventsList(file)}
+              eventsListSaved={Boolean(eventsListPath)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            End
-            <input
-              type="datetime-local"
-              className="rounded border px-2 py-1"
-              value={ends}
-              onChange={(e) => { setEnds(e.target.value); clearEventFeedback(); }}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            City
-            <input
-              className="rounded border px-2 py-1"
-              placeholder="e.g. Los Angeles"
-              value={city}
-              onChange={(e) => { setCity(e.target.value); clearEventFeedback(); }}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            State
-            <input
-              className="rounded border px-2 py-1"
-              placeholder="e.g. CA"
-              value={state}
-              onChange={(e) => { setState(e.target.value); clearEventFeedback(); }}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            ZIP <span className="text-[var(--red)]">*</span>
-            <div className="relative">
-              <input
-                required
-                inputMode="numeric"
-                autoComplete="postal-code"
-                placeholder="e.g., 91322"
-                className={`w-full rounded-xl border px-3 py-2 pr-10 outline-none transition-all duration-200 ${
-                  zip && zipIsValid
-                    ? "border-green-300 bg-green-50 focus:ring-2 focus:ring-green-100"
-                    : "border-slate-200 focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
-                }`}
-                value={zip}
-                onChange={(e) => { setZip(e.target.value); clearEventFeedback(); }}
-              />
-              {zip && zipIsValid && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-green-600">✓</span>
-              )}
-            </div>
-            {zip && !zipIsValid && <span className="text-xs text-amber-700">Use a 5-digit ZIP so refs can match by area.</span>}
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Officials needed
-            <input type="number" min={1} className="rounded border px-2 py-1" value={needed} onChange={(e) => { setNeeded(Number(e.target.value)); clearEventFeedback(); }} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Pay offer
-            <div className="rounded-xl border border-slate-200 p-2">
-              <div className="mb-2 flex gap-2 text-xs font-bold">
-                {(["exact", "range"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      setPayType(type);
-                      clearEventFeedback();
-                    }}
-                    className={`rounded-full px-3 py-1 capitalize ${
-                      payType === type ? "bg-[var(--navy)] text-white" : "bg-slate-100 text-[var(--muted)]"
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-              {payType === "exact" ? (
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full rounded border px-2 py-1"
-                  value={pay}
-                  onChange={(e) => { setPay(e.target.value); clearEventFeedback(); }}
-                  placeholder="e.g. 45"
-                />
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    className="rounded border px-2 py-1"
-                    value={payMin}
-                    onChange={(e) => { setPayMin(e.target.value); clearEventFeedback(); }}
-                    placeholder="Min"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    className="rounded border px-2 py-1"
-                    value={payMax}
-                    onChange={(e) => { setPayMax(e.target.value); clearEventFeedback(); }}
-                    placeholder="Max"
-                  />
-                </div>
-              )}
-            </div>
-          </label>
-        </div>
-        <label className="mt-3 flex flex-col gap-1 text-sm">
-          Notes
-          <textarea className="rounded border px-2 py-1" value={notes} onChange={(e) => { setNotes(e.target.value); clearEventFeedback(); }} />
-        </label>
-        <button
-          type="submit"
-          disabled={publishing}
-          className="mt-4 rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {publishing ? "Publishing…" : "Publish event"}
-        </button>
-        </form>
-        {eventMsg && (
-          <p
-            role="status"
-            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
-              eventMsg.includes("published")
-                ? "border border-green-200 bg-green-50 text-green-800"
-                : "border border-red-200 bg-red-50 text-red-800"
-            }`}
-          >
-            {eventMsg}
-          </p>
-        )}
-            <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-4">
-              <h3 className="font-bold text-[var(--blue)]">Upload events list</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                CSV columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer
+            {justPublished.length === 0 ? (
+              <p className="mt-4 text-center text-sm text-neutral-500">
+                Or{" "}
+                <button
+                  type="button"
+                  onClick={() => setSetupModalOpen(false)}
+                  className="font-semibold text-neutral-800 underline underline-offset-2"
+                >
+                  close without publishing
+                </button>
               </p>
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="mt-3 text-sm"
-                onChange={(e) => void uploadEventsList(e)}
-              />
-              {eventsListPath && <p className="mt-2 text-sm text-green-700">Events list file saved.</p>}
-            </div>
+            ) : null}
           </div>
         )}
 
@@ -1465,18 +1530,6 @@ export default function OrganizerDashboardClient() {
           </div>
         )}
 
-        {setupStep === "events" && needsSetup && (
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setSetupStep("identity")}
-              className="text-sm font-semibold text-neutral-600 underline"
-            >
-              Skip for now — continue to ID & logo
-            </button>
-          </div>
-        )}
-
         {profileMsg && (
           <p
             role="status"
@@ -1493,8 +1546,6 @@ export default function OrganizerDashboardClient() {
         </div>
       )}
 
-      {!needsSetup && (
-        <>
       {msg && (
         <div className="fixed right-4 top-20 z-40 max-w-sm rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-xl">
           {msg}
@@ -1511,7 +1562,7 @@ export default function OrganizerDashboardClient() {
         <button
           type="button"
           onClick={() => openSetup("events")}
-          className="rounded-lg bg-[var(--red)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
+          className="rounded-full bg-[var(--red)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
         >
           Add event
         </button>
@@ -1769,46 +1820,50 @@ export default function OrganizerDashboardClient() {
             const hiredCount = acceptedOffersByEvent[e.id] || 0;
             const payment = acceptedOfferPaymentsByEvent[e.id];
             const filled = hiredCount >= e.officials_needed;
+            const visual = sportListingVisual(e.sport);
             return (
               <article
                 key={e.id}
-                className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                className={`overflow-hidden rounded-2xl border border-neutral-200 bg-white transition duration-300 hover:-translate-y-0.5 ${marketplaceCardShadow}`}
               >
-                <div className="grid gap-4 lg:grid-cols-[1.2fr_1.1fr_auto] lg:items-center">
-                  <div>
+                <div className="grid gap-0 lg:grid-cols-[140px_minmax(0,1fr)_auto]">
+                  <div
+                    className={`relative hidden min-h-[120px] bg-gradient-to-br ${visual.gradient} lg:block`}
+                    aria-hidden
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-90">
+                      {visual.emoji}
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-center gap-2 p-5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-black text-[var(--navy)]">{e.title}</h3>
-                      <span className="rounded-full bg-[var(--blue)]/10 px-3 py-1 text-xs font-bold text-[var(--blue)]">
+                      <h3 className="text-lg font-semibold tracking-tight text-neutral-900">{e.title}</h3>
+                      <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
                         {e.sport}
                       </span>
                     </div>
-                    {payLabel && <p className="mt-2 text-sm font-bold text-emerald-700">Offer {payLabel} per official</p>}
+                    <p className="text-sm text-neutral-600">{formatEventDateTime(e.starts_at)}</p>
+                    <p className="text-sm text-neutral-500">{loc || `ZIP ${e.zip_code}`}</p>
+                    {payLabel ? (
+                      <p className="text-sm font-semibold text-neutral-900">Offer {payLabel} per official</p>
+                    ) : null}
                   </div>
-                  <div className="grid gap-2 text-sm text-[var(--slate)]">
-                    <p className="flex items-center gap-2">
-                      <span aria-hidden="true">📅</span>
-                      <span>{formatEventDateTime(e.starts_at)}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <span aria-hidden="true">📍</span>
-                      <span>{loc || `ZIP ${e.zip_code}`}</span>
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 lg:items-end">
+                  <div className="flex flex-col gap-2 border-t border-neutral-100 p-5 lg:items-end lg:border-l lg:border-t-0">
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-black ${
-                        filled ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        filled ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
                       }`}
                     >
-                      {hiredCount}/{e.officials_needed} Refs Hired
+                      {hiredCount}/{e.officials_needed} refs hired
                     </span>
                     {payment && payment.totalCents > 0 && (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-[var(--slate)]">
-                        <span className="block font-black text-[var(--navy)]">
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600 lg:text-right">
+                        <span className="block font-semibold text-neutral-900">
                           Payment due: {formatCents(payment.totalCents)}
                         </span>
                         <span>
-                          {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)} GotREFS fee
+                          {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)}{" "}
+                          GotREFS fee
                         </span>
                       </div>
                     )}
@@ -1817,7 +1872,7 @@ export default function OrganizerDashboardClient() {
                         type="button"
                         disabled={checkoutEventId === e.id}
                         onClick={() => void startStripeCheckout(e.id)}
-                        className="rounded-full bg-[var(--navy)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--blue)] disabled:opacity-60"
+                        className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
                       >
                         {checkoutEventId === e.id ? "Opening Stripe..." : "Pay with Stripe"}
                       </button>
@@ -1825,14 +1880,14 @@ export default function OrganizerDashboardClient() {
                     <button
                       type="button"
                       onClick={() => openStaffingForEvent(e.id)}
-                      className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-bold text-white transition-all duration-200 hover:bg-[var(--red-dark)]"
+                      className="rounded-full bg-[var(--red)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--red-dark)]"
                     >
                       {applicantCount > 0 ? `Staff game (${applicantCount} applied)` : "Staff game"}
                     </button>
                     <button
                       type="button"
                       onClick={() => browseRefsForEvent(e.id)}
-                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--navy)] transition-all duration-200 hover:border-[var(--blue)]"
+                      className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50"
                     >
                       Browse all refs
                     </button>
@@ -1842,12 +1897,18 @@ export default function OrganizerDashboardClient() {
             );
           })}
           {visibleManageEvents.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-8 text-center">
-              <p className="text-3xl" aria-hidden="true">📋</p>
-              <h3 className="mt-2 font-bold text-[var(--navy)]">
-                {events.length === 0 ? "No upcoming events yet." : "No events on this date."}
+            <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/80 p-10 text-center">
+              <h3 className="text-lg font-semibold text-neutral-900">
+                {events.length === 0 ? "No upcoming events yet" : "No events on this date"}
               </h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">Add a game to start matching with referees.</p>
+              <p className="mt-1 text-sm text-neutral-500">Add a game to start matching with referees.</p>
+              <button
+                type="button"
+                onClick={() => openSetup("events")}
+                className="mt-4 rounded-full bg-[var(--red)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
+              >
+                Add event
+              </button>
             </div>
           )}
         </div>
@@ -1860,7 +1921,7 @@ export default function OrganizerDashboardClient() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Completed games</p>
               <h2 className="mt-1 font-display text-xl font-bold text-[var(--navy)]">Rate your refs</h2>
               <p className="mt-1 text-sm text-amber-900">
-                Help organizers find trusted officials. Ratings only appear after completed games.
+                After a game ends, leave a star rating and public review — the same way Airbnb asks hosts to review guests.
               </p>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-800">
@@ -1868,90 +1929,62 @@ export default function OrganizerDashboardClient() {
             </span>
           </div>
           <div className="mt-4 grid gap-3">
-            {completedUnratedOffers.slice(0, 4).map((offer) => {
+            {completedUnratedOffers.slice(0, 6).map((offer) => {
               const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
               const key = ratingKey(offer.event_id, offer.ref_member_id);
               const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
               const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
-              const draft = ratingDrafts[key] ?? { score: 5, comment: "" };
               return (
-                <article key={key} className="rounded-2xl border border-amber-200 bg-white p-4">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="font-black text-[var(--navy)]">{event?.title ?? "Completed game"}</p>
-                      <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
-                        Official {officialId} ·{" "}
-                        {event?.starts_at ? formatEventDateTime(event.starts_at) : "Game complete"}
-                      </p>
-                      <p className="mt-2 text-sm text-amber-900">
-                        How was this ref? Share a star rating and a short review — like checking out on Airbnb.
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">Overall rating</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {[1, 2, 3, 4, 5].map((score) => (
-                          <button
-                            key={score}
-                            type="button"
-                            disabled={ratingSubmitting === key}
-                            onClick={() =>
-                              setRatingDrafts((current) => ({
-                                ...current,
-                                [key]: { ...draft, score },
-                              }))
-                            }
-                            className={`rounded-full border px-3 py-1.5 text-xs font-black transition-all duration-200 disabled:opacity-50 ${
-                              draft.score === score
-                                ? "border-amber-500 bg-amber-500 text-white"
-                                : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                            }`}
-                          >
-                            {renderStarScore(score)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <label className="block text-sm font-bold text-[var(--navy)]">
-                      Written review (optional)
-                      <textarea
-                        className="mt-2 min-h-24 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-normal text-[var(--slate)]"
-                        placeholder="Professional, on time, great with players..."
-                        value={draft.comment}
-                        disabled={ratingSubmitting === key}
-                        onChange={(event) =>
-                          setRatingDrafts((current) => ({
-                            ...current,
-                            [key]: { ...draft, comment: event.target.value },
-                          }))
-                        }
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={ratingSubmitting === key}
-                        onClick={() => void submitRating(offer, draft.score, false, draft.comment)}
-                        className="rounded-full bg-[var(--navy)] px-4 py-2 text-xs font-black text-white transition-all duration-200 hover:bg-[var(--blue)] disabled:opacity-50"
-                      >
-                        {ratingSubmitting === key ? "Publishing..." : "Publish review"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={ratingSubmitting === key}
-                        onClick={() => void submitRating(offer, null, true)}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-bold text-[var(--muted)] transition-all duration-200 hover:bg-[var(--grey-light)] disabled:opacity-50"
-                      >
-                        Skip
-                      </button>
-                    </div>
+                <article
+                  key={key}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white p-4"
+                >
+                  <div>
+                    <p className="font-black text-[var(--navy)]">{event?.title ?? "Completed game"}</p>
+                    <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+                      Official {officialId} ·{" "}
+                      {event?.starts_at ? formatEventDateTime(event.starts_at) : "Game complete"}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setLeaveReviewOffer(offer)}
+                    className="rounded-full bg-neutral-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-neutral-800"
+                  >
+                    Leave a review
+                  </button>
                 </article>
               );
             })}
           </div>
         </section>
       )}
+
+      {leaveReviewOffer && (() => {
+        const event = Array.isArray(leaveReviewOffer.scheduled_events)
+          ? leaveReviewOffer.scheduled_events[0]
+          : leaveReviewOffer.scheduled_events;
+        const refMeta = refs.find((ref) => ref.id === leaveReviewOffer.ref_member_id);
+        const officialId =
+          refMeta?.gotrefsId ?? `GR-${leaveReviewOffer.ref_member_id.slice(0, 8).toUpperCase()}`;
+        const key = ratingKey(leaveReviewOffer.event_id, leaveReviewOffer.ref_member_id);
+        return (
+          <LeaveReviewModal
+            open
+            onClose={() => setLeaveReviewOffer(null)}
+            subjectLabel={`Official ${officialId}`}
+            eventTitle={event?.title ?? "Completed game"}
+            eventWhen={event?.starts_at ? formatEventDateTime(event.starts_at) : undefined}
+            submitting={ratingSubmitting === key}
+            onSubmit={async ({ score, comment }) => {
+              await submitRating(leaveReviewOffer, score, false, comment);
+            }}
+            onSkip={async () => {
+              await submitRating(leaveReviewOffer, null, true);
+            }}
+          />
+        );
+      })()}
 
       {signupRequests.length > 0 && (
         <section ref={applicantsRef} className="space-y-5">
@@ -1971,6 +2004,7 @@ export default function OrganizerDashboardClient() {
                 eyebrow="Ref application"
                 title={`Official ${sr.gotrefsId}`}
                 subtitle={`Requested to work ${sr.eventTitle}`}
+                refMemberId={sr.refMemberId}
                 ratingAverage={sr.ratingAverage}
                 ratingCount={sr.ratingCount}
                 reviewsTitle="Reviews from hosts"
@@ -1978,7 +2012,7 @@ export default function OrganizerDashboardClient() {
                   score: review.score,
                   comment: review.comment,
                   createdAt: review.createdAt,
-                  authorLabel: "Host",
+                  authorLabel: review.authorLabel ?? "Host",
                 }))}
                 metaRows={[
                   sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
@@ -2053,11 +2087,18 @@ export default function OrganizerDashboardClient() {
                 return (
                   <div key={r.id}>
                     <RefListingCard
+                      refMemberId={r.id}
                       gotrefsId={r.gotrefsId}
                       primarySport={r.primarySport}
                       rateLabel={formatRefRate(r)}
                       ratingAverage={r.ratingAverage}
                       ratingCount={r.ratingCount}
+                      reviews={(r.reviews ?? []).map((review) => ({
+                        score: review.score,
+                        comment: review.comment,
+                        createdAt: review.createdAt,
+                        authorLabel: review.authorLabel ?? "Host",
+                      }))}
                       reviewSnippet={r.reviews?.[0]?.comment}
                       availabilityLabel={availabilityLabel}
                       priceFits={selectedOfferEvent ? priceFits : undefined}
@@ -2213,8 +2254,6 @@ export default function OrganizerDashboardClient() {
             await sendOffer(refId, staffingEvent.id);
           }}
         />
-      )}
-        </>
       )}
     </div>
   );

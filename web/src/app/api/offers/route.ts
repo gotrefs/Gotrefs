@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { emailSiteUrl } from "@/lib/email/resend";
+import { notifyInBackground, notifyOfferInvite } from "@/lib/email/notifications";
 import { payRangesOverlap } from "@/lib/pay-range";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -126,6 +128,17 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  notifyInBackground(() =>
+    notifyOfferInvite({
+      admin,
+      refMemberId: body.refMemberId,
+      eventId: body.eventId,
+      message: body.message,
+      offeredPay,
+      siteUrl: emailSiteUrl(request.url),
+    })
+  );
 
   return NextResponse.json({ ok: true, offerId: data.id });
 }

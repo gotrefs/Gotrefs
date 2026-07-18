@@ -76,23 +76,43 @@ export async function GET() {
 
   const { data: ratings } = await admin
     .from("ref_ratings")
-    .select("ref_member_id, score, skipped, comment, created_at")
+    .select("ref_member_id, score, skipped, comment, created_at, organizer_member_id")
     .in("ref_member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("skipped", false)
     .not("score", "is", null)
     .order("created_at", { ascending: false });
 
-  const ratingSummaryByRef = new Map<string, { total: number; count: number; reviews: Array<{ score: number; comment: string | null; createdAt: string }> }>();
+  const orgIds = [...new Set((ratings ?? []).map((r) => r.organizer_member_id).filter(Boolean))];
+  const { data: orgMembers } =
+    orgIds.length > 0
+      ? await admin.from("members").select("id, display_name").in("id", orgIds)
+      : { data: [] as { id: string; display_name: string }[] };
+  const orgNameById = new Map((orgMembers ?? []).map((m) => [m.id, m.display_name]));
+
+  const ratingSummaryByRef = new Map<
+    string,
+    {
+      total: number;
+      count: number;
+      reviews: Array<{
+        score: number;
+        comment: string | null;
+        createdAt: string;
+        authorLabel: string;
+      }>;
+    }
+  >();
   for (const rating of ratings ?? []) {
     if (typeof rating.score !== "number") continue;
     const next = ratingSummaryByRef.get(rating.ref_member_id) ?? { total: 0, count: 0, reviews: [] };
     next.total += rating.score;
     next.count += 1;
-    if (next.reviews.length < 3) {
+    if (next.reviews.length < 8) {
       next.reviews.push({
         score: rating.score,
         comment: rating.comment ?? null,
         createdAt: rating.created_at,
+        authorLabel: orgNameById.get(rating.organizer_member_id)?.trim() || "Host",
       });
     }
     ratingSummaryByRef.set(rating.ref_member_id, next);

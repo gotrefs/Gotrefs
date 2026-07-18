@@ -26,6 +26,8 @@ type PlacesWhereInputProps = {
   onChange: (label: string) => void;
   onPlaceSelect: (place: PlaceSelection | null) => void;
   className?: string;
+  /** Restrict Autocomplete primary types. Omit for broader results (e.g. street addresses). */
+  includedPrimaryTypes?: string[];
 };
 
 /** Places Autocomplete (New) with our own dropdown — avoids legacy Autocomplete “Oops!” UI. */
@@ -36,6 +38,7 @@ export function PlacesWhereInput({
   onChange,
   onPlaceSelect,
   className = "",
+  includedPrimaryTypes = ["locality", "sublocality", "postal_code", "administrative_area_level_3"],
 }: PlacesWhereInputProps) {
   const [ready, setReady] = useState(false);
   const [mapsError, setMapsError] = useState<string | null>(null);
@@ -96,7 +99,7 @@ export function PlacesWhereInput({
           }
           const { suggestions: next } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
             input: value.trim(),
-            includedPrimaryTypes: ["locality", "sublocality", "postal_code", "administrative_area_level_3"],
+            ...(includedPrimaryTypes.length > 0 ? { includedPrimaryTypes } : {}),
             includedRegionCodes: ["us"],
             language: "en-US",
             region: "us",
@@ -159,7 +162,7 @@ export function PlacesWhereInput({
     }, 220);
 
     return () => window.clearTimeout(timer);
-  }, [ready, value]);
+  }, [ready, value, includedPrimaryTypes]);
 
   async function selectSuggestion(item: SuggestionItem) {
     const places = placesRef.current;

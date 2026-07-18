@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { notifyInBackground, notifyProfileSubmitted } from "@/lib/email/notifications";
+import { emailSiteUrl } from "@/lib/email/resend";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { refProfilePackageComplete, refVerificationDocsComplete } from "@/lib/ref-eligibility";
 
 export async function POST() {
@@ -63,6 +66,19 @@ export async function POST() {
       updated_at: new Date().toISOString(),
     })
     .eq("ref_member_id", user.id);
+
+  try {
+    const admin = createServiceClient();
+    notifyInBackground(() =>
+      notifyProfileSubmitted({
+        admin,
+        refMemberId: user.id,
+        siteUrl: emailSiteUrl(),
+      })
+    );
+  } catch {
+    // Email is best-effort.
+  }
 
   return NextResponse.json({ ok: true, status: "submitted" });
 }

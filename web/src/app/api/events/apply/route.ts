@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
+import { notifyInBackground, notifyOrganizerNewApplication } from "@/lib/email/notifications";
+import { emailSiteUrl } from "@/lib/email/resend";
 import { refOfferEligible } from "@/lib/ref-eligibility";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -93,6 +95,15 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  notifyInBackground(() =>
+    notifyOrganizerNewApplication({
+      admin,
+      eventId: event.id,
+      refMemberId: user.id,
+      siteUrl: emailSiteUrl(request.url),
+    })
+  );
 
   return NextResponse.json({ ok: true, eventTitle: event.title });
 }

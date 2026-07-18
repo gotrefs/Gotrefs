@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/auth/require-admin-api";
-import { normalizeFixRequiredSteps, type RefVerificationStepKey } from "@/lib/ref-verification-steps";
+import { notifyInBackground, notifyVerificationDecision } from "@/lib/email/notifications";
+import { emailSiteUrl } from "@/lib/email/resend";
+import { normalizeFixRequiredSteps } from "@/lib/ref-verification-steps";
 import { createServiceClient } from "@/lib/supabase/service";
 
 type ReviewAction = "approve" | "reject" | "request_info";
@@ -118,6 +120,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
           updated_at: now,
         })
         .eq("ref_member_id", refMemberId);
+    }
+
+    if (action === "approve" || action === "reject") {
+      notifyInBackground(() =>
+        notifyVerificationDecision({
+          admin,
+          refMemberId,
+          approved: action === "approve",
+          adminNotes,
+          siteUrl: emailSiteUrl(request.url),
+        })
+      );
     }
 
     return NextResponse.json({

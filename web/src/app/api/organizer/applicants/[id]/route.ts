@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { notifyApplicationDecision, notifyInBackground } from "@/lib/email/notifications";
+import { emailSiteUrl } from "@/lib/email/resend";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -51,6 +53,15 @@ export async function PATCH(
       .update({ status: "declined" })
       .eq("id", id);
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+    notifyInBackground(() =>
+      notifyApplicationDecision({
+        admin,
+        refMemberId: row.ref_member_id,
+        eventId: row.event_id,
+        accepted: false,
+        siteUrl: emailSiteUrl(request.url),
+      })
+    );
     return NextResponse.json({ ok: true, status: "declined" });
   }
 
@@ -71,6 +82,16 @@ export async function PATCH(
     .update({ status: "accepted" })
     .eq("id", id);
   if (acceptError) return NextResponse.json({ error: acceptError.message }, { status: 400 });
+
+  notifyInBackground(() =>
+    notifyApplicationDecision({
+      admin,
+      refMemberId: row.ref_member_id,
+      eventId: row.event_id,
+      accepted: true,
+      siteUrl: emailSiteUrl(request.url),
+    })
+  );
 
   return NextResponse.json({ ok: true, status: "accepted" });
 }

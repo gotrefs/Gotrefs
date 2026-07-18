@@ -1,6 +1,7 @@
 "use client";
 
 import { ListingPhotoCarousel } from "@/components/marketplace/ListingPhotoCarousel";
+import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import {
   marketplaceCardShadow,
   refListingPhotos,
@@ -9,10 +10,12 @@ import {
 } from "@/lib/marketplace/airbnb-styles";
 
 export type AirbnbAcceptReview = {
+  id?: string;
   score: number;
   comment: string | null;
   createdAt?: string;
   authorLabel?: string;
+  eventTitle?: string | null;
 };
 
 export function AirbnbAcceptProfile({
@@ -22,6 +25,7 @@ export function AirbnbAcceptProfile({
   eyebrow,
   title,
   subtitle,
+  refMemberId,
   ratingAverage,
   ratingCount,
   reviewsTitle = "Reviews from hosts",
@@ -41,6 +45,7 @@ export function AirbnbAcceptProfile({
   eyebrow?: string;
   title: string;
   subtitle?: string;
+  refMemberId?: string;
   ratingAverage?: number | null;
   ratingCount?: number;
   reviewsTitle?: string;
@@ -55,10 +60,16 @@ export function AirbnbAcceptProfile({
   busy?: boolean;
 }) {
   const count = ratingCount ?? 0;
-  const stars =
-    ratingAverage != null && count > 0 ? `★ ${ratingAverage.toFixed(1)}` : null;
   const reviewList = reviews ?? [];
   const visual = sportListingVisual(sportForVisual);
+  const publicReviews = reviewList.map((review) => ({
+    id: review.id,
+    score: review.score,
+    comment: review.comment,
+    createdAt: review.createdAt ?? "",
+    authorLabel: review.authorLabel ?? "Host",
+    eventTitle: review.eventTitle ?? null,
+  }));
 
   return (
     <article className={`overflow-hidden rounded-2xl bg-white ${marketplaceCardShadow}`}>
@@ -81,10 +92,18 @@ export function AirbnbAcceptProfile({
           {subtitle ? <p className="mt-1 text-sm text-neutral-500">{subtitle}</p> : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-neutral-700">
-            {stars ? (
+            {refMemberId ? (
+              <RefReviewsButton
+                refMemberId={refMemberId}
+                title={title}
+                average={ratingAverage}
+                count={count}
+                initialReviews={publicReviews}
+                emptyLabel={emptyReviewsLabel}
+              />
+            ) : count > 0 && ratingAverage != null ? (
               <span className="font-semibold">
-                {stars}
-                {count > 0 ? ` · ${count} review${count === 1 ? "" : "s"}` : ""}
+                ★ {ratingAverage.toFixed(2)} · {count} review{count === 1 ? "" : "s"}
               </span>
             ) : (
               <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
