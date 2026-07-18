@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { RefereeIdCard } from "@/components/RefereeIdCard";
-import { ADDITIONAL_SPORTS, PRIMARY_SPORTS } from "@/data/sports";
+import { ADDITIONAL_SPORTS, ALL_SPORTS } from "@/data/sports";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
 import { validatePasswordStrength } from "@/lib/auth/password";
 
@@ -375,7 +375,7 @@ export function SignupForm() {
                     onChange={(e) => setPrimarySport(e.target.value)}
                     className="rounded-xl border border-[var(--border)] px-3 py-3"
                   >
-                    {[...PRIMARY_SPORTS, ...ADDITIONAL_SPORTS].map((sportName) => (
+                    {ALL_SPORTS.map((sportName) => (
                       <option key={sportName} value={sportName}>
                         {sportName}
                       </option>
@@ -385,7 +385,7 @@ export function SignupForm() {
                 <div className="mt-4">
                   <p className="text-sm font-medium text-[var(--blue-text)]">Additional sports</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {ADDITIONAL_SPORTS.slice(0, 12).map((sportName) => {
+                    {ADDITIONAL_SPORTS.map((sportName) => {
                       const active = additionalSports.includes(sportName);
                       return (
                         <button
@@ -610,7 +610,7 @@ export function SignupForm() {
                     onChange={(e) => setPrimarySport(e.target.value)}
                     className="rounded-xl border border-[var(--border)] px-3 py-3"
                   >
-                    {[...PRIMARY_SPORTS, ...ADDITIONAL_SPORTS].map((sportName) => (
+                    {ALL_SPORTS.map((sportName) => (
                       <option key={sportName} value={sportName}>
                         {sportName}
                       </option>
@@ -620,7 +620,7 @@ export function SignupForm() {
                 <div className="mt-4">
                   <p className="text-sm font-medium text-[var(--blue-text)]">Additional sports</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {ADDITIONAL_SPORTS.slice(0, 12).map((sportName) => {
+                    {ADDITIONAL_SPORTS.map((sportName) => {
                       const active = additionalSports.includes(sportName);
                       return (
                         <button

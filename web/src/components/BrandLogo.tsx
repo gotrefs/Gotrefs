@@ -13,7 +13,7 @@ type BrandLogoProps = {
 export function BrandLogo({
   href = "/",
   className = "",
-  imageClassName = "h-9 w-auto",
+  imageClassName = "h-12 w-auto",
   priority = false,
   src = "/gotrefs-logo.png",
 }: BrandLogoProps) {

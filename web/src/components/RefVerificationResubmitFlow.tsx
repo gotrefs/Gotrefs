@@ -339,9 +339,24 @@ export function RefVerificationResubmitFlow({
                 className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
               />
             </label>
-            <label className="block cursor-pointer rounded-xl border-2 border-dashed border-[var(--blue)]/40 bg-slate-50 px-4 py-6 text-center">
-              <span className="text-sm font-bold text-[var(--navy)]">Upload profile photo</span>
-              {photoFile && <span className="mt-2 block text-sm text-green-700">✓ {photoFile.name}</span>}
+            <label
+              className={`relative block cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
+                photoFile
+                  ? "border-green-400 bg-green-50"
+                  : "border-[var(--blue)]/40 bg-slate-50 hover:border-[var(--blue)]"
+              }`}
+            >
+              {photoFile ? (
+                <>
+                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-2xl font-black text-white">
+                    ✓
+                  </span>
+                  <span className="mt-3 block text-sm font-bold text-green-800">Profile photo uploaded</span>
+                  <span className="mt-1 block text-xs text-green-700/80">{photoFile.name} · tap to replace</span>
+                </>
+              ) : (
+                <span className="text-sm font-bold text-[var(--navy)]">Upload profile photo</span>
+              )}
               <input
                 type="file"
                 accept=".jpg,.jpeg,.png,.webp"

@@ -7,7 +7,7 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 h-[var(--marketing-header-height)] shrink-0 border-b border-white/10 bg-[var(--blue-hero)]">
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4">
-        <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-10 w-auto sm:h-14" priority />
+        <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-12 w-auto sm:h-16" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
           <MarketingNavLink href="#features" className="hover:text-white">
             How it works

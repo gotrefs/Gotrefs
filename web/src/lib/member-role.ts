@@ -4,7 +4,6 @@ export type MemberRole = "ref" | "organizer";
 
 type MemberRow = {
   role: string | null;
-  organization_name: string | null;
 } | null;
 
 export function dashboardPathForRole(role: MemberRole): string {
@@ -20,47 +19,27 @@ export function dashboardPathForSignupRole(
   return dashboardPathForRole(role);
 }
 
-/** Resolve role from a members row plus auth metadata. */
+/** Resolve role from members row, then auth metadata fallback. */
 export function roleFromMemberRow(
   member: MemberRow,
   metadata?: Record<string, unknown> | null
 ): MemberRole {
   if (member?.role === "organizer") return "organizer";
-  if (member?.role === "ref") {
-    if (member.organization_name?.trim()) return "organizer";
-    return "ref";
-  }
+  if (member?.role === "ref") return "ref";
   if (metadata?.role === "organizer") return "organizer";
   return "ref";
 }
 
-/** Load role from DB (members + organizer profile + past events) with metadata fallback. */
+/** Load the role chosen at signup (one dashboard per email). */
 export async function resolveMemberRole(
   supabase: SupabaseClient,
   user: Pick<User, "id" | "user_metadata">
 ): Promise<MemberRole> {
   const { data: member } = await supabase
     .from("members")
-    .select("role, organization_name")
+    .select("role")
     .eq("id", user.id)
     .maybeSingle();
 
-  const role = roleFromMemberRow(member, user.user_metadata);
-
-  if (role === "ref") {
-    const { data: orgProfile } = await supabase
-      .from("organizer_profiles")
-      .select("member_id")
-      .eq("member_id", user.id)
-      .maybeSingle();
-    if (orgProfile) return "organizer";
-
-    const { count } = await supabase
-      .from("scheduled_events")
-      .select("id", { count: "exact", head: true })
-      .eq("organizer_member_id", user.id);
-    if (count && count > 0) return "organizer";
-  }
-
-  return role;
+  return roleFromMemberRow(member, user.user_metadata);
 }

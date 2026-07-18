@@ -1,49 +1,56 @@
+/** Sports available for refs/organizers — names only, A–Z. */
 export const PRIMARY_SPORTS = [
-  "Basketball",
-  "Football",
-  "Soccer",
+  "American Football",
+  "Archery",
+  "Australian Rules Football",
+  "Badminton",
+  "Bandy",
   "Baseball",
-  "Softball",
-  "Volleyball",
-  "Hockey",
-  "Lacrosse",
-  "Wrestling",
-  "Tennis",
+  "Basketball",
+  "Boxing",
+  "Cricket",
+  "Curling",
+  "Diving",
+  "Equestrian",
+  "Fencing",
+  "Field Hockey",
+  "Figure Skating",
+  "Gaelic Football / Hurling",
   "Golf",
+  "Gymnastics",
+  "Handball (Team)",
+  "Ice Hockey",
+  "Judo",
+  "Lacrosse",
+  "Mixed Martial Arts (MMA)",
+  "Motorsports (F1 / NASCAR)",
+  "Pickleball",
+  "Polo",
+  "Rowing",
+  "Rugby League / Rugby Union",
+  "Sailing",
+  "Soccer",
+  "Softball",
+  "Squash",
   "Swimming",
-  "Track & Field",
-  "Cross Country",
-  "Cheerleading",
-  "Dance",
-  "Martial Arts",
+  "Table Tennis",
+  "Taekwondo",
+  "Tennis",
+  "Volleyball",
+  "Water Polo",
+  "Weightlifting",
+  "Wrestling",
 ] as const;
 
-export const ADDITIONAL_SPORTS = [
-  "7v7 Football",
-  "Flag Football",
-  "11v11 Football",
-  "5v5 Basketball",
-  "3v3 Basketball",
-  "Indoor Soccer",
-  "Futsal",
-  "Rugby",
-  "Field Hockey",
-  "Ice Hockey",
-  "Roller Hockey",
-  "Pickleball",
-  "Badminton",
-  "Cricket",
-  "Ultimate Frisbee",
-  "Water Polo",
-  "Gymnastics",
-  "Esports",
-] as const;
+/** Same catalog for additional / secondary picks (A–Z). */
+export const ADDITIONAL_SPORTS = PRIMARY_SPORTS;
 
 export const OTHER_SPORT_VALUE = "__other__";
 
-export const ALL_SPORTS = [...PRIMARY_SPORTS, ...ADDITIONAL_SPORTS] as const;
+/** Combined sports list, A–Z, for dropdowns and pickers. */
+export const ALL_SPORTS = PRIMARY_SPORTS;
 
-export type SportName = (typeof ALL_SPORTS)[number];
+export type SportName = (typeof PRIMARY_SPORTS)[number];
 
 /** Map stored primary sport to dropdown + optional custom text when "Other". */
 export function sportPickerFromStored(stored: string): { select: string; custom: string } {

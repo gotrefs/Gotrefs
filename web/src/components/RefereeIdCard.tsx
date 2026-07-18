@@ -173,7 +173,7 @@ export function RefereeIdCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-3 sm:gap-4">
           <div className="rounded-xl bg-white/95 px-2.5 py-2 shadow-lg sm:px-3">
-            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-6 w-auto sm:h-8" />
+            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-8 w-auto sm:h-10" />
           </div>
           <div className="text-right">
             {id && (

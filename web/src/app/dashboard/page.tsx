@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { gotrefsAdminDashboardPath, isGotrefsAdminUser } from "@/lib/auth/admin-access";
+import { dashboardPathForRole, resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
-import { DashboardIndexClient } from "./DashboardIndexClient";
 
 export default async function DashboardIndexPage() {
   const supabase = await createClient();
@@ -16,5 +16,6 @@ export default async function DashboardIndexPage() {
     redirect(gotrefsAdminDashboardPath());
   }
 
-  return <DashboardIndexClient />;
+  const role = await resolveMemberRole(supabase, user);
+  redirect(dashboardPathForRole(role));
 }

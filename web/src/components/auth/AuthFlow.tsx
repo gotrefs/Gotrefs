@@ -73,8 +73,9 @@ export function AuthFlow() {
   const [phone, setPhone] = useState("");
   const [primarySport, setPrimarySport] = useState("Basketball");
   const [customPrimarySport, setCustomPrimarySport] = useState("");
-  const [selectedSports, setSelectedSports] = useState<string[]>(["Basketball"]);
+  const [secondarySport, setSecondarySport] = useState("");
   const [certificationLevel, setCertificationLevel] = useState("");
+  const [hourlyRateMin, setHourlyRateMin] = useState(String(SIGNUP_HOURLY_RATE_FLOOR));
   const [hourlyRateMax, setHourlyRateMax] = useState("75");
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
   const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
@@ -146,14 +147,10 @@ export function AuthFlow() {
         ? ["Organization", "Payments", "Account"]
         : ["Authority", "Crew", "Account"];
   const resolvedPrimarySport = sportPickerToStored(primarySport, customPrimarySport);
-
-  function toggleSport(sport: string) {
-    setSelectedSports((current) => {
-      const next = current.includes(sport) ? current.filter((item) => item !== sport) : [...current, sport];
-      if (next.length > 0 && !next.includes(primarySport)) setPrimarySport(next[0]);
-      return next;
-    });
-  }
+  const resolvedAdditionalSports =
+    secondarySport.trim() && secondarySport !== resolvedPrimarySport && secondarySport !== OTHER_SPORT_VALUE
+      ? [secondarySport.trim()]
+      : [];
 
   function toggleRegion(region: string) {
     setWorkRegions((current) =>
@@ -259,9 +256,18 @@ export function AuthFlow() {
       return;
     }
     if (role === "ref" && wizardStep === 1) {
+      const minRate = Number(hourlyRateMin);
       const maxRate = Number(hourlyRateMax);
-      if (!Number.isFinite(maxRate) || maxRate < SIGNUP_HOURLY_RATE_FLOOR) {
-        setError(`Set your hourly rate to at least $${SIGNUP_HOURLY_RATE_FLOOR}.`);
+      if (!Number.isFinite(minRate) || minRate < SIGNUP_HOURLY_RATE_FLOOR) {
+        setError(`Set your minimum hourly rate to at least $${SIGNUP_HOURLY_RATE_FLOOR}.`);
+        return;
+      }
+      if (!Number.isFinite(maxRate) || maxRate < minRate) {
+        setError("Maximum hourly rate must be at least your minimum.");
+        return;
+      }
+      if (maxRate > SIGNUP_HOURLY_RATE_CEILING) {
+        setError(`Maximum hourly rate cannot exceed $${SIGNUP_HOURLY_RATE_CEILING}.`);
         return;
       }
     }
@@ -368,9 +374,9 @@ export function AuthFlow() {
         organizationName: isOrganizer ? organizationName.trim() : undefined,
         phone: isOrganizer ? phone.trim() : undefined,
         primarySport: resolvedPrimarySport,
-        additionalSports: selectedSports.filter((sport) => sport !== primarySport),
+        additionalSports: resolvedAdditionalSports,
         certificationLevel: certificationLevel.trim() || undefined,
-        rateMin: role === "ref" ? SIGNUP_HOURLY_RATE_FLOOR : undefined,
+        rateMin: role === "ref" ? Number(hourlyRateMin) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateMax: role === "ref" ? Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateType: role === "ref" ? "range" : undefined,
         rateUnit: role === "ref" ? "hour" : undefined,
@@ -442,7 +448,7 @@ export function AuthFlow() {
               },
               {
                 primarySport: resolvedPrimarySport,
-                additionalSports: selectedSports.filter((sport) => sport !== resolvedPrimarySport),
+                additionalSports: resolvedAdditionalSports,
                 certificationLevel: certificationLevel.trim() || "Youth / Recreational",
               }
             );
@@ -748,30 +754,59 @@ export function AuthFlow() {
                   Legal name
                   <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="First and last name" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
                 </label>
-                <label className="flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed border-slate-200 p-4">
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-500">
-                    {photoSelected ? "Ready" : "Photo"}
+                <label
+                  className={`relative flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition ${
+                    photoSelected
+                      ? "border-green-400 bg-green-50"
+                      : "border-slate-200 hover:border-[var(--blue)]/50"
+                  }`}
+                >
+                  <span
+                    className={`relative flex h-16 w-16 items-center justify-center rounded-full text-xs font-black ${
+                      photoSelected ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {photoSelected ? (
+                      <span className="text-2xl" aria-hidden>
+                        ✓
+                      </span>
+                    ) : (
+                      "Photo"
+                    )}
                   </span>
                   <span>
-                    <span className="block text-sm font-black text-[var(--navy)]">Upload profile photo</span>
-                    <span className="block text-xs text-[var(--muted)]">Circle preview template. You can update this later.</span>
+                    <span className="block text-sm font-black text-[var(--navy)]">
+                      {photoSelected ? "Profile photo uploaded" : "Upload profile photo"}
+                    </span>
+                    <span className="block text-xs text-[var(--muted)]">
+                      {photoSelected
+                        ? "Green check means you’re set — tap to replace anytime."
+                        : "Circle preview template. You can update this later."}
+                    </span>
                   </span>
-                  <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={(event) => setPhotoSelected(Boolean(event.target.files?.[0]))} />
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="sr-only"
+                    onChange={(event) => setPhotoSelected(Boolean(event.target.files?.[0]))}
+                  />
                 </label>
               </div>
             )}
 
             {role === "ref" && wizardStep === 1 && (
               <SportsAndCerts
-                selectedSports={selectedSports}
                 primarySport={primarySport}
                 customPrimarySport={customPrimarySport}
+                secondarySport={secondarySport}
                 certificationLevel={certificationLevel}
+                hourlyRateMin={hourlyRateMin}
                 hourlyRateMax={hourlyRateMax}
-                onToggleSport={toggleSport}
                 onPrimarySport={setPrimarySport}
                 onCustomPrimarySport={setCustomPrimarySport}
+                onSecondarySport={setSecondarySport}
                 onCertificationLevel={setCertificationLevel}
+                onHourlyRateMin={setHourlyRateMin}
                 onHourlyRateMax={setHourlyRateMax}
               />
             )}
@@ -974,12 +1009,34 @@ function SignupFileUpload({
   file: File | null;
   onFile: (file: File | null) => void;
 }) {
+  const uploaded = Boolean(file);
   return (
-    <label className="flex cursor-pointer flex-col rounded-2xl border-2 border-dashed border-[var(--blue)]/35 bg-[var(--blue)]/5 p-4 text-sm transition hover:border-[var(--blue)]">
-      <span className="font-bold text-[var(--navy)]">{label}</span>
-      <span className="mt-1 text-xs text-[var(--muted)]">JPG, PNG, or PDF</span>
-      {file ? (
-        <span className="mt-2 font-semibold text-green-700">{file.name}</span>
+    <label
+      className={`relative flex cursor-pointer flex-col rounded-2xl border-2 border-dashed p-4 text-sm transition ${
+        uploaded
+          ? "border-green-400 bg-green-50 hover:border-green-500"
+          : "border-[var(--blue)]/35 bg-[var(--blue)]/5 hover:border-[var(--blue)]"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="font-bold text-[var(--navy)]">{label}</span>
+          <span className="mt-1 block text-xs text-[var(--muted)]">JPG, PNG, or PDF</span>
+        </div>
+        {uploaded && (
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-500 text-lg font-black text-white shadow-sm"
+            aria-label="Uploaded"
+          >
+            ✓
+          </span>
+        )}
+      </div>
+      {uploaded ? (
+        <>
+          <span className="mt-3 font-semibold text-green-800">Uploaded · {file!.name}</span>
+          <span className="mt-1 text-xs text-green-700/80">Tap to replace</span>
+        </>
       ) : (
         <span className="mt-2 font-semibold text-[var(--blue)]">Choose file to upload</span>
       )}
@@ -994,33 +1051,61 @@ function SignupFileUpload({
 }
 
 function SportsAndCerts({
-  selectedSports,
   primarySport,
   customPrimarySport,
+  secondarySport,
   certificationLevel,
+  hourlyRateMin,
   hourlyRateMax,
-  onToggleSport,
   onPrimarySport,
   onCustomPrimarySport,
+  onSecondarySport,
   onCertificationLevel,
+  onHourlyRateMin,
   onHourlyRateMax,
 }: {
-  selectedSports: string[];
   primarySport: string;
   customPrimarySport: string;
+  secondarySport: string;
   certificationLevel: string;
+  hourlyRateMin: string;
   hourlyRateMax: string;
-  onToggleSport: (sport: string) => void;
   onPrimarySport: (sport: string) => void;
   onCustomPrimarySport: (value: string) => void;
+  onSecondarySport: (sport: string) => void;
   onCertificationLevel: (value: string) => void;
+  onHourlyRateMin: (value: string) => void;
   onHourlyRateMax: (value: string) => void;
 }) {
+  const minVal = Number(hourlyRateMin) || SIGNUP_HOURLY_RATE_FLOOR;
+  const maxVal = Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR;
+  const span = SIGNUP_HOURLY_RATE_CEILING - SIGNUP_HOURLY_RATE_FLOOR;
+  const leftPct = ((minVal - SIGNUP_HOURLY_RATE_FLOOR) / span) * 100;
+  const rightPct = ((maxVal - SIGNUP_HOURLY_RATE_FLOOR) / span) * 100;
+
+  function setMin(raw: string) {
+    const next = Math.min(Number(raw), maxVal);
+    onHourlyRateMin(String(Math.max(SIGNUP_HOURLY_RATE_FLOOR, next)));
+  }
+
+  function setMax(raw: string) {
+    const next = Math.max(Number(raw), minVal);
+    onHourlyRateMax(String(Math.min(SIGNUP_HOURLY_RATE_CEILING, next)));
+  }
+
   return (
     <div className="space-y-4">
       <label className="block text-sm font-bold text-[var(--navy)]">
         Primary sport
-        <select value={primarySport} onChange={(event) => onPrimarySport(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3">
+        <select
+          value={primarySport}
+          onChange={(event) => {
+            const next = event.target.value;
+            onPrimarySport(next);
+            if (secondarySport === next) onSecondarySport("");
+          }}
+          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+        >
           {ALL_SPORTS.map((sport) => (
             <option key={sport} value={sport}>
               {sport}
@@ -1035,54 +1120,76 @@ function SportsAndCerts({
           <input
             value={customPrimarySport}
             onChange={(event) => onCustomPrimarySport(event.target.value)}
-            placeholder="e.g. Dodgeball, Boxing, Pickleball"
+            placeholder="e.g. Dodgeball"
             className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
           />
         </label>
       )}
-      <div>
-        <p className="text-sm font-bold text-[var(--navy)]">Sports you officiate</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {ALL_SPORTS.slice(0, 12).map((sport) => (
-            <button
-              key={sport}
-              type="button"
-              onClick={() => onToggleSport(sport)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
-                selectedSports.includes(sport) ? "border-[var(--navy)] bg-[var(--navy)] text-white" : "border-slate-200 text-[var(--muted)]"
-              }`}
-            >
+      <label className="block text-sm font-bold text-[var(--navy)]">
+        Secondary sport <span className="font-medium text-[var(--muted)]">(optional)</span>
+        <select
+          value={secondarySport}
+          onChange={(event) => onSecondarySport(event.target.value)}
+          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+        >
+          <option value="">None — primary sport only</option>
+          {ALL_SPORTS.filter((sport) => sport !== primarySport).map((sport) => (
+            <option key={sport} value={sport}>
               {sport}
-            </button>
+            </option>
           ))}
-        </div>
-      </div>
+        </select>
+      </label>
+      <p className="text-xs text-[var(--muted)]">
+        Add another sport you also officiate if you want. You can skip this and continue.
+      </p>
       <label className="block text-sm font-bold text-[var(--navy)]">
         Certification level
-        <input value={certificationLevel} onChange={(event) => onCertificationLevel(event.target.value)} placeholder="Youth, varsity, NFHS, USSF, etc." className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+        <input
+          value={certificationLevel}
+          onChange={(event) => onCertificationLevel(event.target.value)}
+          placeholder="Youth, varsity, NFHS, USSF, etc."
+          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+        />
       </label>
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Event organizers only see your GotREFS ID until you accept a game. Set the hourly pay you expect.
+          Drag both ends of the slider. Event organizers only see your GotREFS ID until you accept a game.
         </p>
         <p className="mt-3 text-lg font-black text-[var(--navy)]">
-          {formatHourlyRateRange(SIGNUP_HOURLY_RATE_FLOOR, Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR)}
+          {formatHourlyRateRange(minVal, maxVal)}
         </p>
-        <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-          Max hourly rate
+        <div className="dual-range relative mt-6 h-8">
+          <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200" />
+          <div
+            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-[var(--navy)]"
+            style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+          />
           <input
             type="range"
             min={SIGNUP_HOURLY_RATE_FLOOR}
             max={SIGNUP_HOURLY_RATE_CEILING}
             step={5}
-            value={hourlyRateMax}
-            onChange={(event) => onHourlyRateMax(event.target.value)}
-            className="mt-2 w-full accent-[var(--navy)]"
+            value={minVal}
+            onChange={(event) => setMin(event.target.value)}
+            aria-label="Minimum hourly rate"
           />
-        </label>
-        <div className="mt-1 flex justify-between text-xs font-semibold text-[var(--muted)]">
+          <input
+            type="range"
+            min={SIGNUP_HOURLY_RATE_FLOOR}
+            max={SIGNUP_HOURLY_RATE_CEILING}
+            step={5}
+            value={maxVal}
+            onChange={(event) => setMax(event.target.value)}
+            aria-label="Maximum hourly rate"
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-xs font-semibold text-[var(--muted)]">
           <span>${SIGNUP_HOURLY_RATE_FLOOR}/hr</span>
+          <span>
+            ${minVal} – ${maxVal}/hr
+          </span>
           <span>${SIGNUP_HOURLY_RATE_CEILING}/hr</span>
         </div>
       </div>

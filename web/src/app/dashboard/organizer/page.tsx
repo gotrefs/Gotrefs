@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { dashboardPathForRole, resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
 import OrganizerDashboardClient from "./OrganizerDashboardClient";
 
@@ -8,6 +9,11 @@ export default async function OrganizerDashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
+
+  const role = await resolveMemberRole(supabase, user);
+  if (role !== "organizer") {
+    redirect(dashboardPathForRole(role));
+  }
 
   return <OrganizerDashboardClient />;
 }
