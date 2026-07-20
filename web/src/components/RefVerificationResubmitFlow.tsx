@@ -23,6 +23,7 @@ type RefVerificationResubmitFlowProps = {
   initialStep?: RefVerificationStepKey;
   existingGovId?: boolean;
   existingCert?: boolean;
+  initialHourlyRateMin?: string;
   initialHourlyRateMax?: string;
   displayName: string;
   primarySport: string;
@@ -52,6 +53,7 @@ export function RefVerificationResubmitFlow({
   initialStep,
   existingGovId = false,
   existingCert = false,
+  initialHourlyRateMin = String(HOURLY_RATE_FLOOR),
   initialHourlyRateMax = "75",
   displayName: initialDisplayName,
   primarySport: initialPrimarySport,
@@ -80,6 +82,7 @@ export function RefVerificationResubmitFlow({
   const [primarySport, setPrimarySport] = useState(initialPrimarySport);
   const [additionalSports, setAdditionalSports] = useState(initialAdditionalSports);
   const [certificationLevel, setCertificationLevel] = useState(initialCertificationLevel);
+  const [hourlyRateMin, setHourlyRateMin] = useState(initialHourlyRateMin);
   const [hourlyRateMax, setHourlyRateMax] = useState(initialHourlyRateMax);
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
   const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
@@ -113,9 +116,16 @@ export function RefVerificationResubmitFlow({
       const sport = primarySport.trim();
       if (!sport) return "Select or enter your primary sport.";
       if (!certificationLevel.trim()) return "Enter your certification level.";
+      const minRate = Number(hourlyRateMin);
       const maxRate = Number(hourlyRateMax);
-      if (!Number.isFinite(maxRate) || maxRate < HOURLY_RATE_FLOOR) {
-        return `Set your hourly rate to at least $${HOURLY_RATE_FLOOR}.`;
+      if (!Number.isFinite(minRate) || minRate < HOURLY_RATE_FLOOR) {
+        return `Set your minimum hourly rate to at least $${HOURLY_RATE_FLOOR}.`;
+      }
+      if (!Number.isFinite(maxRate) || maxRate < minRate) {
+        return "Maximum hourly rate must be at least your minimum.";
+      }
+      if (maxRate > HOURLY_RATE_CEILING) {
+        return `Maximum hourly rate cannot exceed $${HOURLY_RATE_CEILING}.`;
       }
     }
     if (currentStep === "government_id") {
@@ -167,6 +177,7 @@ export function RefVerificationResubmitFlow({
 
     if (currentStep === "sports") {
       const resolvedSport = primarySport.trim();
+      const minRate = Number(hourlyRateMin);
       const maxRate = Number(hourlyRateMax);
       await supabase
         .from("ref_profiles")
@@ -175,9 +186,9 @@ export function RefVerificationResubmitFlow({
           additional_sports: additionalSports.filter((sport) => sport !== resolvedSport),
           certification_level: certificationLevel.trim(),
           rate_type: "range",
-          rate_min: HOURLY_RATE_FLOOR,
+          rate_min: minRate,
           rate_max: maxRate,
-          rate_per_game: HOURLY_RATE_FLOOR,
+          rate_per_game: minRate,
           rate_unit: "hour",
           updated_at: new Date().toISOString(),
         })
@@ -386,21 +397,61 @@ export function RefVerificationResubmitFlow({
             </label>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
-              <p className="mt-3 text-lg font-black text-[var(--navy)]">
-                {formatHourlyRateRange(HOURLY_RATE_FLOOR, Number(hourlyRateMax) || HOURLY_RATE_FLOOR)}
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Drag both ends. The left end starts at ${HOURLY_RATE_FLOOR}/hr.
               </p>
-              <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                Max hourly rate
-                <input
-                  type="range"
-                  min={HOURLY_RATE_FLOOR}
-                  max={HOURLY_RATE_CEILING}
-                  step={5}
-                  value={hourlyRateMax}
-                  onChange={(event) => setHourlyRateMax(event.target.value)}
-                  className="mt-2 w-full accent-[var(--navy)]"
-                />
-              </label>
+              {(() => {
+                const minVal = Number(hourlyRateMin) || HOURLY_RATE_FLOOR;
+                const maxVal = Number(hourlyRateMax) || HOURLY_RATE_FLOOR;
+                const span = HOURLY_RATE_CEILING - HOURLY_RATE_FLOOR;
+                const leftPct = ((minVal - HOURLY_RATE_FLOOR) / span) * 100;
+                const rightPct = ((maxVal - HOURLY_RATE_FLOOR) / span) * 100;
+                return (
+                  <>
+                    <p className="mt-3 text-lg font-black text-[var(--navy)]">
+                      {formatHourlyRateRange(minVal, maxVal)}
+                    </p>
+                    <div className="dual-range relative mt-6 h-8">
+                      <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200" />
+                      <div
+                        className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-[var(--navy)]"
+                        style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+                      />
+                      <input
+                        type="range"
+                        min={HOURLY_RATE_FLOOR}
+                        max={HOURLY_RATE_CEILING}
+                        step={5}
+                        value={minVal}
+                        onChange={(event) => {
+                          const next = Math.min(Number(event.target.value), maxVal);
+                          setHourlyRateMin(String(Math.max(HOURLY_RATE_FLOOR, next)));
+                        }}
+                        aria-label="Minimum hourly rate"
+                      />
+                      <input
+                        type="range"
+                        min={HOURLY_RATE_FLOOR}
+                        max={HOURLY_RATE_CEILING}
+                        step={5}
+                        value={maxVal}
+                        onChange={(event) => {
+                          const next = Math.max(Number(event.target.value), minVal);
+                          setHourlyRateMax(String(Math.min(HOURLY_RATE_CEILING, next)));
+                        }}
+                        aria-label="Maximum hourly rate"
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs font-semibold text-[var(--muted)]">
+                      <span>${HOURLY_RATE_FLOOR}/hr</span>
+                      <span>
+                        ${minVal} – ${maxVal}/hr
+                      </span>
+                      <span>${HOURLY_RATE_CEILING}/hr</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </>
         )}

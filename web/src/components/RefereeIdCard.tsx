@@ -35,6 +35,8 @@ type RefereeIdCardProps = {
   emptyPlaceholders?: boolean;
   profileComplete?: boolean;
   onEditField?: (field: EditableRefCardField) => void;
+  /** When set, tapping the photo opens a file picker and uploads immediately. */
+  onUploadPhoto?: (file: File) => void;
   className?: string;
 };
 
@@ -119,6 +121,7 @@ export function RefereeIdCard({
   emptyPlaceholders,
   profileComplete,
   onEditField,
+  onUploadPhoto,
   className = "",
 }: RefereeIdCardProps) {
   const name = fullName?.trim() || (emptyPlaceholders ? "" : "Marcus Johnson");
@@ -191,22 +194,40 @@ export function RefereeIdCard({
 
         <div className="mt-5 grid grid-cols-[5.75rem_1fr] gap-3 sm:mt-6 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => onEditField?.("photo")}
-              className={`aspect-[4/5] w-full overflow-hidden rounded-[1.6rem] border border-white/25 bg-white/10 shadow-2xl shadow-black/25 ${editableClass}`}
-              aria-label="Edit profile photo"
+            <label
+              className={`relative block aspect-[4/5] w-full cursor-pointer overflow-hidden rounded-[1.6rem] border border-white/25 bg-white/10 shadow-2xl shadow-black/25 ${editableClass}`}
+              aria-label={avatarUrl ? "Change profile photo" : "Add profile photo"}
             >
               {avatarUrl ? (
-                // Uploaded photos are browser object URLs/data URLs, so use a native image.
+                // Uploaded photos use signed/object URLs, so use a native image.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt={`${name} avatar`} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] text-2xl font-black sm:text-3xl">
-                  {avatarLabel}
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] px-2 text-center">
+                  <span className="text-2xl font-black sm:text-3xl">{avatarLabel}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-white/90">Add photo</span>
                 </div>
               )}
-            </button>
+              {onUploadPhoto ? (
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onUploadPhoto(file);
+                    e.target.value = "";
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="absolute inset-0"
+                  onClick={() => onEditField?.("photo")}
+                  aria-label="Edit profile photo"
+                />
+              )}
+            </label>
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-green-400 px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-green-950 shadow-lg">
               Active
             </div>

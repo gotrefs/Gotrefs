@@ -549,6 +549,10 @@ export default function RefereeDashboardClient() {
   }
 
   function openProfileWizard(field: EditableRefCardField) {
+    if (field === "photo") {
+      // Photo is handled by the direct file picker on the ID card.
+      return;
+    }
     const mapped = mapCardFieldToVerificationStep(field);
     if (mapped === "availability") {
       window.requestAnimationFrame(() => {
@@ -561,6 +565,35 @@ export default function RefereeDashboardClient() {
       initialStep: mapped,
       steps: ALL_REF_VERIFICATION_STEP_KEYS,
     });
+  }
+
+  async function uploadProfilePhoto(file: File) {
+    if (!memberId) return;
+    setMsg(null);
+    try {
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+      const path = `${memberId}/profile_photo_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("verification_documents")
+        .upload(path, file, { upsert: true });
+      if (upErr) {
+        setMsg(upErr.message);
+        return;
+      }
+      const { error: updateErr } = await supabase
+        .from("members")
+        .update({ profile_picture_url: path, updated_at: new Date().toISOString() })
+        .eq("id", memberId);
+      if (updateErr) {
+        setMsg(updateErr.message);
+        return;
+      }
+      const signed = await resolveProfilePhotoUrl(supabase, path);
+      setAvatarUrl(signed);
+      setMsg("Profile photo added to your GotREFS ID card.");
+    } catch {
+      setMsg("Could not upload your photo. Try again.");
+    }
   }
 
   function openResubmitWizard() {
@@ -907,6 +940,7 @@ export default function RefereeDashboardClient() {
               adminMessage={profileWizard.adminMessage}
               existingGovId={Boolean(govIdPath)}
               existingCert={Boolean(certDocPath)}
+              initialHourlyRateMin={rateMin || "10"}
               initialHourlyRateMax={rateMax || rateMin || "75"}
               displayName={displayName}
               primarySport={sport}
@@ -1023,6 +1057,7 @@ export default function RefereeDashboardClient() {
             verificationSkipped={cardMeta.verificationSkipped}
             profileComplete={profileComplete}
             onEditField={(field) => openProfileWizard(field)}
+            onUploadPhoto={(file) => void uploadProfilePhoto(file)}
           />
         </div>
       ) : null}

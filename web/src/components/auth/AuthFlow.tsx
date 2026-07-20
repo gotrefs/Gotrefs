@@ -1155,7 +1155,8 @@ function SportsAndCerts({
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Drag both ends of the slider. Event organizers only see your GotREFS ID until you accept a game.
+          Drag both ends of the slider. The left handle starts at ${SIGNUP_HOURLY_RATE_FLOOR}/hr.
+          Event organizers only see your GotREFS ID until you accept a game.
         </p>
         <p className="mt-3 text-lg font-black text-[var(--navy)]">
           {formatHourlyRateRange(minVal, maxVal)}
