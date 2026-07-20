@@ -11,8 +11,10 @@ import {
   type JustPublishedEvent,
 } from "@/components/marketplace/OrganizerEventComposer";
 import { RefListingCard } from "@/components/marketplace/RefListingCard";
+import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import {
   OrganizerListingWizard,
+  gameLevelLabel,
   type OrganizerWizardDraft,
   type PayoutMethodPayload,
 } from "@/components/organizer/OrganizerListingWizard";
@@ -21,6 +23,7 @@ import { SportsFields } from "@/components/SportsFields";
 import { formatEventLocation, formatPayOffer } from "@/data/sports";
 import { marketplaceCardShadow, sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import { payRangesOverlap } from "@/lib/pay-range";
+import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 
 type RefReview = {
   score: number;
@@ -127,6 +130,10 @@ function isMissingPayRangeColumn(error: { message?: string } | null | undefined)
   return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
 }
 
+function isMissingAvatarPathColumn(error: { message?: string } | null | undefined) {
+  return (error?.message ?? "").includes("avatar_path");
+}
+
 function isMissingOrganizerRateColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
   return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
@@ -215,6 +222,8 @@ type OrganizerOfferRow = {
   event_id: string;
   ref_member_id: string;
   offered_pay: number | null;
+  base_pay?: number | null;
+  boost_percent?: number | null;
   status: string;
   message: string | null;
   created_at: string;
@@ -309,6 +318,11 @@ export default function OrganizerDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [setupStep, setSetupStep] = useState<OrganizerSetupStep>("sport");
   const [setupModalOpen, setSetupModalOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [payoutWizardOpen, setPayoutWizardOpen] = useState(false);
+  const [payoutSet, setPayoutSet] = useState(false);
+  const [activeTab, setActiveTab] = useState<"today" | "calendar" | "listings" | "messages">("today");
+  const [todayFilter, setTodayFilter] = useState<"today" | "upcoming">("today");
   const [displayName, setDisplayName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
@@ -327,6 +341,9 @@ export default function OrganizerDashboardClient() {
   const [rateMax, setRateMax] = useState("");
   const [idDocPath, setIdDocPath] = useState<string | null>(null);
   const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [eventsListPath, setEventsListPath] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState<JustPublishedEvent[]>([]);
 
@@ -346,7 +363,6 @@ export default function OrganizerDashboardClient() {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [magicSearch, setMagicSearch] = useState("");
-  const [manageViewMode, setManageViewMode] = useState<"list" | "calendar">("list");
   const [manageCalendarCursor, setManageCalendarCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -374,7 +390,10 @@ export default function OrganizerDashboardClient() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setRatingCutoffIso(new Date().toISOString());
     const meta = user.user_metadata ?? {};
     setDisplayName(
@@ -385,13 +404,27 @@ export default function OrganizerDashboardClient() {
     );
     setOrganizationName(String(meta.organization_name ?? "").trim() || "Organization");
     setAccountEmail(user.email ?? "");
+    setPayoutSet(Boolean(meta.payout_method));
 
-    const organizerProfileResult = await supabase
+    let organizerProfileResult = await supabase
       .from("organizer_profiles")
-      .select("bio, primary_sport, additional_sports, rate_per_official, rate_type, rate_min, rate_max, id_document_path, logo_path, events_list_path")
+      .select(
+        "bio, primary_sport, additional_sports, rate_per_official, rate_type, rate_min, rate_max, id_document_path, logo_path, avatar_path, events_list_path"
+      )
       .eq("member_id", user.id)
       .maybeSingle();
-    let op = organizerProfileResult.data;
+    if (isMissingAvatarPathColumn(organizerProfileResult.error)) {
+      organizerProfileResult = await supabase
+        .from("organizer_profiles")
+        .select(
+          "bio, primary_sport, additional_sports, rate_per_official, rate_type, rate_min, rate_max, id_document_path, logo_path, events_list_path"
+        )
+        .eq("member_id", user.id)
+        .maybeSingle() as typeof organizerProfileResult;
+    }
+    let op = organizerProfileResult.data as
+      | (NonNullable<typeof organizerProfileResult.data> & { avatar_path?: string | null })
+      | null;
     const opErr = organizerProfileResult.error;
     if (isMissingOrganizerRateColumn(opErr)) {
       const fallback = await supabase
@@ -412,6 +445,9 @@ export default function OrganizerDashboardClient() {
       setRateMax(op.rate_max != null ? String(op.rate_max) : "");
       setIdDocPath(op.id_document_path);
       setLogoPath(op.logo_path);
+      setAvatarPath(op.avatar_path ?? null);
+      setLogoUrl(await resolveProfilePhotoUrl(supabase, op.logo_path));
+      setAvatarUrl(await resolveProfilePhotoUrl(supabase, op.avatar_path ?? null));
       setEventsListPath(op.events_list_path);
 
       const payConfigured =
@@ -422,6 +458,10 @@ export default function OrganizerDashboardClient() {
       else if (!payConfigured) setSetupStep("pay");
       else if (!(op.bio || "").trim()) setSetupStep("bio");
       else if (!op.id_document_path || !op.logo_path) setSetupStep("identity");
+    } else {
+      setAvatarPath(null);
+      setAvatarUrl(null);
+      setLogoUrl(null);
     }
 
     const eventResult = await supabase
@@ -445,13 +485,25 @@ export default function OrganizerDashboardClient() {
     const applicantsJson = (await applicantsRes.json()) as { applicants?: ApplicantRow[] };
     setSignupRequests(applicantsJson.applicants ?? []);
 
-    const { data: offers } = await supabase
+    let { data: offers, error: offersError } = await supabase
       .from("assignment_offers")
       .select(
-        "id, event_id, ref_member_id, offered_pay, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
+        "id, event_id, ref_member_id, offered_pay, base_pay, boost_percent, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
       )
       .eq("scheduled_events.organizer_member_id", user.id)
       .order("created_at", { ascending: false });
+    if (offersError) {
+      // Older databases may not have the boost columns yet.
+      const retry = await supabase
+        .from("assignment_offers")
+        .select(
+          "id, event_id, ref_member_id, offered_pay, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
+        )
+        .eq("scheduled_events.organizer_member_id", user.id)
+        .order("created_at", { ascending: false });
+      offers = retry.data as typeof offers;
+      offersError = retry.error;
+    }
     setSentOffers((offers as unknown as OrganizerOfferRow[]) || []);
 
     const { data: ratings } = await supabase
@@ -540,9 +592,8 @@ export default function OrganizerDashboardClient() {
 
   function requireOrganizerOnboarding() {
     if (isOrganizerProfileComplete()) return true;
-    setSetupStep(firstIncompleteOrganizerSetupStep());
-    setSetupModalOpen(true);
-    setMsg("Finish your organizer profile first so refs know who they are working with.");
+    setWizardOpen(true);
+    setMsg("Finish your organizer listing first so refs know who they are working with.");
     return false;
   }
 
@@ -556,9 +607,12 @@ export default function OrganizerDashboardClient() {
   }
 
   function openSetup(step: OrganizerSetupStep) {
+    // Event posting always uses the Airbnb-style listing wizard.
     if (step === "events") {
       setJustPublished([]);
       setEventMsg(null);
+      setWizardOpen(true);
+      return;
     }
     setSetupStep(step);
     setSetupModalOpen(true);
@@ -577,6 +631,7 @@ export default function OrganizerDashboardClient() {
   }
 
   function browseRefsForEvent(eventId: string) {
+    setActiveTab("listings");
     setOfferEvent(eventId);
     setOfferRef("");
     window.requestAnimationFrame(() => {
@@ -594,8 +649,9 @@ export default function OrganizerDashboardClient() {
   function prefillEventDate(date: Date) {
     setStarts(toDatetimeLocalValue(date, 18));
     setEnds(toDatetimeLocalValue(date, 20));
-    openSetup(isOrganizerProfileComplete() ? "events" : firstIncompleteOrganizerSetupStep());
     clearEventFeedback();
+    // Airbnb-style full listing wizard — not the legacy setup modal.
+    setWizardOpen(true);
   }
 
   function goToNextSetupStep(current: OrganizerSetupStep) {
@@ -709,6 +765,7 @@ export default function OrganizerDashboardClient() {
     }
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
+    setLogoUrl(await resolveProfilePhotoUrl(supabase, path));
     if (idDocPath) {
       setMsg("Organization ID and logo complete.");
     } else {
@@ -716,14 +773,34 @@ export default function OrganizerDashboardClient() {
     }
   }
 
-  async function uploadVenuePhotoFile(file: File) {
+  async function uploadAvatarFile(file: File) {
+    setMsg(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const path = `${user.id}/venue_photo_${crypto.randomUUID()}_${sanitizeFilename(file.name)}`;
+    await ensureOrganizerProfile(user.id);
+    const path = `${user.id}/organizer_avatar_${crypto.randomUUID()}_${sanitizeFilename(file.name)}`;
     const { error: upErr } = await supabase.storage.from("verification_documents").upload(path, file);
-    if (upErr) setMsg(upErr.message);
+    if (upErr) {
+      setMsg(upErr.message);
+      return;
+    }
+    const { error: updateErr } = await supabase
+      .from("organizer_profiles")
+      .update({ avatar_path: path })
+      .eq("member_id", user.id);
+    if (updateErr) {
+      setMsg(
+        isMissingAvatarPathColumn(updateErr)
+          ? "Run the latest database migration to enable organizer face photos."
+          : updateErr.message
+      );
+      return;
+    }
+    setAvatarPath(path);
+    setAvatarUrl(await resolveProfilePhotoUrl(supabase, path));
+    setMsg("Face photo added to your GotREFS ID card.");
   }
 
   async function savePayoutMethod(payload: PayoutMethodPayload): Promise<boolean> {
@@ -743,6 +820,7 @@ export default function OrganizerDashboardClient() {
       setMsg(updateErr.message);
       return false;
     }
+    setPayoutSet(true);
     return true;
   }
 
@@ -806,14 +884,6 @@ export default function OrganizerDashboardClient() {
     } finally {
       setSavingProfile(false);
     }
-  }
-
-  async function finishListingWizard(draft: OrganizerWizardDraft) {
-    applyWizardDraft(draft);
-    await saveWizardProfile(draft);
-    await load();
-    setMsg("Organizer profile ready. Add your first event anytime.");
-    setSetupModalOpen(false);
   }
 
   async function uploadEventsList(file: File) {
@@ -890,6 +960,69 @@ export default function OrganizerDashboardClient() {
     setMsg(saved);
     setEventMsg(saved);
     await load();
+  }
+
+  async function createEventFromWizard(draft: OrganizerWizardDraft): Promise<boolean> {
+    setMsg(null);
+    const startVal = draft.eventStart.trim();
+    const zipVal = draft.zip.trim();
+    if (!startVal) {
+      setMsg("Pick when your event starts.");
+      return false;
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(zipVal)) {
+      setMsg("Enter a valid ZIP code so refs can match by area.");
+      return false;
+    }
+    try {
+      await fetch("/api/auth/sync-member", { method: "POST" });
+      const rateNum = draft.ratePerOfficial === "" ? null : Number(draft.ratePerOfficial);
+      const minNum = draft.rateMin === "" ? null : Number(draft.rateMin);
+      const maxNum = draft.rateMax === "" ? null : Number(draft.rateMax);
+      const publishedTitle = draft.eventTitle.trim() || `${draft.sport || "Game"} event`;
+      const contactParts: string[] = [];
+      const levelLabel = gameLevelLabel(draft.gameLevel);
+      if (levelLabel) contactParts.push(`Level: ${levelLabel}`);
+      if (draft.clubName.trim()) contactParts.push(`Club: ${draft.clubName.trim()}`);
+      if (draft.contactName.trim()) contactParts.push(`Contact: ${draft.contactName.trim()}`);
+      if (draft.contactEmail.trim()) contactParts.push(draft.contactEmail.trim());
+      if (draft.contactPhone.trim()) contactParts.push(draft.contactPhone.trim());
+      if (draft.refInstructions.trim()) contactParts.push(`Notes for refs: ${draft.refInstructions.trim()}`);
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: publishedTitle,
+          sport: draft.sport || "Basketball",
+          starts_at: startVal,
+          ends_at: draft.eventEnd.trim() || startVal,
+          city: draft.city.trim() || null,
+          state: draft.state.trim() || null,
+          zip_code: zipVal,
+          officials_needed: draft.officialsNeeded,
+          pay_offer:
+            draft.rateType === "range" && Number.isFinite(minNum as number)
+              ? minNum
+              : Number.isFinite(rateNum as number)
+                ? rateNum
+                : null,
+          pay_type: draft.rateType,
+          pay_min: draft.rateType === "range" && Number.isFinite(minNum as number) ? minNum : null,
+          pay_max: draft.rateType === "range" && Number.isFinite(maxNum as number) ? maxNum : null,
+          notes: contactParts.join(" · ") || null,
+          boosts: draft.discounts,
+        }),
+      });
+      const json = (await res.json()) as { error?: string; ok?: boolean; id?: string };
+      if (!res.ok) {
+        setMsg(json.error || "Could not publish event.");
+        return false;
+      }
+      return true;
+    } catch {
+      setMsg("Could not reach the server. Refresh and try again.");
+      return false;
+    }
   }
 
   async function createEvent() {
@@ -1134,6 +1267,76 @@ export default function OrganizerDashboardClient() {
     }
   }
 
+  const needsSetup = !isOrganizerProfileComplete();
+  const forceWizard = searchParams.get("setup") === "1";
+
+  // Open the Airbnb wizard as soon as ?setup=1 / Post event is requested —
+  // don't wait on the full dashboard load (directory can take seconds).
+  if (forceWizard || wizardOpen || payoutWizardOpen) {
+    const payoutOnly = payoutWizardOpen && !forceWizard && !wizardOpen;
+    return (
+      <OrganizerListingWizard
+        organizationName={organizationName || displayName}
+        saving={savingProfile}
+        idDocPath={idDocPath}
+        logoPath={logoPath}
+        avatarPath={avatarPath}
+        payoutOnly={payoutOnly}
+        initialDraft={{
+          sport,
+          additionalSports,
+          bio,
+          rateType,
+          ratePerOfficial,
+          rateMin,
+          rateMax,
+          city,
+          state,
+          zip,
+          officialsNeeded: needed,
+          clubName: organizationName,
+          contactName: displayName,
+          contactEmail: accountEmail,
+        }}
+        onSaveProfile={saveWizardProfile}
+        onUploadId={uploadIdFile}
+        onUploadLogo={uploadLogoFile}
+        onUploadAvatar={uploadAvatarFile}
+        onSavePayoutMethod={savePayoutMethod}
+        onCreateEvent={createEventFromWizard}
+        onSaveAndExit={(draft) => {
+          applyWizardDraft(draft);
+          if (forceWizard) {
+            window.history.replaceState({}, "", "/dashboard/organizer");
+          }
+          setWizardOpen(false);
+          setPayoutWizardOpen(false);
+          setMsg("Progress saved. Pick up where you left off anytime.");
+          void load();
+        }}
+        onComplete={(draft) => {
+          if (payoutOnly) {
+            setPayoutWizardOpen(false);
+            setMsg(payoutSet ? "Payout method added." : null);
+            void load();
+            return;
+          }
+          if (forceWizard) {
+            applyWizardDraft(draft);
+            setMsg("Setup preview finished. Remove ?setup=1 from the URL to return to your dashboard.");
+            window.history.replaceState({}, "", "/dashboard/organizer");
+            void load();
+            return;
+          }
+          setWizardOpen(false);
+          applyWizardDraft(draft);
+          setMsg("Your event is posted. Staff it from Listings.");
+          void load();
+        }}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -1212,18 +1415,24 @@ export default function OrganizerDashboardClient() {
     return acc;
   }, {});
   const acceptedOfferPaymentsByEvent = sentOffers.reduce<
-    Record<string, { refSubtotalCents: number; platformFeeCents: number; totalCents: number }>
+    Record<string, { refSubtotalCents: number; platformFeeCents: number; totalCents: number; boostCents: number }>
   >((acc, offer) => {
     if (offer.status !== "accepted") return acc;
     const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
     const refSubtotalCents = dollarsToCents(offer.offered_pay ?? event?.pay_offer);
-    const current = acc[offer.event_id] ?? { refSubtotalCents: 0, platformFeeCents: 0, totalCents: 0 };
+    const boostCents =
+      offer.base_pay != null && offer.offered_pay != null
+        ? Math.max(0, dollarsToCents(offer.offered_pay) - dollarsToCents(offer.base_pay))
+        : 0;
+    const current =
+      acc[offer.event_id] ?? { refSubtotalCents: 0, platformFeeCents: 0, totalCents: 0, boostCents: 0 };
     const nextRefSubtotalCents = current.refSubtotalCents + refSubtotalCents;
     const nextPlatformFeeCents = Math.round(nextRefSubtotalCents * 0.1);
     acc[offer.event_id] = {
       refSubtotalCents: nextRefSubtotalCents,
       platformFeeCents: nextPlatformFeeCents,
       totalCents: nextRefSubtotalCents + nextPlatformFeeCents,
+      boostCents: current.boostCents + boostCents,
     };
     return acc;
   }, {});
@@ -1239,47 +1448,39 @@ export default function OrganizerDashboardClient() {
     );
   });
 
-  const needsSetup = !isOrganizerProfileComplete();
-  const forceWizard = searchParams.get("setup") === "1";
-
-  if (needsSetup || forceWizard) {
-    return (
-      <OrganizerListingWizard
-        organizationName={organizationName || displayName}
-        saving={savingProfile}
-        idDocPath={idDocPath}
-        logoPath={logoPath}
-        initialDraft={{
-          sport,
-          additionalSports,
-          bio,
-          rateType,
-          ratePerOfficial,
-          rateMin,
-          rateMax,
-          city,
-          state,
-          zip,
-          officialsNeeded: needed,
-        }}
-        onSaveProfile={saveWizardProfile}
-        onUploadId={uploadIdFile}
-        onUploadLogo={uploadLogoFile}
-        onUploadVenuePhoto={uploadVenuePhotoFile}
-        onSavePayoutMethod={savePayoutMethod}
-        onComplete={(draft) => {
-          if (forceWizard) {
-            applyWizardDraft(draft);
-            setMsg("Setup preview finished. Remove ?setup=1 from the URL to return to your dashboard.");
-            window.history.replaceState({}, "", "/dashboard/organizer");
-            void load();
-            return;
-          }
-          void finishListingWizard(draft);
-        }}
-      />
-    );
-  }
+  const acceptedBookings = sentOffers
+    .filter((offer) => offer.status === "accepted")
+    .map((offer) => {
+      const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+      const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+      return {
+        id: offer.id,
+        eventId: offer.event_id,
+        officialId: refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`,
+        eventTitle: event?.title ?? "Your event",
+        sport: event?.sport ?? "Game",
+        startsAt: event?.starts_at ?? null,
+        pay: offer.offered_pay ?? event?.pay_offer ?? null,
+        boostPercent: offer.boost_percent ?? 0,
+      };
+    })
+    .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? ""));
+  const todayBookings = acceptedBookings.filter((booking) => {
+    if (!booking.startsAt) return false;
+    return sameDay(new Date(booking.startsAt), new Date());
+  });
+  const upcomingBookings = acceptedBookings.filter((booking) => {
+    if (!booking.startsAt) return false;
+    return new Date(booking.startsAt).getTime() >= Date.now();
+  });
+  const visibleBookings = todayFilter === "today" ? todayBookings : upcomingBookings;
+  const pendingOffersByEvent = sentOffers.reduce<Record<string, number>>((acc, offer) => {
+    if (offer.status !== "accepted" && offer.status !== "declined") {
+      acc[offer.event_id] = (acc[offer.event_id] || 0) + 1;
+    }
+    return acc;
+  }, {});
+  const messagesCount = signupRequests.length + respondedSentOffers.length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -1507,14 +1708,28 @@ export default function OrganizerDashboardClient() {
           <div className="mt-5 space-y-5">
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
+                <p className="text-lg font-semibold text-neutral-900">Your face photo</p>
+                <p className="mt-1 text-sm text-neutral-500">Shows on your GotREFS ID card · JPG or PNG</p>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  className="mt-4 text-sm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadAvatarFile(file);
+                  }}
+                />
+                {avatarPath && <p className="mt-2 text-sm text-emerald-700">Photo on your ID card.</p>}
+              </div>
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
                 <p className="text-lg font-semibold text-neutral-900">Government ID or league credential</p>
                 <p className="mt-1 text-sm text-neutral-500">JPG, PNG, or PDF</p>
                 <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="mt-4 text-sm" onChange={(e) => void uploadId(e)} />
                 {idDocPath && <p className="mt-2 text-sm text-emerald-700">ID on file.</p>}
               </div>
-              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
+              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5 sm:col-span-2">
                 <p className="text-lg font-semibold text-neutral-900">Organization logo</p>
-                <p className="mt-1 text-sm text-neutral-500">PNG, JPG, SVG, or WEBP</p>
+                <p className="mt-1 text-sm text-neutral-500">PNG, JPG, SVG, or WEBP — badge on your ID card</p>
                 <input type="file" accept=".jpg,.jpeg,.png,.svg,.webp" className="mt-4 text-sm" onChange={(e) => void uploadLogo(e)} />
                 {logoPath && <p className="mt-2 text-sm text-emerald-700">Logo on file.</p>}
               </div>
@@ -1552,72 +1767,209 @@ export default function OrganizerDashboardClient() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Your events</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            {organizationName || displayName || accountEmail || "Organizer"} · Post games and hire verified refs.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => openSetup("events")}
-          className="rounded-full bg-[var(--red)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
-        >
-          Add event
-        </button>
+      {/* Airbnb-host-style top nav */}
+      <div className="flex flex-wrap items-center justify-center gap-1 border-b border-neutral-200 pb-3">
+        {(
+          [
+            { id: "today", label: "Today" },
+            { id: "calendar", label: "Calendar" },
+            { id: "listings", label: "Listings" },
+            { id: "messages", label: "Messages" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`relative rounded-full px-4 py-2 text-sm transition ${
+              activeTab === tab.id
+                ? "font-semibold text-neutral-900 underline decoration-2 underline-offset-[14px]"
+                : "font-medium text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800"
+            }`}
+          >
+            {tab.label}
+            {tab.id === "messages" && messagesCount > 0 && (
+              <span className="absolute right-1 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--red)]" />
+            )}
+          </button>
+        ))}
       </div>
 
-      {(signupRequests.length > 0 || respondedSentOffers.length > 0) && (
-        <section ref={notificationsRef} className="rounded-2xl border border-neutral-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-neutral-900">Inbox</h2>
-          <div className="mt-3 space-y-2">
-            {signupRequests.slice(0, 3).map((sr) => (
-              <button
-                key={sr.id}
-                type="button"
-                onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                className="block w-full rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm hover:bg-neutral-50"
-              >
-                Official {sr.gotrefsId} requested {sr.eventTitle}
-              </button>
-            ))}
-            {respondedSentOffers.slice(0, 3).map((offer) => {
-              const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
-              const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
-              const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
-              return (
-                <p key={offer.id} className="rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700">
-                  Official {officialId} {offer.status} {ev?.title ?? "your event"}
-                </p>
-              );
-            })}
-          </div>
-        </section>
+      {/* Action required cards — what's left to complete */}
+      {(needsSetup || !payoutSet) && (
+        <div className="flex flex-wrap justify-center gap-3">
+          {needsSetup && (
+            <button
+              type="button"
+              onClick={() => setWizardOpen(true)}
+              className={`flex w-full max-w-sm items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-2xl" aria-hidden>
+                📋
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-neutral-900">Add registration details</span>
+                <span className="mt-0.5 block text-xs text-neutral-500">Required to publish</span>
+              </span>
+            </button>
+          )}
+          {!payoutSet && (
+            <button
+              type="button"
+              onClick={() => setPayoutWizardOpen(true)}
+              className={`flex w-full max-w-sm items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-2xl" aria-hidden>
+                🪙
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-neutral-900">Add a payout method</span>
+                <span className="mt-0.5 block text-xs text-neutral-500">Required to get paid</span>
+              </span>
+            </button>
+          )}
+        </div>
       )}
 
+      {/* ── Today tab ── */}
+      {activeTab === "today" && (
+        <>
+          <div className="mx-auto w-full max-w-lg">
+            <OrganizerIdCard
+              organizationName={organizationName || "Organization"}
+              contactName={displayName}
+              email={accountEmail}
+              primarySport={sport || undefined}
+              additionalSports={additionalSports}
+              typicalPay={
+                rateType === "range"
+                  ? [rateMin, rateMax].filter(Boolean).join("–") || undefined
+                  : ratePerOfficial || undefined
+              }
+              bio={bio || undefined}
+              eventsCount={events.length}
+              idUploaded={Boolean(idDocPath)}
+              photoUploaded={Boolean(avatarPath)}
+              photoUrl={avatarUrl}
+              logoUploaded={Boolean(logoPath)}
+              logoUrl={logoUrl}
+              onUploadPhoto={(file) => void uploadAvatarFile(file)}
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <div className="flex gap-2">
+              {(["today", "upcoming"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setTodayFilter(filter)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold capitalize transition ${
+                    todayFilter === filter
+                      ? "bg-neutral-800 text-white"
+                      : "border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400"
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visibleBookings.length === 0 ? (
+            <div className="mx-auto max-w-md py-10 text-center">
+              <p className="text-7xl" aria-hidden>
+                📖
+              </p>
+              <h2 className="mt-6 text-2xl font-semibold tracking-tight text-neutral-900">
+                You don&apos;t have any bookings
+              </h2>
+              <p className="mt-2 text-sm text-neutral-500">
+                {needsSetup
+                  ? "To get refs booked, you'll need to complete and publish your listing."
+                  : "Post an event and invite refs to get your first booking."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setWizardOpen(true)}
+                className="mt-6 rounded-lg border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-900 shadow-sm transition hover:bg-neutral-50"
+              >
+                {needsSetup ? "Complete your listing" : "Post an event"}
+              </button>
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-2xl space-y-3">
+              {visibleBookings.map((booking) => (
+                <button
+                  key={booking.id}
+                  type="button"
+                  onClick={() => openStaffingForEvent(booking.eventId)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      Official {booking.officialId} · {booking.eventTitle}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {booking.sport}
+                      {booking.startsAt ? ` · ${formatEventDateTime(booking.startsAt)}` : ""}
+                      {booking.pay != null ? ` · $${booking.pay}` : ""}
+                    </p>
+                  </div>
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    {booking.boostPercent > 0 && (
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                        +{booking.boostPercent}% boost
+                      </span>
+                    )}
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      Confirmed
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(signupRequests.length > 0 || respondedSentOffers.length > 0) && (
+            <section ref={notificationsRef} className="rounded-2xl border border-neutral-200 bg-white p-5">
+              <h2 className="text-lg font-semibold text-neutral-900">Inbox</h2>
+              <div className="mt-3 space-y-2">
+                {signupRequests.slice(0, 3).map((sr) => (
+                  <button
+                    key={sr.id}
+                    type="button"
+                    onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="block w-full rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm hover:bg-neutral-50"
+                  >
+                    Official {sr.gotrefsId} requested {sr.eventTitle}
+                  </button>
+                ))}
+                {respondedSentOffers.slice(0, 3).map((offer) => {
+                  const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+                  const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+                  const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
+                  return (
+                    <p key={offer.id} className="rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700">
+                      Official {officialId} {offer.status} {ev?.title ?? "your event"}
+                    </p>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {activeTab === "calendar" && (
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-neutral-900">Upcoming</h2>
-            <p className="mt-1 text-sm text-neutral-500">Staff games and review applicants.</p>
-          </div>
-          <div className="rounded-full border border-neutral-200 bg-neutral-50 p-1">
-            {(["list", "calendar"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setManageViewMode(mode)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${
-                  manageViewMode === mode ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
+            <h2 className="text-xl font-semibold text-neutral-900">Calendar</h2>
+            <p className="mt-1 text-sm text-neutral-500">Your games by date — adjust pricing and availability on the right.</p>
           </div>
         </div>
-        {manageViewMode === "calendar" && (
+        {(
           <div className="mt-5 grid gap-5 transition-all duration-200 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-2xl border border-[#F1F5F9] bg-white p-4">
               <div className="flex items-center justify-between gap-3">
@@ -1716,7 +2068,67 @@ export default function OrganizerDashboardClient() {
                 Click a blank date to prefill the Add Event form. Click a date with games to filter the list.
               </p>
             </div>
-            <div className="rounded-2xl border border-[#F1F5F9] bg-slate-50/60 p-4">
+            <div className="space-y-4">
+              {/* Airbnb-style right rail: pricing, discounts, availability */}
+              <div className="divide-y divide-neutral-100 rounded-2xl border border-neutral-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => openSetup("pay")}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-neutral-50"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-neutral-900">Pricing</span>
+                    <span className="mt-0.5 block text-xs text-neutral-500">
+                      {formatPayRange({
+                        pay_offer: ratePerOfficial === "" ? null : Number(ratePerOfficial),
+                        pay_type: rateType,
+                        pay_min: rateMin === "" ? null : Number(rateMin),
+                        pay_max: rateMax === "" ? null : Number(rateMax),
+                      }) || "Set your pay"}{" "}
+                      per official
+                    </span>
+                  </span>
+                  <span className="text-neutral-400" aria-hidden>
+                    ›
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSetup("pay")}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-neutral-50"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-neutral-900">Discounts</span>
+                    <span className="mt-0.5 block text-xs text-neutral-500">
+                      20% boost for your first 10 refs
+                      <br />
+                      +11% last-minute boost (within 14 days)
+                    </span>
+                  </span>
+                  <span className="text-neutral-400" aria-hidden>
+                    ›
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("listings")}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-neutral-50"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-neutral-900">Availability</span>
+                    <span className="mt-0.5 block text-xs text-neutral-500">
+                      {events.length} upcoming event{events.length === 1 ? "" : "s"}
+                      <br />
+                      Same day advance notice
+                    </span>
+                  </span>
+                  <span className="text-neutral-400" aria-hidden>
+                    ›
+                  </span>
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-[#F1F5F9] bg-slate-50/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wide text-[var(--muted)]">
@@ -1790,6 +2202,9 @@ export default function OrganizerDashboardClient() {
                       {payment && payment.totalCents > 0 && (
                         <p className="mt-2 text-xs font-semibold text-[var(--muted)]">
                           Includes {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)} GotREFS fee.
+                          {payment.boostCents > 0
+                            ? ` Ref pay includes ${formatCents(payment.boostCents)} in boosts.`
+                            : ""}
                         </p>
                       )}
                     </article>
@@ -1809,112 +2224,96 @@ export default function OrganizerDashboardClient() {
                   </div>
                 )}
               </div>
+              </div>
             </div>
           </div>
         )}
-        <div className={`mt-5 grid gap-4 transition-opacity duration-200 ${manageViewMode === "calendar" ? "hidden" : ""}`}>
-          {visibleManageEvents.map((e) => {
+      </section>
+      )}
+
+      {/* ── Listings tab ── */}
+      {activeTab === "listings" && (
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Your listings</h2>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            aria-label="Post an event"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-xl text-neutral-700 transition hover:bg-neutral-50"
+          >
+            +
+          </button>
+        </div>
+        <div className="mt-4 hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-3 border-b border-neutral-200 pb-2 text-xs font-semibold text-neutral-500 sm:grid">
+          <span>Listing</span>
+          <span>Type</span>
+          <span>Location</span>
+          <span>Status</span>
+        </div>
+        <div className="divide-y divide-neutral-100">
+          {events.map((e) => {
             const loc = formatEventLocation(e.city, e.state, e.zip_code);
-            const payLabel = formatPayRange(e);
             const applicantCount = signupRequests.filter((request) => request.eventId === e.id).length;
             const hiredCount = acceptedOffersByEvent[e.id] || 0;
-            const payment = acceptedOfferPaymentsByEvent[e.id];
+            const pendingCount = pendingOffersByEvent[e.id] || 0;
             const filled = hiredCount >= e.officials_needed;
+            const status = filled
+              ? { dot: "bg-emerald-500", label: "Confirmed" }
+              : applicantCount > 0 || pendingCount > 0
+                ? { dot: "bg-amber-400", label: "Pending" }
+                : { dot: "bg-red-500", label: "Action required" };
             const visual = sportListingVisual(e.sport);
             return (
-              <article
+              <button
                 key={e.id}
-                className={`overflow-hidden rounded-2xl border border-neutral-200 bg-white transition duration-300 hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+                type="button"
+                onClick={() => openStaffingForEvent(e.id)}
+                className="grid w-full grid-cols-1 items-center gap-3 py-3 text-left transition hover:bg-neutral-50 sm:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr]"
               >
-                <div className="grid gap-0 lg:grid-cols-[140px_minmax(0,1fr)_auto]">
-                  <div
-                    className={`relative hidden min-h-[120px] bg-gradient-to-br ${visual.gradient} lg:block`}
+                <span className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-xl ${visual.gradient}`}
                     aria-hidden
                   >
-                    <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-90">
-                      {visual.emoji}
-                    </div>
-                  </div>
-                  <div className="flex flex-col justify-center gap-2 p-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold tracking-tight text-neutral-900">{e.title}</h3>
-                      <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700">
-                        {e.sport}
-                      </span>
-                    </div>
-                    <p className="text-sm text-neutral-600">{formatEventDateTime(e.starts_at)}</p>
-                    <p className="text-sm text-neutral-500">{loc || `ZIP ${e.zip_code}`}</p>
-                    {payLabel ? (
-                      <p className="text-sm font-semibold text-neutral-900">Offer {payLabel} per official</p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col gap-2 border-t border-neutral-100 p-5 lg:items-end lg:border-l lg:border-t-0">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        filled ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {hiredCount}/{e.officials_needed} refs hired
-                    </span>
-                    {payment && payment.totalCents > 0 && (
-                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600 lg:text-right">
-                        <span className="block font-semibold text-neutral-900">
-                          Payment due: {formatCents(payment.totalCents)}
-                        </span>
-                        <span>
-                          {formatCents(payment.refSubtotalCents)} ref pay + {formatCents(payment.platformFeeCents)}{" "}
-                          GotREFS fee
-                        </span>
-                      </div>
-                    )}
-                    {payment && payment.totalCents > 0 && (
-                      <button
-                        type="button"
-                        disabled={checkoutEventId === e.id}
-                        onClick={() => void startStripeCheckout(e.id)}
-                        className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
-                      >
-                        {checkoutEventId === e.id ? "Opening Stripe..." : "Pay with Stripe"}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => openStaffingForEvent(e.id)}
-                      className="rounded-full bg-[var(--red)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--red-dark)]"
-                    >
-                      {applicantCount > 0 ? `Staff game (${applicantCount} applied)` : "Staff game"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => browseRefsForEvent(e.id)}
-                      className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50"
-                    >
-                      Browse all refs
-                    </button>
-                  </div>
-                </div>
-              </article>
+                    {visual.emoji}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-neutral-900">{e.title}</span>
+                    <span className="block text-xs text-neutral-500">{formatEventDateTime(e.starts_at)}</span>
+                  </span>
+                </span>
+                <span className="text-sm text-neutral-600">{e.sport}</span>
+                <span className="text-sm text-neutral-600">{loc || `ZIP ${e.zip_code}`}</span>
+                <span className="flex items-center gap-2 text-sm text-neutral-700">
+                  <span className={`h-2.5 w-2.5 rounded-full ${status.dot}`} aria-hidden />
+                  {status.label}
+                  <span className="text-xs text-neutral-400">
+                    · {hiredCount}/{e.officials_needed} refs
+                  </span>
+                </span>
+              </button>
             );
           })}
-          {visibleManageEvents.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/80 p-10 text-center">
-              <h3 className="text-lg font-semibold text-neutral-900">
-                {events.length === 0 ? "No upcoming events yet" : "No events on this date"}
-              </h3>
-              <p className="mt-1 text-sm text-neutral-500">Add a game to start matching with referees.</p>
+          {events.length === 0 && (
+            <div className="py-12 text-center">
+              <h3 className="text-lg font-semibold text-neutral-900">No listings yet</h3>
+              <p className="mt-1 text-sm text-neutral-500">Post your first event to start matching with referees.</p>
               <button
                 type="button"
-                onClick={() => openSetup("events")}
-                className="mt-4 rounded-full bg-[var(--red)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--red-dark)]"
+                onClick={() => setWizardOpen(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--red)] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-red-500/20 transition hover:-translate-y-0.5 hover:bg-[var(--red-dark)] hover:shadow-xl"
               >
-                Add event
+                <span className="text-lg leading-none">+</span>
+                Post an event
               </button>
             </div>
           )}
         </div>
       </section>
+      )}
 
-      {completedUnratedOffers.length > 0 && (
+      {activeTab === "today" && completedUnratedOffers.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1986,7 +2385,7 @@ export default function OrganizerDashboardClient() {
         );
       })()}
 
-      {signupRequests.length > 0 && (
+      {activeTab === "today" && signupRequests.length > 0 && (
         <section ref={applicantsRef} className="space-y-5">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Requests</h2>
@@ -2028,6 +2427,7 @@ export default function OrganizerDashboardClient() {
         </section>
       )}
 
+      {activeTab === "listings" && (
       <section ref={marketplaceRef} className="space-y-5 py-2">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -2169,6 +2569,89 @@ export default function OrganizerDashboardClient() {
           </>
         )}
       </section>
+      )}
+
+      {/* ── Messages tab ── */}
+      {activeTab === "messages" && (
+        <section className="mx-auto w-full max-w-2xl">
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Messages</h2>
+          <p className="mt-1 text-sm text-neutral-500">Requests and replies between you and refs.</p>
+          <div className="mt-5 space-y-3">
+            {signupRequests.map((sr) => (
+              <button
+                key={sr.id}
+                type="button"
+                onClick={() => openStaffingForEvent(sr.eventId)}
+                className={`flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
+                  {sr.gotrefsId.slice(-2)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-neutral-900">
+                    Official {sr.gotrefsId}
+                  </span>
+                  <span className="block truncate text-xs text-neutral-500">
+                    Requested to work {sr.eventTitle} — tap to review and reply
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden />
+                  Pending
+                </span>
+              </button>
+            ))}
+            {respondedSentOffers.map((offer) => {
+              const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+              const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+              const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
+              const accepted = offer.status === "accepted";
+              return (
+                <button
+                  key={offer.id}
+                  type="button"
+                  onClick={() => openStaffingForEvent(offer.event_id)}
+                  className={`flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-sm font-semibold text-neutral-700">
+                    {officialId.slice(-2)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-neutral-900">
+                      Official {officialId}
+                    </span>
+                    <span className="block truncate text-xs text-neutral-500">
+                      {accepted ? "Accepted" : "Declined"} {ev?.title ?? "your event"}
+                      {accepted && offer.offered_pay != null ? ` · $${offer.offered_pay}` : ""}
+                      {accepted && (offer.boost_percent ?? 0) > 0 ? ` (includes ${offer.boost_percent}% boost)` : ""}
+                      {offer.message ? ` — “${offer.message}”` : ""}
+                    </span>
+                  </span>
+                  <span
+                    className={`flex items-center gap-1.5 text-xs font-semibold ${
+                      accepted ? "text-emerald-700" : "text-red-600"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${accepted ? "bg-emerald-500" : "bg-red-500"}`} aria-hidden />
+                    {accepted ? "Confirmed" : "Declined"}
+                  </span>
+                </button>
+              );
+            })}
+            {messagesCount === 0 && (
+              <div className="py-14 text-center">
+                <p className="text-6xl" aria-hidden>
+                  💬
+                </p>
+                <h3 className="mt-4 text-lg font-semibold text-neutral-900">No messages yet</h3>
+                <p className="mt-1 text-sm text-neutral-500">
+                  When refs apply to your events or respond to invites, you&apos;ll see the conversation here.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
       {inviteRef && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onClick={() => setInviteRef(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

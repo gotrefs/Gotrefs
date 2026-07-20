@@ -11,6 +11,8 @@ export type RefWorkOffer = {
   id: string;
   status: string;
   offered_pay: number | null;
+  base_pay?: number | null;
+  boost_percent?: number | null;
   message: string | null;
   organizer?: {
     displayName: string | null;
@@ -205,7 +207,15 @@ export function RefMyWorkPanel({
                     [sport, ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : null, loc]
                       .filter(Boolean)
                       .join(" · "),
-                    offer.offered_pay != null ? `Offered pay $${offer.offered_pay}` : null,
+                    offer.offered_pay != null
+                      ? `Offered pay $${offer.offered_pay}${
+                          (offer.boost_percent ?? 0) > 0
+                            ? ` · includes ${offer.boost_percent}% boost${
+                                offer.base_pay != null ? ` (base $${offer.base_pay})` : ""
+                              }`
+                            : ""
+                        }`
+                      : null,
                   ].filter(Boolean) as string[]}
                   message={offer.message}
                   primaryLabel="Accept"

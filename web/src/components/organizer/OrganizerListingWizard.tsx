@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
 import { VenuePinMap } from "@/components/organizer/VenuePinMap";
 import { SportsFields } from "@/components/SportsFields";
+import { EVENT_BOOSTS } from "@/lib/boosts";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 
 export type OrganizerWizardDraft = {
@@ -17,10 +18,11 @@ export type OrganizerWizardDraft = {
   addressLabel: string;
   lat: number | null;
   lng: number | null;
-  showPreciseLocation: boolean;
   officialsNeeded: number;
   sport: string;
   additionalSports: string[];
+  gameLevel: string;
+  refInstructions: string;
   rateType: "exact" | "range";
   ratePerOfficial: string;
   rateMin: string;
@@ -32,6 +34,13 @@ export type OrganizerWizardDraft = {
   billingCity: string;
   billingState: string;
   billingZip: string;
+  eventTitle: string;
+  eventStart: string;
+  eventEnd: string;
+  clubName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
 };
 
 export type PayoutMethodPayload = {
@@ -50,13 +59,16 @@ type WizardScreen =
   | "pinMap"
   | "locationPrivacy"
   | "basics"
+  | "schedule"
   | "intro2"
-  | "photos"
+  | "gameLevel"
   | "sport"
+  | "refInstructions"
   | "bio"
   | "intro3"
   | "prices"
   | "discounts"
+  | "contact"
   | "finalDetails"
   | "done";
 
@@ -69,10 +81,24 @@ const STEP1_SCREENS: WizardScreen[] = [
   "pinMap",
   "locationPrivacy",
   "basics",
+  "schedule",
 ];
-const STEP2_SCREENS: WizardScreen[] = ["intro2", "photos", "sport", "bio"];
-const STEP3_SCREENS: WizardScreen[] = ["intro3", "prices", "discounts", "finalDetails"];
+const STEP2_SCREENS: WizardScreen[] = ["intro2", "gameLevel", "sport", "refInstructions", "bio"];
+const STEP3_SCREENS: WizardScreen[] = ["intro3", "prices", "discounts", "contact", "finalDetails"];
 const ALL_SCREENS: WizardScreen[] = [...STEP1_SCREENS, ...STEP2_SCREENS, ...STEP3_SCREENS, "done"];
+
+const GAME_LEVELS = [
+  { id: "youth", title: "Youth / recreational", subtitle: "U8–U14 or community rec leagues" },
+  { id: "middle_school", title: "Middle school", subtitle: "Junior high / middle school games" },
+  { id: "high_school", title: "High school", subtitle: "JV, varsity, or high school tournaments" },
+  { id: "college", title: "College / club", subtitle: "NCAA, NAIA, junior college, or club" },
+  { id: "adult", title: "Adult / open", subtitle: "Adult rec, men's / women's leagues" },
+  { id: "tournament", title: "Tournament / showcase", subtitle: "Multi-game events or showcases" },
+] as const;
+
+export function gameLevelLabel(id: string): string | undefined {
+  return GAME_LEVELS.find((level) => level.id === id)?.title;
+}
 
 const VENUE_TYPES = [
   { id: "gym", label: "Gym", emoji: "🏟️" },
@@ -95,32 +121,10 @@ const ACCESS_TYPES = [
   { id: "outdoor", title: "An outdoor field or court", subtitle: "Open-air space — fields, courts, tracks, parks.", emoji: "🌿" },
 ] as const;
 
-const DISCOUNT_OPTIONS = [
-  {
-    id: "new_listing",
-    percent: "20%",
-    title: "New event promotion",
-    subtitle: "Offer 20% more pay to your first 10 refs booked",
-  },
-  {
-    id: "last_minute",
-    percent: "11%",
-    title: "Last-minute boost",
-    subtitle: "Extra pay for refs who accept 14 days or less before the game",
-  },
-  {
-    id: "multi_game",
-    percent: "10%",
-    title: "Multi-game bonus",
-    subtitle: "For refs working 3 or more of your games",
-  },
-  {
-    id: "season",
-    percent: "15%",
-    title: "Season commitment",
-    subtitle: "For refs who commit to your full season",
-  },
-] as const;
+const DISCOUNT_OPTIONS = EVENT_BOOSTS.map((boost) => ({
+  ...boost,
+  percentLabel: `${boost.percent}%`,
+}));
 
 function parseUsAddress(label: string): Partial<OrganizerWizardDraft> {
   const cleaned = label.replace(/,?\s*USA$/i, "").trim();
@@ -218,7 +222,25 @@ function AddressField({
   );
 }
 
-type VenuePhoto = { previewUrl: string; name: string };
+function GreenCheck({ size = "md", label }: { size?: "sm" | "md"; label?: string }) {
+  const dim = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  const icon = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  return (
+    <span
+      className={`flex ${dim} shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white`}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+    >
+      <svg viewBox="0 0 20 20" fill="currentColor" className={icon}>
+        <path
+          fillRule="evenodd"
+          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </span>
+  );
+}
 
 type PayoutStage = "prompt" | "method" | "holder" | "bank" | null;
 
@@ -227,36 +249,41 @@ export function OrganizerListingWizard({
   saving,
   idDocPath,
   logoPath,
+  avatarPath = null,
   initialDraft,
+  payoutOnly = false,
   onSaveProfile,
   onUploadId,
   onUploadLogo,
-  onUploadVenuePhoto,
+  onUploadAvatar,
   onSavePayoutMethod,
+  onCreateEvent,
+  onSaveAndExit,
   onComplete,
 }: {
   organizationName?: string;
   saving?: boolean;
   idDocPath: string | null;
   logoPath: string | null;
+  avatarPath?: string | null;
   initialDraft?: Partial<OrganizerWizardDraft>;
+  /** Skip the listing flow and open straight into the payout-method steps. */
+  payoutOnly?: boolean;
   onSaveProfile: (draft: OrganizerWizardDraft) => Promise<boolean>;
   onUploadId: (file: File) => Promise<void>;
   onUploadLogo: (file: File) => Promise<void>;
-  onUploadVenuePhoto?: (file: File) => Promise<void>;
+  onUploadAvatar?: (file: File) => Promise<void>;
   onSavePayoutMethod?: (payload: PayoutMethodPayload) => Promise<boolean>;
+  onCreateEvent?: (draft: OrganizerWizardDraft) => Promise<boolean>;
+  onSaveAndExit?: (draft: OrganizerWizardDraft) => void;
   onComplete: (draft: OrganizerWizardDraft) => void;
 }) {
-  const [screen, setScreen] = useState<WizardScreen>("intro1");
+  const [screen, setScreen] = useState<WizardScreen>(payoutOnly ? "done" : "intro1");
   const [country] = useState("United States");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [photos, setPhotos] = useState<VenuePhoto[]>([]);
-  const [photoModalOpen, setPhotoModalOpen] = useState(false);
-  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
-  const [payoutStage, setPayoutStage] = useState<PayoutStage>(null);
+  const [payoutStage, setPayoutStage] = useState<PayoutStage>(payoutOnly ? "prompt" : null);
   const [payoutMethod, setPayoutMethod] = useState<"fastpay" | "bank" | "paypal" | "">("");
   const [payoutHolder, setPayoutHolder] = useState("");
   const [payoutAccountType, setPayoutAccountType] = useState<"checking" | "savings" | "">("");
@@ -264,7 +291,6 @@ export function OrganizerListingWizard({
   const [accountNumber, setAccountNumber] = useState("");
   const [accountNumberConfirm, setAccountNumberConfirm] = useState("");
   const [savingPayout, setSavingPayout] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<OrganizerWizardDraft>({
     venueType: "",
     accessType: "",
@@ -276,10 +302,11 @@ export function OrganizerListingWizard({
     addressLabel: "",
     lat: null,
     lng: null,
-    showPreciseLocation: false,
     officialsNeeded: 2,
     sport: "",
     additionalSports: [],
+    gameLevel: "",
+    refInstructions: "",
     rateType: "exact",
     ratePerOfficial: "",
     rateMin: "",
@@ -291,6 +318,13 @@ export function OrganizerListingWizard({
     billingCity: "",
     billingState: "",
     billingZip: "",
+    eventTitle: "",
+    eventStart: "",
+    eventEnd: "",
+    clubName: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
     ...initialDraft,
   });
 
@@ -334,21 +368,6 @@ export function OrganizerListingWizard({
     if (idx < ALL_SCREENS.length - 1) setScreen(ALL_SCREENS[idx + 1]);
   }
 
-  async function uploadPendingPhotos() {
-    if (pendingPhotos.length === 0) return;
-    setUploadingPhotos(true);
-    try {
-      for (const file of pendingPhotos) {
-        if (onUploadVenuePhoto) await onUploadVenuePhoto(file);
-        setPhotos((current) => [...current, { previewUrl: URL.createObjectURL(file), name: file.name }]);
-      }
-      setPendingPhotos([]);
-      setPhotoModalOpen(false);
-    } finally {
-      setUploadingPhotos(false);
-    }
-  }
-
   async function handleNext() {
     if (screen === "venueType" && !draft.venueType) {
       setError("Pick the option that best describes your venue.");
@@ -376,6 +395,20 @@ export function OrganizerListingWizard({
         [draft.street, draft.city, `${draft.state} ${draft.zip}`.trim(), "USA"].filter(Boolean).join(", ");
       patch({ addressLabel: label });
     }
+    if (screen === "schedule") {
+      if (!draft.eventStart.trim()) {
+        setError("Pick when your event starts.");
+        return;
+      }
+      if (draft.eventEnd.trim() && draft.eventEnd < draft.eventStart) {
+        setError("The end time can't be before the start time.");
+        return;
+      }
+    }
+    if (screen === "gameLevel" && !draft.gameLevel) {
+      setError("Pick the level that best matches your games.");
+      return;
+    }
     if (screen === "sport" && !draft.sport.trim()) {
       setError("Choose a primary sport.");
       return;
@@ -397,6 +430,20 @@ export function OrganizerListingWizard({
       const saved = await onSaveProfile(draft);
       if (!saved) return;
     }
+    if (screen === "contact") {
+      if (!draft.contactName.trim()) {
+        setError("Add a contact name so refs know who they're working with.");
+        return;
+      }
+      if (!draft.contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail.trim())) {
+        setError("Enter a valid email address.");
+        return;
+      }
+      if (!draft.contactPhone.trim()) {
+        setError("Add a phone number in case a ref needs to reach you.");
+        return;
+      }
+    }
     if (screen === "finalDetails") {
       if (!idDocPath || !logoPath) {
         setError("Upload your ID and organization logo to create your listing.");
@@ -404,6 +451,10 @@ export function OrganizerListingWizard({
       }
       const saved = await onSaveProfile(draft);
       if (!saved) return;
+      if (onCreateEvent) {
+        const posted = await onCreateEvent(draft);
+        if (!posted) return;
+      }
       setScreen("done");
       setPayoutStage("prompt");
       return;
@@ -431,7 +482,7 @@ export function OrganizerListingWizard({
 
   const nextLabel =
     screen === "finalDetails"
-      ? "Create listing"
+      ? "Post event"
       : screen.startsWith("intro")
         ? "Get started"
         : "Next";
@@ -450,7 +501,7 @@ export function OrganizerListingWizard({
           <button
             type="button"
             disabled={Boolean(saving)}
-            onClick={() => void onSaveProfile(draft).then(() => onComplete(draft))}
+            onClick={() => void onSaveProfile(draft).then(() => (onSaveAndExit ?? onComplete)(draft))}
             className="rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50"
           >
             Save & exit
@@ -626,42 +677,23 @@ export function OrganizerListingWizard({
           {screen === "locationPrivacy" && (
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Choose how refs see your location on a map
+                Your exact address stays private
               </h1>
               <p className="mt-2 max-w-2xl text-neutral-600">
-                We only share your address after refs book. Until then, they&apos;ll see an approximate location.
+                We only share your address after refs book through GotREFS. Until then, they&apos;ll see an
+                approximate location on the map — so they can&apos;t go around the platform to find you.
               </p>
               <div className="mt-6">
                 <VenuePinMap
                   center={{ lat: draft.lat ?? 34.05, lng: draft.lng ?? -118.25 }}
                   addressLabel={draft.addressLabel || draft.street}
-                  approximate={!draft.showPreciseLocation}
+                  approximate
                   onCenterChange={(coords) => patch({ lat: coords.lat, lng: coords.lng })}
                 />
               </div>
-              <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
-                <div>
-                  <p className="font-semibold text-neutral-900">Show precise location</p>
-                  <p className="mt-1 text-sm text-neutral-500">
-                    Let refs see your venue&apos;s exact location on the map before they book.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={draft.showPreciseLocation}
-                  onClick={() => patch({ showPreciseLocation: !draft.showPreciseLocation })}
-                  className={`relative h-8 w-14 shrink-0 rounded-full transition ${
-                    draft.showPreciseLocation ? "bg-neutral-900" : "bg-neutral-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${
-                      draft.showPreciseLocation ? "left-7" : "left-1"
-                    }`}
-                  />
-                </button>
-              </div>
+              <p className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-sm text-neutral-600">
+                Precise pin and street address unlock for the hired refs once their booking is confirmed.
+              </p>
             </div>
           )}
 
@@ -683,6 +715,46 @@ export function OrganizerListingWizard({
             </div>
           )}
 
+          {screen === "schedule" && (
+            <div className="mx-auto max-w-xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+                When is your event?
+              </h1>
+              <p className="mt-2 text-neutral-500">Refs see the date and time so they can match their availability.</p>
+              <div className="mt-8 space-y-4">
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Event name (optional)</span>
+                  <input
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={draft.eventTitle}
+                    onChange={(e) => patch({ eventTitle: e.target.value })}
+                    placeholder="e.g. Varsity vs. Central High"
+                  />
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                    <span className="text-xs text-neutral-500">Starts</span>
+                    <input
+                      type="datetime-local"
+                      className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 outline-none"
+                      value={draft.eventStart}
+                      onChange={(e) => patch({ eventStart: e.target.value })}
+                    />
+                  </label>
+                  <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                    <span className="text-xs text-neutral-500">Ends (optional)</span>
+                    <input
+                      type="datetime-local"
+                      className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 outline-none"
+                      value={draft.eventEnd}
+                      onChange={(e) => patch({ eventEnd: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
           {screen === "intro2" && (
             <div className="grid items-center gap-10 lg:grid-cols-2">
               <div>
@@ -691,8 +763,8 @@ export function OrganizerListingWizard({
                   Make your event stand out
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
-                  In this step, you&apos;ll add photos of your venue, your sport, and a short description.
-                  The detailed stuff comes at the very end.
+                  Tell refs the game level, sport, and anything they should know before they accept —
+                  so the right officials show up prepared.
                 </p>
               </div>
               <div className={`overflow-hidden rounded-[2rem] bg-gradient-to-br ${visual.gradient}`}>
@@ -701,51 +773,42 @@ export function OrganizerListingWizard({
             </div>
           )}
 
-          {screen === "photos" && (
-            <div className="mx-auto max-w-2xl">
+          {screen === "gameLevel" && (
+            <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Add some photos of your venue
+                What level are these games?
               </h1>
-              <p className="mt-2 text-neutral-500">
-                You can start with one photo and add more or make changes later.
-              </p>
-
-              {photos.length === 0 ? (
-                <div className="mt-8 flex min-h-[380px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50">
-                  <span className="text-6xl" aria-hidden>
-                    📷
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoModalOpen(true)}
-                    className="mt-6 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-sm ring-1 ring-neutral-200 hover:bg-neutral-100"
-                  >
-                    Add photos
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-8 grid grid-cols-2 gap-3">
-                  {photos.map((photo, index) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={`${photo.name}-${index}`}
-                      src={photo.previewUrl}
-                      alt={photo.name}
-                      className={`w-full rounded-2xl object-cover ${index === 0 ? "col-span-2 aspect-[2/1]" : "aspect-square"}`}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setPhotoModalOpen(true)}
-                    className="flex aspect-square flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 text-neutral-600 hover:border-neutral-500"
-                  >
-                    <span className="text-3xl" aria-hidden>
-                      +
-                    </span>
-                    <span className="mt-1 text-sm font-medium">Add more</span>
-                  </button>
-                </div>
-              )}
+              <p className="mt-2 text-neutral-500">Helps the right refs find you — and know what to expect.</p>
+              <div className="mt-8 space-y-3">
+                {GAME_LEVELS.map((level) => {
+                  const selected = draft.gameLevel === level.id;
+                  return (
+                    <button
+                      key={level.id}
+                      type="button"
+                      onClick={() => patch({ gameLevel: level.id })}
+                      className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-5 py-5 text-left transition ${
+                        selected
+                          ? "border-2 border-neutral-900 bg-neutral-50"
+                          : "border-neutral-300 hover:border-neutral-500"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-lg font-semibold text-neutral-900">{level.title}</p>
+                        <p className="mt-1 text-sm text-neutral-500">{level.subtitle}</p>
+                      </div>
+                      <span
+                        aria-hidden
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                          selected ? "border-neutral-900" : "border-neutral-300"
+                        }`}
+                      >
+                        {selected ? <span className="h-3 w-3 rounded-full bg-neutral-900" /> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -761,6 +824,25 @@ export function OrganizerListingWizard({
                   onAdditionalChange={(additionalSports) => patch({ additionalSports })}
                 />
               </div>
+            </div>
+          )}
+
+          {screen === "refInstructions" && (
+            <div className="mx-auto max-w-xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+                Anything refs should know before they arrive?
+              </h1>
+              <p className="mt-2 text-neutral-500">
+                Parking, check-in spot, locker rooms, dress code, gate codes — optional but helpful.
+              </p>
+              <textarea
+                className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"
+                value={draft.refInstructions}
+                onChange={(e) => patch({ refInstructions: e.target.value })}
+                placeholder="e.g. Park in Lot B, check in at the front desk, black pants required…"
+                maxLength={600}
+              />
+              <p className="mt-2 text-right text-xs text-neutral-500">{draft.refInstructions.length}/600</p>
             </div>
           )}
 
@@ -921,7 +1003,7 @@ export function OrganizerListingWizard({
                           checked ? "bg-white ring-1 ring-neutral-300" : "bg-neutral-100"
                         }`}
                       >
-                        {option.percent}
+                        {option.percentLabel}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold text-neutral-900">{option.title}</span>
@@ -938,6 +1020,57 @@ export function OrganizerListingWizard({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {screen === "contact" && (
+            <div className="mx-auto max-w-xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+                How can refs and GotREFS reach you?
+              </h1>
+              <p className="mt-2 text-neutral-500">
+                We use this to confirm your booking and keep you updated about your event.
+              </p>
+              <div className="mt-8 space-y-4">
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Your name</span>
+                  <input
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={draft.contactName}
+                    onChange={(e) => patch({ contactName: e.target.value })}
+                    placeholder="First and last name"
+                  />
+                </label>
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Company or club name</span>
+                  <input
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={draft.clubName}
+                    onChange={(e) => patch({ clubName: e.target.value })}
+                    placeholder="e.g. Riverside Youth Basketball League"
+                  />
+                </label>
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Email</span>
+                  <input
+                    type="email"
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={draft.contactEmail}
+                    onChange={(e) => patch({ contactEmail: e.target.value })}
+                    placeholder="you@example.com"
+                  />
+                </label>
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Phone number</span>
+                  <input
+                    type="tel"
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={draft.contactPhone}
+                    onChange={(e) => patch({ contactPhone: e.target.value })}
+                    placeholder="(555) 123-4567"
+                  />
+                </label>
               </div>
             </div>
           )}
@@ -977,11 +1110,56 @@ export function OrganizerListingWizard({
 
               <p className="mt-10 font-semibold text-neutral-900">Verify your organization</p>
               <p className="mt-1 text-sm text-neutral-500">
-                Upload a government ID or league credential, plus your logo.
+                Upload your face photo for your GotREFS ID card, a government ID or league credential, and your logo.
               </p>
+              {idDocPath && logoPath ? (
+                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                  <GreenCheck />
+                  <div>
+                    <p className="font-semibold text-emerald-900">Organization verified</p>
+                    <p className="text-sm text-emerald-800">
+                      ID and logo are on file
+                      {avatarPath ? ", and your face photo is on your ID card" : ""}. You&apos;re ready to publish.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-4 space-y-3">
-                <label className="block rounded-2xl border border-neutral-300 p-5">
-                  <p className="font-semibold text-neutral-900">Government ID or league credential</p>
+                {onUploadAvatar ? (
+                  <label
+                    className={`block rounded-2xl border p-5 transition ${
+                      avatarPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-neutral-900">Your face photo</p>
+                      {avatarPath ? <GreenCheck size="sm" label="Face photo uploaded" /> : null}
+                    </div>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      className="mt-3 text-sm"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void onUploadAvatar(file);
+                      }}
+                    />
+                    {avatarPath ? (
+                      <p className="mt-2 text-sm font-medium text-emerald-700">Photo will show on your GotREFS ID card</p>
+                    ) : (
+                      <p className="mt-2 text-sm text-neutral-500">JPG, PNG, or WEBP</p>
+                    )}
+                  </label>
+                ) : null}
+                <label
+                  className={`block rounded-2xl border p-5 transition ${
+                    idDocPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-neutral-900">Government ID or league credential</p>
+                    {idDocPath ? <GreenCheck size="sm" label="Credential uploaded" /> : null}
+                  </div>
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.pdf"
@@ -991,10 +1169,21 @@ export function OrganizerListingWizard({
                       if (file) void onUploadId(file);
                     }}
                   />
-                  {idDocPath ? <p className="mt-2 text-sm text-emerald-700">ID on file.</p> : null}
+                  {idDocPath ? (
+                    <p className="mt-2 text-sm font-medium text-emerald-700">Credential uploaded</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-neutral-500">JPG, PNG, or PDF</p>
+                  )}
                 </label>
-                <label className="block rounded-2xl border border-neutral-300 p-5">
-                  <p className="font-semibold text-neutral-900">Organization logo</p>
+                <label
+                  className={`block rounded-2xl border p-5 transition ${
+                    logoPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-neutral-900">Organization logo</p>
+                    {logoPath ? <GreenCheck size="sm" label="Logo uploaded" /> : null}
+                  </div>
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp,.svg"
@@ -1004,7 +1193,11 @@ export function OrganizerListingWizard({
                       if (file) void onUploadLogo(file);
                     }}
                   />
-                  {logoPath ? <p className="mt-2 text-sm text-emerald-700">Logo on file.</p> : null}
+                  {logoPath ? (
+                    <p className="mt-2 text-sm font-medium text-emerald-700">Logo uploaded</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-neutral-500">JPG, PNG, WEBP, or SVG</p>
+                  )}
                 </label>
               </div>
             </div>
@@ -1015,14 +1208,9 @@ export function OrganizerListingWizard({
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Your listing</h1>
               <div className="mt-6 max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-neutral-200">
                 <div className="relative">
-                  {photos[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photos[0].previewUrl} alt="Venue" className="aspect-[4/3] w-full object-cover" />
-                  ) : (
-                    <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-6xl`}>
-                      {visual.emoji}
-                    </div>
-                  )}
+                  <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-6xl`}>
+                    {visual.emoji}
+                  </div>
                   <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-neutral-800">
                     ● Action required
                   </span>
@@ -1076,111 +1264,6 @@ export function OrganizerListingWizard({
             </button>
           </div>
         </footer>
-      )}
-
-      {/* Photo upload modal — same page, overlay */}
-      {photoModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="relative border-b border-neutral-100 px-5 py-4 text-center">
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => {
-                  setPhotoModalOpen(false);
-                  setPendingPhotos([]);
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-neutral-700 hover:text-neutral-900"
-              >
-                ✕
-              </button>
-              <p className="font-semibold text-neutral-900">Upload photos</p>
-              <p className="text-xs text-neutral-500">
-                {pendingPhotos.length === 0 ? "No items selected" : `${pendingPhotos.length} selected`}
-              </p>
-              <button
-                type="button"
-                aria-label="Add more photos"
-                onClick={() => photoInputRef.current?.click()}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-xl text-neutral-700 hover:text-neutral-900"
-              >
-                +
-              </button>
-            </div>
-            <div className="p-5">
-              <div
-                className="flex min-h-56 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 px-6 py-10 text-center"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-                  if (files.length > 0) setPendingPhotos((current) => [...current, ...files]);
-                }}
-              >
-                {pendingPhotos.length === 0 ? (
-                  <>
-                    <span className="text-4xl" aria-hidden>
-                      🖼️
-                    </span>
-                    <p className="mt-3 text-lg font-semibold text-neutral-900">Drag and drop</p>
-                    <p className="mt-1 text-sm text-neutral-500">or browse for photos</p>
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      className="mt-4 rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800"
-                    >
-                      Browse
-                    </button>
-                  </>
-                ) : (
-                  <div className="grid w-full grid-cols-3 gap-2">
-                    {pendingPhotos.map((file, index) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={`${file.name}-${index}`}
-                        src={URL.createObjectURL(file)}
-                        alt={file.name}
-                        className="aspect-square w-full rounded-xl object-cover"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  if (files.length > 0) setPendingPhotos((current) => [...current, ...files]);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setPhotoModalOpen(false);
-                  setPendingPhotos([]);
-                }}
-                className="text-sm font-semibold text-neutral-800 underline underline-offset-2"
-              >
-                Done
-              </button>
-              <button
-                type="button"
-                disabled={pendingPhotos.length === 0 || uploadingPhotos}
-                onClick={() => void uploadPendingPhotos()}
-                className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-neutral-200 disabled:text-neutral-400"
-              >
-                {uploadingPhotos ? "Uploading…" : "Upload"}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Similar listings map overlay — same page */}

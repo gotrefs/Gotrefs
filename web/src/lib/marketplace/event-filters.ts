@@ -1,3 +1,4 @@
+import type { AppliedBoost } from "@/lib/boosts";
 import { payBounds, payRangesOverlap, type PayRangeInput } from "@/lib/pay-range";
 
 export type OpenEventRecord = {
@@ -16,6 +17,9 @@ export type OpenEventRecord = {
   pay_max?: number | null;
   notes: string | null;
   booked_count?: number;
+  boosts?: string[] | null;
+  /** Boosts that currently apply for the ref viewing this event. */
+  active_boosts?: AppliedBoost[];
 };
 
 export type RefProfileForMatch = {

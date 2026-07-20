@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { boostedOfferPay, computeOfferBoost } from "@/lib/boosts-server";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { notifyInBackground, notifyOfferInvite } from "@/lib/email/notifications";
 import { payRangesOverlap } from "@/lib/pay-range";
@@ -33,11 +34,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "eventId and refMemberId required" }, { status: 400 });
   }
 
-  const { data: event, error: evErr } = await supabase
+  let { data: event, error: evErr } = await supabase
     .from("scheduled_events")
-    .select("id, organizer_member_id, pay_offer, pay_type, pay_min, pay_max")
+    .select("id, organizer_member_id, pay_offer, pay_type, pay_min, pay_max, starts_at, boosts")
     .eq("id", body.eventId)
     .single();
+  if (evErr && (evErr.message ?? "").includes("boosts")) {
+    const retry = await supabase
+      .from("scheduled_events")
+      .select("id, organizer_member_id, pay_offer, pay_type, pay_min, pay_max, starts_at")
+      .eq("id", body.eventId)
+      .single();
+    event = retry.data ? { ...retry.data, boosts: [] } : retry.data;
+    evErr = retry.error;
+  }
 
   if (evErr || !event || event.organizer_member_id !== user.id) {
     return NextResponse.json({ error: "Event not found or not yours" }, { status: 403 });
@@ -109,14 +119,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const offeredPay = body.offeredPay ?? event.pay_offer ?? null;
+  const basePay = body.offeredPay ?? event.pay_offer ?? null;
+  const boost = await computeOfferBoost(admin, {
+    organizerMemberId: user.id,
+    refMemberId: body.refMemberId,
+    eventStartsAt: event.starts_at,
+    eventBoosts: event.boosts,
+  });
+  const offeredPay = boostedOfferPay(basePay, boost.percent);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("assignment_offers")
     .upsert({
       event_id: body.eventId,
       ref_member_id: body.refMemberId,
       offered_pay: offeredPay,
+      base_pay: basePay,
+      boost_percent: boost.percent,
       message: body.message ?? null,
       status: "pending",
     }, {
@@ -124,9 +143,26 @@ export async function POST(request: Request) {
     })
     .select("id")
     .single();
+  if (error && /boost_percent|base_pay/.test(error.message ?? "")) {
+    const retry = await supabase
+      .from("assignment_offers")
+      .upsert({
+        event_id: body.eventId,
+        ref_member_id: body.refMemberId,
+        offered_pay: offeredPay,
+        message: body.message ?? null,
+        status: "pending",
+      }, {
+        onConflict: "event_id,ref_member_id",
+      })
+      .select("id")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message ?? "Could not create offer." }, { status: 400 });
   }
 
   notifyInBackground(() =>

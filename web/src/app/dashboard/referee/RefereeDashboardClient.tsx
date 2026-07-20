@@ -11,6 +11,7 @@ import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeId
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import { BRAND_NAME } from "@/lib/brand";
+import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
@@ -40,6 +41,8 @@ type OfferRow = {
   id: string;
   status: string;
   offered_pay: number | null;
+  base_pay?: number | null;
+  boost_percent?: number | null;
   message: string | null;
   organizer?: {
     displayName: string | null;
@@ -165,6 +168,7 @@ export default function RefereeDashboardClient() {
   const [myRatingAverage, setMyRatingAverage] = useState<number | null>(null);
   const [myRatingCount, setMyRatingCount] = useState(0);
   const [myReviews, setMyReviews] = useState<PublicReview[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const {
@@ -179,6 +183,17 @@ export default function RefereeDashboardClient() {
         user.email?.split("@")[0] ||
         "Referee"
     );
+
+    const { data: memberRow } = await supabase
+      .from("members")
+      .select("profile_picture_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    const photoSource =
+      memberRow?.profile_picture_url ||
+      (typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null) ||
+      (typeof meta.avatar_url === "string" ? meta.avatar_url : null);
+    setAvatarUrl(await resolveProfilePhotoUrl(supabase, photoSource));
     setCardMeta({
       gotrefsId: typeof meta.gotrefs_id === "string" ? meta.gotrefs_id : undefined,
       certifiedBy: typeof meta.certified_by === "string" ? meta.certified_by : undefined,
@@ -200,13 +215,25 @@ export default function RefereeDashboardClient() {
       .maybeSingle();
     setScreening(sc);
 
-    const { data: o } = await supabase
+    let { data: o, error: offersError } = await supabase
       .from("assignment_offers")
       .select(
-        "id, status, offered_pay, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
+        "id, status, offered_pay, base_pay, boost_percent, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
+    if (offersError) {
+      // Older databases may not have the boost columns yet.
+      const retry = await supabase
+        .from("assignment_offers")
+        .select(
+          "id, status, offered_pay, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
+        )
+        .eq("ref_member_id", user.id)
+        .order("created_at", { ascending: false });
+      o = retry.data as typeof o;
+      offersError = retry.error;
+    }
 
     const offerRows = (o as unknown as OfferRow[]) || [];
     const organizerIds = Array.from(
@@ -983,6 +1010,7 @@ export default function RefereeDashboardClient() {
             certificationLevel={cert}
             certifiedBy={cardMeta.certifiedBy}
             rate={rateLabel()}
+            avatarUrl={avatarUrl ?? undefined}
             avatarLabel={avatarLabel}
             baseCity={cardMeta.baseCity}
             workRegions={cardMeta.workRegions}

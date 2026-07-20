@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { boostedOfferPay, computeOfferBoost } from "@/lib/boosts-server";
 import { notifyApplicationDecision, notifyInBackground } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { isOrganizerMember } from "@/lib/organizer-access";
@@ -32,11 +33,24 @@ export async function PATCH(
   }
 
   const admin = createServiceClient();
-  const { data: row, error } = await admin
+  let { data: row, error } = await admin
     .from("event_signup_requests")
-    .select("id, event_id, ref_member_id, status, scheduled_events!inner ( organizer_member_id, pay_offer )")
+    .select(
+      "id, event_id, ref_member_id, status, scheduled_events!inner ( organizer_member_id, pay_offer, starts_at, boosts )"
+    )
     .eq("id", id)
     .maybeSingle();
+  if (error && (error.message ?? "").includes("boosts")) {
+    const retry = await admin
+      .from("event_signup_requests")
+      .select(
+        "id, event_id, ref_member_id, status, scheduled_events!inner ( organizer_member_id, pay_offer, starts_at )"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    row = retry.data as typeof row;
+    error = retry.error;
+  }
 
   if (error || !row) {
     return NextResponse.json({ error: error?.message || "Application not found" }, { status: 404 });
@@ -65,13 +79,33 @@ export async function PATCH(
     return NextResponse.json({ ok: true, status: "declined" });
   }
 
-  const { error: offerError } = await admin.from("assignment_offers").insert({
+  const basePay = event?.pay_offer ?? null;
+  const boost = await computeOfferBoost(admin, {
+    organizerMemberId: user.id,
+    refMemberId: row.ref_member_id,
+    eventStartsAt: (event as { starts_at?: string } | null)?.starts_at ?? null,
+    eventBoosts: (event as { boosts?: string[] } | null)?.boosts ?? [],
+  });
+
+  let { error: offerError } = await admin.from("assignment_offers").insert({
     event_id: row.event_id,
     ref_member_id: row.ref_member_id,
-    offered_pay: event?.pay_offer ?? null,
+    offered_pay: boostedOfferPay(basePay, boost.percent),
+    base_pay: basePay,
+    boost_percent: boost.percent,
     message: "Your application was accepted — please confirm this assignment.",
     status: "pending",
   });
+  if (offerError && /boost_percent|base_pay/.test(offerError.message ?? "")) {
+    const retry = await admin.from("assignment_offers").insert({
+      event_id: row.event_id,
+      ref_member_id: row.ref_member_id,
+      offered_pay: boostedOfferPay(basePay, boost.percent),
+      message: "Your application was accepted — please confirm this assignment.",
+      status: "pending",
+    });
+    offerError = retry.error;
+  }
 
   if (offerError && !/duplicate|unique/i.test(offerError.message)) {
     return NextResponse.json({ error: offerError.message }, { status: 400 });

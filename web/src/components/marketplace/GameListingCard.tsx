@@ -2,17 +2,20 @@
 
 import { formatEventLocation } from "@/data/sports";
 import { ListingPhotoCarousel } from "@/components/marketplace/ListingPhotoCarousel";
+import { applyBoostToPay, totalBoostPercent } from "@/lib/boosts";
 import { marketplaceCardShadow, sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
 import { formatPayRangeLabel } from "@/lib/pay-range";
 
-function formatEventPay(event: OpenEventRecord) {
+function formatEventPay(event: OpenEventRecord, boostPercent = 0) {
+  const boosted = (value: number | null | undefined) =>
+    value != null && boostPercent > 0 ? applyBoostToPay(value, boostPercent) : value;
   return (
     formatPayRangeLabel({
       type: event.pay_type === "range" ? "range" : "exact",
-      exact: event.pay_offer,
-      min: event.pay_min,
-      max: event.pay_max,
+      exact: boosted(event.pay_offer),
+      min: boosted(event.pay_min),
+      max: boosted(event.pay_max),
       unit: "hour",
     }) ?? "Pay TBD"
   );
@@ -47,6 +50,8 @@ export function GameListingCard({
 }) {
   const visual = sportListingVisual(event.sport);
   const loc = formatEventLocation(event.city, event.state, event.zip_code) || `ZIP ${event.zip_code}`;
+  const activeBoosts = event.active_boosts ?? [];
+  const boostPercent = totalBoostPercent(activeBoosts);
 
   return (
     <article className="group cursor-pointer" onClick={() => !ctaDisabled && onAction()}>
@@ -76,8 +81,25 @@ export function GameListingCard({
         <div className="space-y-1 p-3">
           <div className="flex items-start justify-between gap-2">
             <h3 className="line-clamp-1 text-[15px] font-semibold text-neutral-900">{event.title}</h3>
-            <span className="shrink-0 text-[15px] font-semibold text-neutral-900">{formatEventPay(event)}</span>
+            <span className="shrink-0 text-right text-[15px] font-semibold text-neutral-900">
+              {boostPercent > 0 && (
+                <span className="mr-1.5 text-sm font-normal text-neutral-400 line-through">
+                  {formatEventPay(event)}
+                </span>
+              )}
+              {formatEventPay(event, boostPercent)}
+            </span>
           </div>
+          {boostPercent > 0 && (
+            <p className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                +{boostPercent}% boost
+              </span>
+              <span className="text-[11px] text-neutral-500">
+                {activeBoosts.map((boost) => boost.title).join(" · ")}
+              </span>
+            </p>
+          )}
           <p className="line-clamp-1 text-sm text-neutral-500">{loc}</p>
           <p className="text-sm text-neutral-500">{formatShortDate(event.starts_at)}</p>
           <p className="pt-1 text-xs text-neutral-400">

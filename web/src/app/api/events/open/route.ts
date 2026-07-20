@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { computeAppliedBoosts } from "@/lib/boosts";
 import {
   filterOpenEvents,
   type OpenEventRecord,
@@ -10,6 +11,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 function isMissingPayRangeColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
   return ["pay_type", "pay_min", "pay_max"].some((column) => message.includes(column));
+}
+
+function isMissingBoostsColumn(error: { message?: string } | null | undefined) {
+  return (error?.message ?? "").includes("boosts");
 }
 
 export async function GET(request: NextRequest) {
@@ -37,40 +42,43 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date().toISOString();
-  let eventsQuery = admin
-    .from("scheduled_events")
-    .select(
-      "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, pay_type, pay_min, pay_max, notes"
-    )
-    .eq("status", "published")
-    .gte("starts_at", startsAfter || now)
-    .order("starts_at", { ascending: true })
-    .limit(200);
+  const baseColumns =
+    "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes, organizer_member_id";
+  const selectCandidates = [
+    `${baseColumns}, pay_type, pay_min, pay_max, boosts`,
+    `${baseColumns}, pay_type, pay_min, pay_max`,
+    baseColumns,
+  ];
 
-  if (startsBefore) {
-    eventsQuery = eventsQuery.lte("starts_at", startsBefore);
-  }
-
-  let { data: events, error: eventsErr } = await eventsQuery;
-  if (isMissingPayRangeColumn(eventsErr)) {
-    const fallback = await admin
+  let events: Record<string, unknown>[] | null = null;
+  let eventsErr: { message?: string } | null = null;
+  for (const columns of selectCandidates) {
+    let eventsQuery = admin
       .from("scheduled_events")
-      .select(
-        "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes"
-      )
+      .select(columns)
       .eq("status", "published")
       .gte("starts_at", startsAfter || now)
       .order("starts_at", { ascending: true })
       .limit(200);
-    events = fallback.data as typeof events;
-    eventsErr = fallback.error;
+    if (startsBefore) {
+      eventsQuery = eventsQuery.lte("starts_at", startsBefore);
+    }
+    const result = await eventsQuery;
+    events = result.data as Record<string, unknown>[] | null;
+    eventsErr = result.error;
+    if (!eventsErr) break;
+    if (!isMissingBoostsColumn(eventsErr) && !isMissingPayRangeColumn(eventsErr)) break;
   }
 
   if (eventsErr) {
     return NextResponse.json({ error: eventsErr.message, events: [] }, { status: 400 });
   }
 
-  const eventIds = (events ?? []).map((event) => event.id);
+  const eventRows = (events ?? []) as unknown as (OpenEventRecord & {
+    organizer_member_id?: string;
+    boosts?: string[] | null;
+  })[];
+  const eventIds = eventRows.map((event) => event.id);
   const bookingCounts = new Map<string, number>();
   if (eventIds.length > 0) {
     const { data: bookings } = await admin
@@ -80,6 +88,35 @@ export async function GET(request: NextRequest) {
       .in("status", ["confirmed", "completed"]);
     for (const row of bookings ?? []) {
       bookingCounts.set(row.event_id, (bookingCounts.get(row.event_id) ?? 0) + 1);
+    }
+  }
+
+  // Accepted-offer counts per organizer power the "first 10 refs" and
+  // "multi-game" boost badges shown to this ref.
+  const organizerIds = Array.from(
+    new Set(eventRows.map((event) => event.organizer_member_id).filter((id): id is string => Boolean(id)))
+  );
+  const organizerAcceptedCounts = new Map<string, number>();
+  const refAcceptedWithOrganizerCounts = new Map<string, number>();
+  const anyBoosts = eventRows.some((event) => (event.boosts ?? []).length > 0);
+  if (organizerIds.length > 0 && anyBoosts) {
+    const { data: acceptedOffers } = await admin
+      .from("assignment_offers")
+      .select("ref_member_id, scheduled_events!inner(organizer_member_id)")
+      .eq("status", "accepted")
+      .in("scheduled_events.organizer_member_id", organizerIds)
+      .limit(5000);
+    for (const offer of acceptedOffers ?? []) {
+      const joined = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
+      const organizerId = (joined as { organizer_member_id?: string } | null)?.organizer_member_id;
+      if (!organizerId) continue;
+      organizerAcceptedCounts.set(organizerId, (organizerAcceptedCounts.get(organizerId) ?? 0) + 1);
+      if (offer.ref_member_id === user.id) {
+        refAcceptedWithOrganizerCounts.set(
+          organizerId,
+          (refAcceptedWithOrganizerCounts.get(organizerId) ?? 0) + 1
+        );
+      }
     }
   }
 
@@ -99,9 +136,19 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  const enriched: OpenEventRecord[] = (events ?? []).map((event) => ({
-    ...(event as OpenEventRecord),
+  const enriched: OpenEventRecord[] = eventRows.map((event) => ({
+    ...event,
     booked_count: bookingCounts.get(event.id) ?? 0,
+    active_boosts: computeAppliedBoosts({
+      eventBoosts: event.boosts,
+      eventStartsAt: event.starts_at,
+      organizerAcceptedCount: event.organizer_member_id
+        ? organizerAcceptedCounts.get(event.organizer_member_id) ?? 0
+        : 0,
+      refAcceptedWithOrganizerCount: event.organizer_member_id
+        ? refAcceptedWithOrganizerCounts.get(event.organizer_member_id) ?? 0
+        : 0,
+    }),
   }));
 
   const filtered = filterOpenEvents(enriched, {

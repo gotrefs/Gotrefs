@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { BRAND_NAME } from "@/lib/brand";
 
 type OrganizerIdCardProps = {
@@ -11,8 +10,11 @@ type OrganizerIdCardProps = {
   bio?: string;
   eventsCount?: number;
   idUploaded?: boolean;
+  photoUploaded?: boolean;
+  photoUrl?: string | null;
   logoUploaded?: boolean;
   logoUrl?: string | null;
+  onUploadPhoto?: (file: File) => void;
 };
 
 export function OrganizerIdCard({
@@ -25,10 +27,27 @@ export function OrganizerIdCard({
   bio,
   eventsCount = 0,
   idUploaded,
+  photoUploaded,
+  photoUrl,
   logoUploaded,
   logoUrl,
+  onUploadPhoto,
 }: OrganizerIdCardProps) {
-  const initials =
+  const faceInitials =
+    contactName
+      ?.split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() ||
+    organizationName
+      ?.split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() ||
+    "ORG";
+  const logoInitials =
     organizationName
       ?.split(" ")
       .map((part) => part[0])
@@ -50,18 +69,45 @@ export function OrganizerIdCard({
         )}
 
         <div className={`grid grid-cols-[7rem_1fr] gap-4 ${idUploaded ? "mt-4" : ""}`}>
-          <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/25 bg-white/10 text-3xl font-black text-white">
-            {logoUploaded ? (
-              <Image
-                src={logoUrl || "/gotrefs-logo.png"}
-                alt={`${organizationName ?? "Organization"} logo`}
-                fill
-                className="object-contain p-3"
-                sizes="112px"
-              />
-            ) : (
-              initials
-            )}
+          <div className="relative">
+            <label
+              className={`relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/25 bg-white/10 text-3xl font-black text-white ${
+                onUploadPhoto ? "hover:border-white/50" : "cursor-default"
+              }`}
+            >
+              {photoUploaded && photoUrl ? (
+                // Native img: signed URLs are ephemeral and not in next/image remotePatterns.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoUrl} alt={`${contactName ?? "Organizer"} photo`} className="h-full w-full object-cover" />
+              ) : (
+                faceInitials
+              )}
+              {onUploadPhoto ? (
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onUploadPhoto(file);
+                    e.target.value = "";
+                  }}
+                />
+              ) : null}
+            </label>
+            <div className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border-2 border-slate-950 bg-white/15 shadow-lg">
+              {logoUploaded && logoUrl ? (
+                // Native img: signed storage URLs are ephemeral.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt={`${organizationName ?? "Organization"} logo`}
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                <span className="text-[10px] font-black text-white">{logoInitials}</span>
+              )}
+            </div>
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-100/80">
@@ -70,6 +116,9 @@ export function OrganizerIdCard({
             <h3 className="mt-2 min-h-9 truncate text-3xl font-black tracking-tight">{organizationName}</h3>
             <p className="mt-1 min-h-5 text-sm font-bold text-cyan-100">{contactName}</p>
             <p className="mt-1 min-h-4 truncate text-xs text-white/55">{email}</p>
+            {onUploadPhoto && !photoUploaded ? (
+              <p className="mt-2 text-[11px] font-semibold text-cyan-100/80">Tap photo to upload your face</p>
+            ) : null}
           </div>
         </div>
 
@@ -97,6 +146,11 @@ export function OrganizerIdCard({
           {eventsCount > 0 && (
             <span className="rounded-full border border-cyan-200/50 bg-cyan-300/15 px-3 py-1 text-[10px] font-bold uppercase text-cyan-50">
               {eventsCount} upcoming event{eventsCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {photoUploaded && (
+            <span className="rounded-full border border-emerald-200 bg-emerald-300/20 px-3 py-1 text-[10px] font-bold uppercase text-emerald-50">
+              Photo on card
             </span>
           )}
           {logoUploaded && (
