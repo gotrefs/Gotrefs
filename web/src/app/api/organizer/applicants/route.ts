@@ -4,30 +4,32 @@ import { payBounds } from "@/lib/pay-range";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
+type EventJoin = {
+  title: string;
+  sport?: string | null;
+  starts_at?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  pay_offer: number | null;
+  pay_type?: string | null;
+  pay_min?: number | null;
+  pay_max?: number | null;
+  organizer_member_id: string;
+};
+
 type ApplicantRow = {
   id: string;
   event_id: string;
   ref_member_id: string;
   created_at: string;
-  scheduled_events:
-    | {
-        title: string;
-        pay_offer: number | null;
-        pay_type?: string | null;
-        pay_min?: number | null;
-        pay_max?: number | null;
-        organizer_member_id: string;
-      }
-    | Array<{
-        title: string;
-        pay_offer: number | null;
-        pay_type?: string | null;
-        pay_min?: number | null;
-        pay_max?: number | null;
-        organizer_member_id: string;
-      }>
-    | null;
+  scheduled_events: EventJoin | EventJoin[] | null;
 };
+
+function eventFromJoin(value: EventJoin | EventJoin[] | null | undefined): EventJoin | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -44,22 +46,6 @@ export async function GET() {
     return NextResponse.json({ applicants: [] });
   }
 
-  const { data: rows, error } = await supabase
-    .from("event_signup_requests")
-    .select(
-      "id, event_id, ref_member_id, created_at, scheduled_events!inner ( title, pay_offer, pay_type, pay_min, pay_max, organizer_member_id )"
-    )
-    .eq("scheduled_events.organizer_member_id", user.id)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message, applicants: [] }, { status: 400 });
-  }
-
-  const applicants = (rows ?? []) as ApplicantRow[];
-  const refIds = Array.from(new Set(applicants.map((row) => row.ref_member_id)));
-
   let admin;
   try {
     admin = createServiceClient();
@@ -67,12 +53,73 @@ export async function GET() {
     return NextResponse.json({ error: "Server configuration error.", applicants: [] }, { status: 503 });
   }
 
+  // Resolve this organizer's events first — avoids brittle nested filters that 400 in PostgREST.
+  const { data: orgEvents, error: eventsError } = await admin
+    .from("scheduled_events")
+    .select("id")
+    .eq("organizer_member_id", user.id);
+
+  if (eventsError) {
+    return NextResponse.json({ error: eventsError.message, applicants: [] }, { status: 400 });
+  }
+
+  const eventIds = (orgEvents ?? []).map((row) => row.id);
+  if (eventIds.length === 0) {
+    return NextResponse.json({ applicants: [] });
+  }
+
+  const selectFull =
+    "id, event_id, ref_member_id, created_at, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, pay_type, pay_min, pay_max, organizer_member_id )";
+  const selectBase =
+    "id, event_id, ref_member_id, created_at, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, organizer_member_id )";
+
+  let rows: ApplicantRow[] | null = null;
+  let error: { message?: string } | null = null;
+  {
+    const result = await admin
+      .from("event_signup_requests")
+      .select(selectFull)
+      .in("event_id", eventIds)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    rows = result.data as ApplicantRow[] | null;
+    error = result.error;
+  }
+  if (error && ["pay_type", "pay_min", "pay_max"].some((col) => (error?.message ?? "").includes(col))) {
+    const result = await admin
+      .from("event_signup_requests")
+      .select(selectBase)
+      .in("event_id", eventIds)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    rows = result.data as ApplicantRow[] | null;
+    error = result.error;
+  }
+
+  if (error) {
+    return NextResponse.json({ error: error.message, applicants: [] }, { status: 400 });
+  }
+
+  const applicants = (rows ?? []).filter((row) => {
+    const event = eventFromJoin(row.scheduled_events);
+    return event?.organizer_member_id === user.id;
+  });
+  const refIds = Array.from(new Set(applicants.map((row) => row.ref_member_id)));
+
   const { data: profiles } = await admin
     .from("ref_profiles")
-    .select("member_id, gotrefs_id, rate_type, rate_min, rate_max, rate_per_game, rate_unit")
+    .select(
+      "member_id, gotrefs_id, rate_type, rate_min, rate_max, rate_per_game, rate_unit, primary_sport, additional_sports, certification_level"
+    )
     .in("member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"]);
 
+  const { data: members } = await admin
+    .from("members")
+    .select("id, display_name, profile_picture_url")
+    .in("id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"]);
+
   const profileByRef = new Map((profiles ?? []).map((profile) => [profile.member_id, profile]));
+  const memberByRef = new Map((members ?? []).map((member) => [member.id, member]));
 
   const { data: ratings } = await admin
     .from("ref_ratings")
@@ -120,8 +167,9 @@ export async function GET() {
 
   const enriched = [];
   for (const row of applicants) {
-    const event = Array.isArray(row.scheduled_events) ? row.scheduled_events[0] : row.scheduled_events;
+    const event = eventFromJoin(row.scheduled_events);
     const profile = profileByRef.get(row.ref_member_id);
+    const member = memberByRef.get(row.ref_member_id);
     const rating = ratingSummaryByRef.get(row.ref_member_id);
 
     let gotrefsId = profile?.gotrefs_id ?? null;
@@ -146,13 +194,31 @@ export async function GET() {
       max: event?.pay_max,
     });
 
+    const place = [event?.city, event?.state].filter(Boolean).join(", ") || event?.zip_code || null;
+    const eventWhen = event?.starts_at
+      ? new Date(event.starts_at).toLocaleString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
+
     enriched.push({
       id: row.id,
       eventId: row.event_id,
       refMemberId: row.ref_member_id,
       createdAt: row.created_at,
       gotrefsId,
+      displayName: member?.display_name ?? null,
+      primarySport: profile?.primary_sport ?? event?.sport ?? null,
+      additionalSports: profile?.additional_sports ?? [],
+      certificationLevel: profile?.certification_level ?? null,
+      avatarPath: member?.profile_picture_url ?? null,
       eventTitle: event?.title ?? "Event",
+      eventPlace: place,
+      eventWhen,
       eventPayLabel:
         eventBounds.min != null
           ? eventBounds.max != null && eventBounds.max > eventBounds.min

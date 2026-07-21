@@ -77,6 +77,7 @@ export function EventStaffingPanel({
   refs,
   hiredCount,
   onClose,
+  onBrowseMarketplace,
   onInviteApplicant,
   onInviteRef,
 }: {
@@ -85,6 +86,7 @@ export function EventStaffingPanel({
   refs: DirectoryRef[];
   hiredCount: number;
   onClose: () => void;
+  onBrowseMarketplace?: () => void;
   onInviteApplicant: (applicant: Applicant) => Promise<void>;
   onInviteRef: (refId: string) => Promise<void>;
 }) {
@@ -145,13 +147,24 @@ export function EventStaffingPanel({
               {hiredCount}/{event.officials_needed} refs confirmed
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)]"
-          >
-            Close
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onBrowseMarketplace && (
+              <button
+                type="button"
+                onClick={onBrowseMarketplace}
+                className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white"
+              >
+                Browse & request refs
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)]"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -203,7 +216,7 @@ export function EventStaffingPanel({
                     onClick={() => void inviteApplicant(applicant)}
                     className="mt-3 rounded-full bg-[var(--blue)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
-                    {busyId === applicant.id ? "Sending…" : "Send invite"}
+                    {busyId === applicant.id ? "Sending…" : "Approve request"}
                   </button>
                 </article>
               ))
@@ -212,7 +225,7 @@ export function EventStaffingPanel({
           {tab === "suggested" &&
             (suggestedRefs.length === 0 ? (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-                No refs match availability, sport, ZIP, and pay for this game. Refs can still apply from Find Games.
+                No refs match availability, sport, ZIP, and pay for this game. Use Browse & request refs to invite from the marketplace, or wait for refs to apply from Find Games.
               </p>
             ) : (
               suggestedRefs.map((ref) => (
@@ -237,7 +250,7 @@ export function EventStaffingPanel({
                     onClick={() => void inviteRef(ref.id)}
                     className="mt-3 rounded-full bg-[var(--red)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
-                    {busyId === ref.id ? "Sending…" : "Invite to game"}
+                    {busyId === ref.id ? "Sending…" : "Request this ref"}
                   </button>
                 </article>
               ))

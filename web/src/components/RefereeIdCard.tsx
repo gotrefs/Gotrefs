@@ -34,6 +34,8 @@ type RefereeIdCardProps = {
   verificationSkipped?: boolean;
   emptyPlaceholders?: boolean;
   profileComplete?: boolean;
+  /** Shown on the green badge, e.g. "Valid thru Jul 20, 2027". */
+  validThrough?: string | null;
   onEditField?: (field: EditableRefCardField) => void;
   /** When set, tapping the photo opens a file picker and uploads immediately. */
   onUploadPhoto?: (file: File) => void;
@@ -120,6 +122,7 @@ export function RefereeIdCard({
   verificationSkipped,
   emptyPlaceholders,
   profileComplete,
+  validThrough,
   onEditField,
   onUploadPhoto,
   className = "",
@@ -211,8 +214,8 @@ export function RefereeIdCard({
               {onUploadPhoto ? (
                 <input
                   type="file"
-                  accept=".jpg,.jpeg,.png,.webp"
-                  className="sr-only"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) onUploadPhoto(file);
@@ -228,8 +231,8 @@ export function RefereeIdCard({
                 />
               )}
             </label>
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-green-400 px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-green-950 shadow-lg">
-              Active
+            <div className="absolute -bottom-2 left-1/2 max-w-[95%] -translate-x-1/2 rounded-full bg-green-400 px-3 py-1 text-center text-[9px] font-black uppercase tracking-[0.12em] text-green-950 shadow-lg">
+              {validThrough ? `Valid thru ${validThrough}` : "Active"}
             </div>
           </div>
 

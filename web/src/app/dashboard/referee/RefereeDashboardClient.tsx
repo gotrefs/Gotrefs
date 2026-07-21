@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
@@ -12,6 +12,7 @@ import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import { BRAND_NAME } from "@/lib/brand";
 import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
+import { downloadRefIdCardPdf, formatCardValidThrough } from "@/lib/ref-id-card-pdf";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
@@ -113,6 +114,7 @@ function formatAvailabilityForCard(slots: AvailabilitySlot[]) {
 export default function RefereeDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const gamesRef = useRef<HTMLDivElement | null>(null);
   const marketplaceRef = useRef<HTMLElement | null>(null);
   const notificationsRef = useRef<HTMLElement | null>(null);
@@ -159,6 +161,17 @@ export default function RefereeDashboardClient() {
     message: string;
     items?: string[];
   } | null>(null);
+  const [applicationDecisionNotice, setApplicationDecisionNotice] = useState<{
+    type: "accepted" | "declined";
+    title: string;
+    message: string;
+  } | null>(null);
+  const [downloadingCard, setDownloadingCard] = useState(false);
+  const [assignorRecommendOpen, setAssignorRecommendOpen] = useState(false);
+  const [assignorName, setAssignorName] = useState("");
+  const [assignorEmail, setAssignorEmail] = useState("");
+  const [assignorPhone, setAssignorPhone] = useState("");
+  const [savingAssignorRec, setSavingAssignorRec] = useState(false);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [isAssignor, setIsAssignor] = useState(false);
   const [assignorSaving, setAssignorSaving] = useState(false);
@@ -292,13 +305,23 @@ export default function RefereeDashboardClient() {
       .order("created_at", { ascending: false });
     setApplications((apps as unknown as RefWorkApplication[]) || []);
 
-    const { data: bks } = await supabase
+    let { data: bks, error: bksError } = await supabase
       .from("bookings")
       .select(
-        "id, event_id, status, scheduled_events ( title, sport, starts_at, ends_at, city, state, zip_code )"
+        "id, event_id, status, scheduled_events ( title, sport, starts_at, ends_at, city, state, zip_code, venue_street, venue_unit, notes )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
+    if (bksError && (bksError.message.includes("venue_street") || bksError.message.includes("venue_unit"))) {
+      const fallback = await supabase
+        .from("bookings")
+        .select(
+          "id, event_id, status, scheduled_events ( title, sport, starts_at, ends_at, city, state, zip_code, notes )"
+        )
+        .eq("ref_member_id", user.id)
+        .order("created_at", { ascending: false });
+      bks = fallback.data as typeof bks;
+    }
     setBookings((bks as unknown as RefWorkBooking[]) || []);
 
     const { data: av } = await supabase
@@ -311,21 +334,37 @@ export default function RefereeDashboardClient() {
     const profileResult = await supabase
       .from("ref_profiles")
       .select(
-        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path, recommended_assignor_name, recommended_assignor_email, recommended_assignor_phone"
       )
       .eq("member_id", user.id)
       .maybeSingle();
-    let rp = profileResult.data;
+    let rp = profileResult.data as
+      | (NonNullable<typeof profileResult.data> & {
+          recommended_assignor_name?: string | null;
+          recommended_assignor_email?: string | null;
+          recommended_assignor_phone?: string | null;
+        })
+      | null;
     const rpErr = profileResult.error;
-    if (rpErr?.message.includes("rate_type")) {
+    if (rpErr?.message.includes("recommended_assignor") || rpErr?.message.includes("rate_type")) {
       const fallback = await supabase
         .from("ref_profiles")
         .select(
-          "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+          "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
         )
         .eq("member_id", user.id)
         .maybeSingle();
       rp = fallback.data as typeof rp;
+      if (fallback.error?.message.includes("rate_type")) {
+        const legacy = await supabase
+          .from("ref_profiles")
+          .select(
+            "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+          )
+          .eq("member_id", user.id)
+          .maybeSingle();
+        rp = legacy.data as typeof rp;
+      }
     }
     if (rp) {
       setRate(rp.rate_per_game != null ? String(rp.rate_per_game) : "");
@@ -337,6 +376,9 @@ export default function RefereeDashboardClient() {
       setIsAssignor(Boolean(rp.is_assignor));
       setCert(rp.certification_level || "Youth / Recreational");
       setBio(rp.bio || "");
+      setAssignorName(rp.recommended_assignor_name?.trim() || "");
+      setAssignorEmail(rp.recommended_assignor_email?.trim() || "");
+      setAssignorPhone(rp.recommended_assignor_phone?.trim() || "");
       setVerificationMethod(
         rp.verification_method === "external" ? "external" : "checkr"
       );
@@ -476,9 +518,10 @@ export default function RefereeDashboardClient() {
     if (refVerificationApproved(verificationStatus)) {
       setVerificationNotice({
         type: "approved",
+        title: "Download your GotREFS ID card",
         message:
           verificationAdminNotes ||
-          "Application Approved — you can now request to work games and browse the calendar below.",
+          "You're approved. Download your digital ID card to show organizers — it's valid for one year from today.",
       });
       return;
     }
@@ -501,6 +544,91 @@ export default function RefereeDashboardClient() {
     verificationAdminNotes,
     verificationFixRequiredSteps,
   ]);
+
+  useEffect(() => {
+    if (loading || !memberId || profileWizard || verificationNotice || applicationDecisionNotice) return;
+    const decided = applications.filter(
+      (app) => app.status === "accepted" || app.status === "declined"
+    );
+    if (decided.length === 0) return;
+    const storageKey = `gotrefs-ref-application-decision-seen:${memberId}`;
+    const seen = new Set((window.localStorage.getItem(storageKey) || "").split(",").filter(Boolean));
+    const next = decided.find((app) => !seen.has(app.id));
+    if (!next) return;
+    const ev = Array.isArray(next.scheduled_events) ? next.scheduled_events[0] : next.scheduled_events;
+    const title = ev?.title || "your game";
+    const when = ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : "";
+    const place = [ev?.city, ev?.state].filter(Boolean).join(", ") || ev?.zip_code || "";
+    if (next.status === "accepted") {
+      setApplicationDecisionNotice({
+        type: "accepted",
+        title: `Approved for ${title}`,
+        message: `You're approved${place ? ` in ${place}` : ""}${when ? ` · ${when}` : ""}. Open Trips → Upcoming for the full address and organizer info.`,
+      });
+    } else {
+      setApplicationDecisionNotice({
+        type: "declined",
+        title: `Not selected for ${title}`,
+        message: "This organizer didn't approve your request for that game. It won't show on your open games list anymore — keep browsing other games.",
+      });
+    }
+    seen.add(next.id);
+    window.localStorage.setItem(storageKey, Array.from(seen).slice(-40).join(","));
+  }, [
+    loading,
+    memberId,
+    profileWizard,
+    verificationNotice,
+    applicationDecisionNotice,
+    applications,
+  ]);
+
+  async function downloadIdCardPdf(): Promise<boolean> {
+    setDownloadingCard(true);
+    try {
+      const safeName = (displayName || "referee").replace(/[^\w\- ]+/g, "").trim() || "referee";
+      await downloadRefIdCardPdf(
+        {
+          fullName: displayName,
+          gotrefsId: cardMeta.gotrefsId,
+          primarySport: sport,
+          additionalSports,
+          certificationLevel: cert,
+          certifiedBy: cardMeta.certifiedBy,
+          rate: rateLabel(),
+          avatarUrl: avatarUrl ?? undefined,
+          avatarLabel,
+          baseCity: cardMeta.baseCity,
+          workRegions: cardMeta.workRegions,
+          travelRadius: cardMeta.travelRadius,
+          availabilitySummary,
+          govIdUploaded: Boolean(govIdPath),
+          certUploaded: Boolean(certDocPath),
+          backgroundStatus: screening?.status,
+          verificationStatus,
+          verificationSkipped: cardMeta.verificationSkipped,
+          profileComplete,
+          validThrough: refVerificationApproved(verificationStatus)
+            ? formatCardValidThrough(verificationReviewedAt)
+            : null,
+        },
+        `GotREFS-ID-${safeName.replace(/\s+/g, "-")}.pdf`
+      );
+      setMsg("ID card downloaded. Valid for one year from your approval date.");
+      return true;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Unknown error";
+      setMsg(`Could not create the PDF (${detail}). Try again, or screenshot your on-screen ID card.`);
+      return false;
+    } finally {
+      setDownloadingCard(false);
+    }
+  }
+
+  async function downloadIdCardAndGoToGames() {
+    await downloadIdCardPdf();
+    dismissVerificationNotice();
+  }
 
   function dismissVerificationNotice() {
     if (!memberId) {
@@ -528,6 +656,46 @@ export default function RefereeDashboardClient() {
       window.requestAnimationFrame(() => {
         gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+    }
+  }
+
+  async function saveAssignorRecommendation() {
+    if (!memberId) return;
+    const name = assignorName.trim();
+    const email = assignorEmail.trim();
+    const phone = assignorPhone.trim();
+    if (!name) {
+      setMsg("Enter the assignor's name.");
+      return;
+    }
+    if (!email && !phone) {
+      setMsg("Enter the assignor's email or phone number.");
+      return;
+    }
+    setSavingAssignorRec(true);
+    setMsg(null);
+    try {
+      const { error } = await supabase
+        .from("ref_profiles")
+        .update({
+          recommended_assignor_name: name,
+          recommended_assignor_email: email || null,
+          recommended_assignor_phone: phone || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("member_id", memberId);
+      if (error) {
+        setMsg(
+          error.message.includes("recommended_assignor")
+            ? "Run the latest database migration to enable assignor recommendations."
+            : error.message
+        );
+        return;
+      }
+      setAssignorRecommendOpen(false);
+      setMsg("Assignor recommendation saved. Thanks!");
+    } finally {
+      setSavingAssignorRec(false);
     }
   }
 
@@ -570,12 +738,19 @@ export default function RefereeDashboardClient() {
   async function uploadProfilePhoto(file: File) {
     if (!memberId) return;
     setMsg(null);
+    // Show the photo on the card immediately while upload finishes.
+    const localPreview = URL.createObjectURL(file);
+    setAvatarUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return localPreview;
+    });
     try {
-      const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
-      const path = `${memberId}/profile_photo_${Date.now()}.${ext}`;
+      const ext = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "jpg";
+      const safeExt = ext && ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+      const path = `${memberId}/profile_photo_${Date.now()}.${safeExt}`;
       const { error: upErr } = await supabase.storage
         .from("verification_documents")
-        .upload(path, file, { upsert: true });
+        .upload(path, file, { upsert: true, contentType: file.type || `image/${safeExt}` });
       if (upErr) {
         setMsg(upErr.message);
         return;
@@ -589,7 +764,12 @@ export default function RefereeDashboardClient() {
         return;
       }
       const signed = await resolveProfilePhotoUrl(supabase, path);
-      setAvatarUrl(signed);
+      if (signed) {
+        setAvatarUrl((prev) => {
+          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return signed;
+        });
+      }
       setMsg("Profile photo added to your GotREFS ID card.");
     } catch {
       setMsg("Could not upload your photo. Try again.");
@@ -860,6 +1040,47 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
+      {applicationDecisionNotice && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className={`w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ${
+              applicationDecisionNotice.type === "accepted"
+                ? "border border-green-200"
+                : "border border-neutral-200"
+            }`}
+          >
+            <p
+              className={`text-xs font-black uppercase tracking-[0.18em] ${
+                applicationDecisionNotice.type === "accepted" ? "text-green-700" : "text-neutral-500"
+              }`}
+            >
+              {applicationDecisionNotice.type === "accepted" ? "Game approved" : "Request update"}
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
+              {applicationDecisionNotice.title}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{applicationDecisionNotice.message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                const wasAccepted = applicationDecisionNotice.type === "accepted";
+                setApplicationDecisionNotice(null);
+                if (wasAccepted) {
+                  router.push("/dashboard/referee?panel=trips");
+                }
+              }}
+              className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
+                applicationDecisionNotice.type === "accepted" ? "bg-green-600" : "bg-[var(--navy)]"
+              }`}
+            >
+              {applicationDecisionNotice.type === "accepted" ? "View upcoming games" : "Got it"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {verificationNotice && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div
@@ -890,7 +1111,7 @@ export default function RefereeDashboardClient() {
             </p>
             <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
               {verificationNotice.type === "approved"
-                ? "You're approved to request games!"
+                ? verificationNotice.title || "Download your GotREFS ID card"
                 : verificationNotice.type === "fix_required"
                   ? verificationNotice.title || "Please fix and resubmit your application"
                   : "Verification not approved"}
@@ -901,6 +1122,15 @@ export default function RefereeDashboardClient() {
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
+            {verificationNotice.type === "approved" && (
+              <p className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-900">
+                Valid for 1 year from your approval date
+                {verificationReviewedAt
+                  ? ` · through ${formatCardValidThrough(verificationReviewedAt)}`
+                  : ""}
+                . Save the PDF to your phone to show organizers at games.
+              </p>
+            )}
             {verificationNotice.type === "fix_required" && verificationNotice.items && verificationNotice.items.length > 0 && (
               <ul className="mt-3 space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-[var(--navy)]">
                 {verificationNotice.items.map((item) => (
@@ -908,23 +1138,103 @@ export default function RefereeDashboardClient() {
                 ))}
               </ul>
             )}
-            <button
-              type="button"
-              onClick={dismissVerificationNotice}
-              className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
-                verificationNotice.type === "approved"
-                  ? "bg-green-600"
-                  : verificationNotice.type === "fix_required"
-                    ? "bg-amber-600"
-                    : "bg-[var(--red)]"
-              }`}
-            >
-              {verificationNotice.type === "approved"
-                ? "Go to calendar"
-                : verificationNotice.type === "fix_required"
+            {verificationNotice.type === "approved" ? (
+              <div className="mt-5 space-y-2">
+                <button
+                  type="button"
+                  disabled={downloadingCard}
+                  onClick={() => void downloadIdCardAndGoToGames()}
+                  className="w-full rounded-full bg-green-600 px-4 py-3 text-sm font-black text-white disabled:opacity-60"
+                >
+                  {downloadingCard ? "Preparing PDF…" : "Download your ref ID card"}
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissVerificationNotice}
+                  className="w-full rounded-full border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700"
+                >
+                  Skip for now — browse games
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={dismissVerificationNotice}
+                className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
+                  verificationNotice.type === "fix_required" ? "bg-amber-600" : "bg-[var(--red)]"
+                }`}
+              >
+                {verificationNotice.type === "fix_required"
                   ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
                   : "Got it"}
-            </button>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {assignorRecommendOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500">
+              Assignor referral
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
+              Recommended by an assignor?
+            </h2>
+            <p className="mt-2 text-sm text-neutral-600">
+              If an assignor introduced you to GotREFS, add their name and email or phone so we can credit them.
+            </p>
+            <label className="mt-4 block text-sm font-bold text-[var(--navy)]">
+              Assignor name
+              <input
+                value={assignorName}
+                onChange={(e) => setAssignorName(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                placeholder="Full name"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-bold text-[var(--navy)]">
+              Email <span className="font-medium text-neutral-500">(or phone below)</span>
+              <input
+                type="email"
+                value={assignorEmail}
+                onChange={(e) => setAssignorEmail(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                placeholder="assignor@example.com"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-bold text-[var(--navy)]">
+              Phone
+              <input
+                type="tel"
+                value={assignorPhone}
+                onChange={(e) => setAssignorPhone(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                placeholder="(555) 555-5555"
+              />
+            </label>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAssignorRecommendOpen(false)}
+                className="flex-1 rounded-full border border-neutral-300 px-4 py-3 text-sm font-semibold text-neutral-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingAssignorRec}
+                onClick={() => void saveAssignorRecommendation()}
+                className="flex-1 rounded-full bg-[var(--navy)] px-4 py-3 text-sm font-black text-white disabled:opacity-60"
+              >
+                {savingAssignorRec ? "Saving…" : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -968,6 +1278,27 @@ export default function RefereeDashboardClient() {
             />
           </div>
         </div>
+      )}
+
+      {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
+
+      {!profileWizard && (
+        <section ref={marketplaceRef}>
+          <RefMarketplaceHub
+            canApplyToEvents={canApplyToGames}
+            applicationPending={showPendingReviewView}
+            applicationRejected={verificationRejected}
+            onRequireProfile={() => {
+              if (showPendingReviewView) return;
+              const next = missingStatuses[0];
+              if (next) openProfileWizard(next.field);
+            }}
+            onReload={load}
+            offers={offers}
+            applications={applications}
+            bookings={bookings}
+          />
+        </section>
       )}
 
       {!profileWizard && !canAcceptOffers ? (
@@ -1036,52 +1367,64 @@ export default function RefereeDashboardClient() {
               </div>
             ) : null}
           </div>
-          <RefereeIdCard
-            fullName={displayName}
-            gotrefsId={cardMeta.gotrefsId}
-            primarySport={sport}
-            additionalSports={additionalSports}
-            certificationLevel={cert}
-            certifiedBy={cardMeta.certifiedBy}
-            rate={rateLabel()}
-            avatarUrl={avatarUrl ?? undefined}
-            avatarLabel={avatarLabel}
-            baseCity={cardMeta.baseCity}
-            workRegions={cardMeta.workRegions}
-            travelRadius={cardMeta.travelRadius}
-            availabilitySummary={availabilitySummary}
-            govIdUploaded={Boolean(govIdPath)}
-            certUploaded={Boolean(certDocPath)}
-            backgroundStatus={screening?.status}
-            verificationStatus={verificationStatus}
-            verificationSkipped={cardMeta.verificationSkipped}
-            profileComplete={profileComplete}
-            onEditField={(field) => openProfileWizard(field)}
-            onUploadPhoto={(file) => void uploadProfilePhoto(file)}
-          />
+          <div>
+            <RefereeIdCard
+              fullName={displayName}
+              gotrefsId={cardMeta.gotrefsId}
+              primarySport={sport}
+              additionalSports={additionalSports}
+              certificationLevel={cert}
+              certifiedBy={cardMeta.certifiedBy}
+              rate={rateLabel()}
+              avatarUrl={avatarUrl ?? undefined}
+              avatarLabel={avatarLabel}
+              baseCity={cardMeta.baseCity}
+              workRegions={cardMeta.workRegions}
+              travelRadius={cardMeta.travelRadius}
+              availabilitySummary={availabilitySummary}
+              govIdUploaded={Boolean(govIdPath)}
+              certUploaded={Boolean(certDocPath)}
+              backgroundStatus={screening?.status}
+              verificationStatus={verificationStatus}
+              verificationSkipped={cardMeta.verificationSkipped}
+              profileComplete={profileComplete}
+              validThrough={
+                refVerificationApproved(verificationStatus)
+                  ? formatCardValidThrough(verificationReviewedAt)
+                  : null
+              }
+              onEditField={(field) => openProfileWizard(field)}
+              onUploadPhoto={(file) => void uploadProfilePhoto(file)}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {refVerificationApproved(verificationStatus) && (
+              <button
+                type="button"
+                disabled={downloadingCard}
+                onClick={() => void downloadIdCardPdf()}
+                className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-60"
+              >
+                {downloadingCard ? "Preparing PDF…" : "Download ID card PDF"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setAssignorRecommendOpen(true)}
+              className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              {assignorName ? "Edit assignor recommendation" : "Recommended by assignor?"}
+            </button>
+          </div>
+          {assignorName ? (
+            <p className="mt-2 text-xs text-neutral-500">
+              Recommended by {assignorName}
+              {assignorEmail ? ` · ${assignorEmail}` : ""}
+              {assignorPhone ? ` · ${assignorPhone}` : ""}
+            </p>
+          ) : null}
         </div>
       ) : null}
-
-      {msg && <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--navy)] shadow-sm">{msg}</p>}
-
-      {!profileWizard && (
-        <section ref={marketplaceRef}>
-          <RefMarketplaceHub
-            canApplyToEvents={canApplyToGames}
-            applicationPending={showPendingReviewView}
-            applicationRejected={verificationRejected}
-            onRequireProfile={() => {
-              if (showPendingReviewView) return;
-              const next = missingActions[0];
-              if (next) openProfileWizard(next.field);
-            }}
-            onReload={load}
-            offers={offers}
-            applications={applications}
-            bookings={bookings}
-          />
-        </section>
-      )}
 
       <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">

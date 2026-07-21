@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
+import { GamePinPreviewDrawer } from "@/components/marketplace/GamePinPreviewDrawer";
 import { isGoogleMapsConfigured } from "@/lib/maps/google-maps-loader";
 
 const GoogleMarketplaceMap = dynamic(
@@ -26,6 +27,8 @@ export function MarketplaceMapView({
   pins,
   selectedId,
   center,
+  requestedIds,
+  requestingId,
   onSelect,
   onRequest,
   className,
@@ -33,29 +36,47 @@ export function MarketplaceMapView({
   pins: MapGamePin[];
   selectedId?: string | null;
   center?: { lat: number; lng: number } | null;
-  onSelect?: (id: string) => void;
+  requestedIds?: Set<string>;
+  requestingId?: string | null;
+  onSelect?: (id: string | null) => void;
   onRequest?: (event: OpenEventRecord) => void;
   className?: string;
 }) {
-  if (isGoogleMapsConfigured()) {
-    return (
-      <GoogleMarketplaceMap
-        pins={pins}
-        selectedId={selectedId}
-        center={center}
-        onSelect={onSelect}
-        onRequest={onRequest}
-        className={className}
-      />
-    );
-  }
+  const selectedPin = selectedId ? pins.find((pin) => pin.id === selectedId) ?? null : null;
+  const alreadyRequested = Boolean(
+    selectedPin && (selectedPin.already_requested || requestedIds?.has(selectedPin.id))
+  );
+  const handleSelect = (id: string) => onSelect?.(id);
+
   return (
-    <MarketplaceMapInner
-      pins={pins}
-      selectedId={selectedId}
-      onSelect={onSelect}
-      onRequest={onRequest}
-      className={className}
-    />
+    <div className={`relative ${className ?? "h-[min(70vh,640px)] w-full"}`}>
+      {isGoogleMapsConfigured() ? (
+        <GoogleMarketplaceMap
+          pins={pins}
+          selectedId={selectedId}
+          center={center}
+          requestedIds={requestedIds}
+          onSelect={handleSelect}
+          onRequest={onRequest}
+          className="h-full w-full rounded-2xl"
+        />
+      ) : (
+        <MarketplaceMapInner
+          pins={pins}
+          selectedId={selectedId}
+          requestedIds={requestedIds}
+          onSelect={handleSelect}
+          onRequest={onRequest}
+          className="h-full w-full rounded-2xl"
+        />
+      )}
+      <GamePinPreviewDrawer
+        event={selectedPin}
+        alreadyRequested={alreadyRequested}
+        requesting={Boolean(selectedPin && requestingId === selectedPin.id)}
+        onClose={() => onSelect?.(null)}
+        onApply={(event) => onRequest?.(event)}
+      />
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   type OpenEventRecord,
   type RefProfileForMatch,
 } from "@/lib/marketplace/event-filters";
+import { publicMapCoordsFromVenue } from "@/lib/maps/event-map-coords";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -15,6 +16,11 @@ function isMissingPayRangeColumn(error: { message?: string } | null | undefined)
 
 function isMissingBoostsColumn(error: { message?: string } | null | undefined) {
   return (error?.message ?? "").includes("boosts");
+}
+
+function isMissingVenueCoordsColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return message.includes("venue_lat") || message.includes("venue_lng");
 }
 
 export async function GET(request: NextRequest) {
@@ -45,6 +51,8 @@ export async function GET(request: NextRequest) {
   const baseColumns =
     "id, title, sport, starts_at, ends_at, city, state, zip_code, officials_needed, pay_offer, notes, organizer_member_id";
   const selectCandidates = [
+    `${baseColumns}, pay_type, pay_min, pay_max, boosts, venue_lat, venue_lng`,
+    `${baseColumns}, pay_type, pay_min, pay_max, venue_lat, venue_lng`,
     `${baseColumns}, pay_type, pay_min, pay_max, boosts`,
     `${baseColumns}, pay_type, pay_min, pay_max`,
     baseColumns,
@@ -67,7 +75,13 @@ export async function GET(request: NextRequest) {
     events = result.data as Record<string, unknown>[] | null;
     eventsErr = result.error;
     if (!eventsErr) break;
-    if (!isMissingBoostsColumn(eventsErr) && !isMissingPayRangeColumn(eventsErr)) break;
+    if (
+      !isMissingBoostsColumn(eventsErr) &&
+      !isMissingPayRangeColumn(eventsErr) &&
+      !isMissingVenueCoordsColumn(eventsErr)
+    ) {
+      break;
+    }
   }
 
   if (eventsErr) {
@@ -77,6 +91,8 @@ export async function GET(request: NextRequest) {
   const eventRows = (events ?? []) as unknown as (OpenEventRecord & {
     organizer_member_id?: string;
     boosts?: string[] | null;
+    venue_lat?: number | null;
+    venue_lng?: number | null;
   })[];
   const eventIds = eventRows.map((event) => event.id);
   const bookingCounts = new Map<string, number>();
@@ -136,20 +152,43 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  const enriched: OpenEventRecord[] = eventRows.map((event) => ({
-    ...event,
-    booked_count: bookingCounts.get(event.id) ?? 0,
-    active_boosts: computeAppliedBoosts({
-      eventBoosts: event.boosts,
-      eventStartsAt: event.starts_at,
-      organizerAcceptedCount: event.organizer_member_id
-        ? organizerAcceptedCounts.get(event.organizer_member_id) ?? 0
-        : 0,
-      refAcceptedWithOrganizerCount: event.organizer_member_id
-        ? refAcceptedWithOrganizerCounts.get(event.organizer_member_id) ?? 0
-        : 0,
-    }),
-  }));
+  const { data: myRequests } = await admin
+    .from("event_signup_requests")
+    .select("event_id, status")
+    .eq("ref_member_id", user.id);
+  const hideEventIds = new Set<string>();
+  const pendingEventIds = new Set<string>();
+  for (const row of myRequests ?? []) {
+    if (row.status === "declined" || row.status === "accepted" || row.status === "withdrawn") {
+      hideEventIds.add(row.event_id);
+    } else if (row.status === "pending") {
+      pendingEventIds.add(row.event_id);
+    }
+  }
+
+  const enriched: OpenEventRecord[] = eventRows
+    .filter((event) => !hideEventIds.has(event.id))
+    .map((event) => {
+      const mapCoords = publicMapCoordsFromVenue(event.id, event.venue_lat, event.venue_lng);
+      const { venue_lat: _lat, venue_lng: _lng, ...publicEvent } = event;
+      return {
+        ...publicEvent,
+        map_lat: mapCoords?.lat ?? null,
+        map_lng: mapCoords?.lng ?? null,
+        booked_count: bookingCounts.get(event.id) ?? 0,
+        already_requested: pendingEventIds.has(event.id),
+        active_boosts: computeAppliedBoosts({
+          eventBoosts: event.boosts,
+          eventStartsAt: event.starts_at,
+          organizerAcceptedCount: event.organizer_member_id
+            ? organizerAcceptedCounts.get(event.organizer_member_id) ?? 0
+            : 0,
+          refAcceptedWithOrganizerCount: event.organizer_member_id
+            ? refAcceptedWithOrganizerCounts.get(event.organizer_member_id) ?? 0
+            : 0,
+        }),
+      };
+    });
 
   const filtered = filterOpenEvents(enriched, {
     sport,

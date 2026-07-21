@@ -39,7 +39,8 @@ export function RefMarketplaceHub({
   const [findView, setFindView] = useState<FindView>("map");
 
   useEffect(() => {
-    if (searchParams.get("panel") === "offers" || searchParams.get("tab") === "my-work") {
+    const panel = searchParams.get("panel");
+    if (panel === "offers" || panel === "trips" || searchParams.get("tab") === "my-work") {
       setTab("my-work");
     }
   }, [searchParams]);
@@ -78,39 +79,35 @@ export function RefMarketplaceHub({
 
         {tab === "find-games" && (
           <div className="flex items-center gap-2">
-            <span className="hidden text-xs font-medium text-neutral-500 sm:inline">View</span>
-            <div className="flex rounded-full border border-neutral-300 bg-white p-0.5 text-sm font-semibold shadow-sm">
-              {(
-                [
-                  { id: "list", label: "List" },
-                  { id: "map", label: "Map" },
-                  { id: "calendar", label: "Calendar" },
-                ] as const
-              ).map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => setFindView(mode.id)}
-                  className={`rounded-full px-3.5 py-1.5 transition ${
-                    findView === mode.id
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:text-neutral-900"
-                  }`}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
+            {(
+              [
+                { id: "list", label: "List" },
+                { id: "map", label: "Map" },
+                { id: "calendar", label: "Calendar" },
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setFindView(mode.id)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  findView === mode.id
+                    ? "bg-neutral-900 text-white"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
       {tab === "find-games" && (
-        <div className="space-y-6">
+        <div>
           {findView === "calendar" ? (
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <RefEventCalendar
-                embedded
                 canApplyToEvents={canApplyToEvents}
                 applicationPending={applicationPending}
                 applicationRejected={applicationRejected}
@@ -133,12 +130,14 @@ export function RefMarketplaceHub({
       )}
 
       {tab === "my-work" && (
-        <RefMyWorkPanel
-          offers={offers}
-          applications={applications}
-          bookings={bookings}
-          onReload={onReload}
-        />
+        <div data-ref-trips>
+          <RefMyWorkPanel
+            offers={offers}
+            applications={applications}
+            bookings={bookings}
+            onReload={onReload}
+          />
+        </div>
       )}
     </div>
   );

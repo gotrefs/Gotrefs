@@ -87,28 +87,63 @@ export async function PATCH(
     eventBoosts: (event as { boosts?: string[] } | null)?.boosts ?? [],
   });
 
-  let { error: offerError } = await admin.from("assignment_offers").insert({
+  // Booking is created by DB trigger on offer status change → accepted (UPDATE only).
+  await admin
+    .from("screening_checks")
+    .upsert(
+      {
+        ref_member_id: row.ref_member_id,
+        status: "clear",
+        summary: "Eligible via organizer-approved game request",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "ref_member_id" }
+    );
+
+  const offerPayload = {
     event_id: row.event_id,
     ref_member_id: row.ref_member_id,
     offered_pay: boostedOfferPay(basePay, boost.percent),
     base_pay: basePay,
     boost_percent: boost.percent,
-    message: "Your application was accepted — please confirm this assignment.",
-    status: "pending",
-  });
+    message: "Organizer approved your request — see Upcoming games for the full address.",
+    status: "pending" as const,
+  };
+
+  let { data: offerRow, error: offerError } = await admin
+    .from("assignment_offers")
+    .upsert(offerPayload, { onConflict: "event_id,ref_member_id" })
+    .select("id, status")
+    .maybeSingle();
+
   if (offerError && /boost_percent|base_pay/.test(offerError.message ?? "")) {
-    const retry = await admin.from("assignment_offers").insert({
-      event_id: row.event_id,
-      ref_member_id: row.ref_member_id,
-      offered_pay: boostedOfferPay(basePay, boost.percent),
-      message: "Your application was accepted — please confirm this assignment.",
-      status: "pending",
-    });
+    const { base_pay: _b, boost_percent: _p, ...withoutBoost } = offerPayload;
+    const retry = await admin
+      .from("assignment_offers")
+      .upsert(withoutBoost, { onConflict: "event_id,ref_member_id" })
+      .select("id, status")
+      .maybeSingle();
+    offerRow = retry.data;
     offerError = retry.error;
   }
 
-  if (offerError && !/duplicate|unique/i.test(offerError.message)) {
+  if (offerError) {
     return NextResponse.json({ error: offerError.message }, { status: 400 });
+  }
+
+  const offerId = offerRow?.id;
+  if (!offerId) {
+    return NextResponse.json({ error: "Could not create assignment for this request." }, { status: 400 });
+  }
+
+  if (offerRow?.status !== "accepted") {
+    const { error: acceptOfferError } = await admin
+      .from("assignment_offers")
+      .update({ status: "accepted" })
+      .eq("id", offerId);
+    if (acceptOfferError) {
+      return NextResponse.json({ error: acceptOfferError.message }, { status: 400 });
+    }
   }
 
   const { error: acceptError } = await admin

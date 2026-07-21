@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
   const { data: event, error: eventError } = await admin
     .from("scheduled_events")
-    .select("id, title, status")
+    .select("id, title, status, city, state, zip_code, starts_at")
     .eq("id", body.eventId)
     .single();
 
@@ -82,15 +82,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This event is not available for applications." }, { status: 404 });
   }
 
-  const { error } = await admin.from("event_signup_requests").upsert(
-    {
-      event_id: event.id,
-      ref_member_id: user.id,
-      status: "pending",
-      message: "Ref applied from the open games calendar",
-    },
-    { onConflict: "event_id,ref_member_id" }
-  );
+  const { data: existing } = await admin
+    .from("event_signup_requests")
+    .select("id, status")
+    .eq("event_id", event.id)
+    .eq("ref_member_id", user.id)
+    .maybeSingle();
+
+  if (existing?.status === "pending") {
+    return NextResponse.json({
+      ok: true,
+      eventTitle: event.title,
+      applicationId: existing.id,
+      alreadyRequested: true,
+    });
+  }
+
+  if (existing?.status === "accepted") {
+    return NextResponse.json(
+      { error: "You're already approved for this game — check Trips → Upcoming." },
+      { status: 400 }
+    );
+  }
+
+  if (existing?.status === "declined" || existing?.status === "withdrawn") {
+    return NextResponse.json(
+      { error: "This game is no longer available for you to request." },
+      { status: 400 }
+    );
+  }
+
+  const { data: upserted, error } = await admin
+    .from("event_signup_requests")
+    .upsert(
+      {
+        event_id: event.id,
+        ref_member_id: user.id,
+        status: "pending",
+        message: "Ref applied from the open games calendar",
+      },
+      { onConflict: "event_id,ref_member_id" }
+    )
+    .select("id")
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -101,9 +135,14 @@ export async function POST(request: Request) {
       admin,
       eventId: event.id,
       refMemberId: user.id,
+      applicationId: upserted?.id,
       siteUrl: emailSiteUrl(request.url),
     })
   );
 
-  return NextResponse.json({ ok: true, eventTitle: event.title });
+  return NextResponse.json({
+    ok: true,
+    eventTitle: event.title,
+    applicationId: upserted?.id ?? null,
+  });
 }

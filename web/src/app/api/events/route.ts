@@ -11,6 +11,10 @@ type EventBody = {
   ends_at?: string;
   city?: string | null;
   state?: string | null;
+  venue_street?: string | null;
+  venue_unit?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
   zip_code?: string;
   officials_needed?: number;
   pay_offer?: number | null;
@@ -61,6 +65,18 @@ async function insertEventRow(client: InsertClient, row: Record<string, unknown>
       delete attempt.pay_min;
       delete attempt.pay_max;
       stripped = true;
+    } else if (
+      (error.message ?? "").includes("venue_street") ||
+      (error.message ?? "").includes("venue_unit") ||
+      (error.message ?? "").includes("venue_lat") ||
+      (error.message ?? "").includes("venue_lng")
+    ) {
+      attempt = { ...attempt };
+      delete attempt.venue_street;
+      delete attempt.venue_unit;
+      delete attempt.venue_lat;
+      delete attempt.venue_lng;
+      stripped = true;
     }
     if (!stripped) return { data, error };
   }
@@ -102,6 +118,12 @@ export async function POST(request: Request) {
   const payMaxRaw = body.pay_max;
   const payMinNum = payMinRaw == null || payMinRaw === ("" as unknown as number) ? null : Number(payMinRaw);
   const payMaxNum = payMaxRaw == null || payMaxRaw === ("" as unknown as number) ? null : Number(payMaxRaw);
+  const venueLatRaw = body.venue_lat;
+  const venueLngRaw = body.venue_lng;
+  const venueLat =
+    venueLatRaw == null || venueLatRaw === ("" as unknown as number) ? null : Number(venueLatRaw);
+  const venueLng =
+    venueLngRaw == null || venueLngRaw === ("" as unknown as number) ? null : Number(venueLngRaw);
 
   const row = {
     organizer_member_id: user.id,
@@ -111,6 +133,10 @@ export async function POST(request: Request) {
     ends_at: times.ends_at,
     city: body.city?.trim() || null,
     state: body.state?.trim() || null,
+    venue_street: body.venue_street?.trim() || null,
+    venue_unit: body.venue_unit?.trim() || null,
+    venue_lat: venueLat != null && Number.isFinite(venueLat) ? venueLat : null,
+    venue_lng: venueLng != null && Number.isFinite(venueLng) ? venueLng : null,
     zip_code: zip,
     officials_needed: needed,
     pay_offer: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : payOffer,

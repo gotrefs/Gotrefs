@@ -23,18 +23,46 @@ async function emailForMemberId(
 async function eventSummary(
   admin: SupabaseClient,
   eventId: string
-): Promise<{ title: string; sport: string; startsAt: string; organizerName: string } | null> {
-  const { data: event } = await admin
+): Promise<{
+  title: string;
+  sport: string;
+  startsAt: string;
+  place: string;
+  address: string;
+  notes: string;
+  organizerName: string;
+} | null> {
+  let { data: event, error } = await admin
     .from("scheduled_events")
-    .select("title, sport, starts_at, organizer_member_id")
+    .select(
+      "title, sport, starts_at, city, state, zip_code, venue_street, venue_unit, notes, organizer_member_id"
+    )
     .eq("id", eventId)
     .maybeSingle();
+  if (error && (error.message.includes("venue_street") || error.message.includes("venue_unit"))) {
+    const fallback = await admin
+      .from("scheduled_events")
+      .select("title, sport, starts_at, city, state, zip_code, notes, organizer_member_id")
+      .eq("id", eventId)
+      .maybeSingle();
+    event = fallback.data as typeof event;
+  }
   if (!event) return null;
   const { data: org } = await admin
     .from("members")
     .select("display_name")
     .eq("id", event.organizer_member_id)
     .maybeSingle();
+  const place = [event.city, event.state].filter(Boolean).join(", ") || event.zip_code || "TBD";
+  const street = [
+    (event as { venue_street?: string | null }).venue_street,
+    (event as { venue_unit?: string | null }).venue_unit,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const address = [street, place, event.zip_code && street ? event.zip_code : null]
+    .filter(Boolean)
+    .join(", ");
   return {
     title: event.title || "Event",
     sport: event.sport || "Sport",
@@ -44,12 +72,51 @@ async function eventSummary(
           timeStyle: "short",
         })
       : "TBD",
+    place,
+    address: address || place,
+    notes: sanitizeOrganizerNotesForRef(event.notes),
     organizerName: org?.display_name?.trim() || "an organizer",
   };
 }
 
+/** Strip email/phone from organizer notes shown to confirmed refs. */
+function sanitizeOrganizerNotesForRef(notes: string | null | undefined): string {
+  if (!notes?.trim()) return "";
+  return notes
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      if (/^contact:/i.test(part)) return "";
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(part)) return "";
+      if (/^(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}$/.test(part.replace(/\s/g, ""))) return "";
+      return part
+        .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "")
+        .replace(/(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[\s,;:·-]+|[\s,;:·-]+$/g, "")
+        .trim();
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function dashboardUrl(siteUrl: string, path: "/dashboard/referee" | "/dashboard/organizer") {
   return `${siteUrl.replace(/\/$/, "")}${path}`;
+}
+
+async function gotrefsIdForMember(admin: SupabaseClient, memberId: string): Promise<string> {
+  const { data: profile } = await admin
+    .from("ref_profiles")
+    .select("gotrefs_id")
+    .eq("member_id", memberId)
+    .maybeSingle();
+  if (profile?.gotrefs_id?.trim()) return profile.gotrefs_id.trim();
+  const { data: authUser } = await admin.auth.admin.getUserById(memberId);
+  if (typeof authUser?.user?.user_metadata?.gotrefs_id === "string") {
+    return authUser.user.user_metadata.gotrefs_id;
+  }
+  return `GR-${memberId.slice(0, 8).toUpperCase()}`;
 }
 
 /** Fire-and-forget wrapper so API routes never block on email. */
@@ -89,14 +156,15 @@ export async function notifyOfferInvite(opts: {
       title: "An organizer wants you to ref",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
-        <p><strong>${escapeHtml(event.organizerName)}</strong> invited you to officiate:</p>
+        <p>An event organizer invited you to officiate:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
+          <li>${escapeHtml(event.place)}</li>
           <li>Offered pay: ${escapeHtml(pay)}</li>
         </ul>
         ${note}
-        <p>Open your dashboard to accept or decline this offer.</p>
+        <p>Open your dashboard to accept or decline. Names, emails, and phone numbers are never shared.</p>
       `,
       ctaLabel: "Open referee dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
@@ -119,37 +187,41 @@ export async function notifyApplicationDecision(opts: {
   if (!ref || !event) return false;
 
   if (opts.accepted) {
+    const notesBlock = event.notes
+      ? `<p><strong>Notes:</strong> ${escapeHtml(event.notes)}</p>`
+      : "";
     return sendEmail({
       to: ref.email,
-      subject: `${BRAND_NAME}: Your application was accepted — ${event.title}`,
+      subject: `${BRAND_NAME}: You've been confirmed for ${event.title}`,
       html: emailLayout({
-        title: "You've been accepted",
+        title: "You're confirmed",
         bodyHtml: `
           <p>Hi ${escapeHtml(ref.displayName)},</p>
-          <p>Good news — <strong>${escapeHtml(event.organizerName)}</strong> accepted your request to ref:</p>
+          <p>You've been confirmed for <strong>${escapeHtml(event.title)}</strong>.</p>
           <ul>
-            <li><strong>${escapeHtml(event.title)}</strong></li>
-            <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
+            <li><strong>When:</strong> ${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
+            <li><strong>Address:</strong> ${escapeHtml(event.address)}</li>
           </ul>
-          <p>Confirm the assignment in your dashboard when you’re ready.</p>
+          ${notesBlock}
+          <p>These details are also saved under Upcoming games in your dashboard. Organizer names, emails, and phone numbers are never shared.</p>
         `,
-        ctaLabel: "Open referee dashboard",
-        ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
+        ctaLabel: "View upcoming games",
+        ctaUrl: `${dashboardUrl(siteUrl, "/dashboard/referee")}?panel=trips`,
       }),
     });
   }
 
   return sendEmail({
     to: ref.email,
-    subject: `${BRAND_NAME}: Application update — ${event.title}`,
+    subject: `${BRAND_NAME}: Update on ${event.title}`,
     html: emailLayout({
-      title: "Application not selected",
+      title: "Not this time",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
-        <p>Your request to officiate <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}) was not accepted this time.</p>
-        <p>Keep browsing open games — new opportunities are posted every day.</p>
+        <p>No worries — you weren’t selected for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.place)} · ${escapeHtml(event.startsAt)}) this time.</p>
+        <p>You can check out more events on your dashboard and keep requesting games that fit your schedule.</p>
       `,
-      ctaLabel: "Find games now",
+      ctaLabel: "See upcoming event games",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
@@ -164,24 +236,23 @@ export async function notifyOfferResponseToOrganizer(opts: {
   siteUrl?: string;
 }) {
   const siteUrl = opts.siteUrl || emailSiteUrl();
-  const [org, ref, event] = await Promise.all([
+  const [org, event, refId] = await Promise.all([
     emailForMemberId(opts.admin, opts.organizerMemberId),
-    emailForMemberId(opts.admin, opts.refMemberId),
     eventSummary(opts.admin, opts.eventId),
+    gotrefsIdForMember(opts.admin, opts.refMemberId),
   ]);
   if (!org || !event) return false;
-  const refName = ref?.displayName || "A referee";
 
   return sendEmail({
     to: org.email,
     subject: opts.accepted
-      ? `${BRAND_NAME}: ${refName} accepted your offer`
-      : `${BRAND_NAME}: ${refName} declined your offer`,
+      ? `${BRAND_NAME}: Ref ${refId} accepted your offer`
+      : `${BRAND_NAME}: Ref ${refId} declined your offer`,
     html: emailLayout({
       title: opts.accepted ? "Offer accepted" : "Offer declined",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
-        <p><strong>${escapeHtml(refName)}</strong> ${opts.accepted ? "accepted" : "declined"} your offer for:</p>
+        <p><strong>Ref ${escapeHtml(refId)}</strong> ${opts.accepted ? "accepted" : "declined"} your offer for:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
@@ -227,6 +298,7 @@ export async function notifyOrganizerNewApplication(opts: {
   admin: SupabaseClient;
   eventId: string;
   refMemberId: string;
+  applicationId?: string | null;
   siteUrl?: string;
 }) {
   const siteUrl = opts.siteUrl || emailSiteUrl();
@@ -240,29 +312,34 @@ export async function notifyOrganizerNewApplication(opts: {
     .maybeSingle();
   if (!scheduled?.organizer_member_id) return false;
 
-  const [org, ref] = await Promise.all([
+  const [org] = await Promise.all([
     emailForMemberId(opts.admin, scheduled.organizer_member_id),
-    emailForMemberId(opts.admin, opts.refMemberId),
   ]);
   if (!org) return false;
-  const refName = ref?.displayName || "A referee";
+
+  const gotrefsId = await gotrefsIdForMember(opts.admin, opts.refMemberId);
+
+  const reviewUrl = opts.applicationId
+    ? `${dashboardUrl(siteUrl, "/dashboard/organizer")}?request=${encodeURIComponent(opts.applicationId)}`
+    : `${dashboardUrl(siteUrl, "/dashboard/organizer")}?panel=requests`;
 
   return sendEmail({
     to: org.email,
-    subject: `${BRAND_NAME}: New ref request — ${event.title}`,
+    subject: `Ref Requested For ${event.title} (${event.place} · ${event.startsAt})`,
     html: emailLayout({
-      title: "A referee wants this game",
+      title: "Ref requested for your event",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
-        <p><strong>${escapeHtml(refName)}</strong> requested to officiate:</p>
+        <p><strong>Ref ${escapeHtml(gotrefsId)}</strong> requested to officiate:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
+          <li>${escapeHtml(event.place)}</li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>Review applicants in your organizer dashboard to accept or decline.</p>
+        <p>Review their GotREFS ID card, ratings, and price — then approve or deny. Names, emails, and phone numbers are never shared.</p>
       `,
-      ctaLabel: "Review applicants",
-      ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer"),
+      ctaLabel: "Review this request",
+      ctaUrl: reviewUrl,
     }),
   });
 }

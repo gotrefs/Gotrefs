@@ -18,6 +18,10 @@ import {
   type OrganizerWizardDraft,
   type PayoutMethodPayload,
 } from "@/components/organizer/OrganizerListingWizard";
+import {
+  ApplicantReviewModal,
+  type ApplicantReviewData,
+} from "@/components/organizer/ApplicantReviewModal";
 import { LeaveReviewModal } from "@/components/reviews/LeaveReviewModal";
 import { SportsFields } from "@/components/SportsFields";
 import { formatEventLocation, formatPayOffer } from "@/data/sports";
@@ -209,7 +213,15 @@ type ApplicantRow = {
   refMemberId: string;
   createdAt: string;
   gotrefsId: string;
+  displayName?: string | null;
+  primarySport?: string | null;
+  additionalSports?: string[];
+  certificationLevel?: string | null;
+  avatarPath?: string | null;
+  avatarUrl?: string | null;
   eventTitle: string;
+  eventPlace?: string | null;
+  eventWhen?: string | null;
   eventPayLabel: string | null;
   refRateLabel: string | null;
   ratingAverage: number | null;
@@ -371,6 +383,7 @@ export default function OrganizerDashboardClient() {
   const [refs, setRefs] = useState<DirectoryRef[]>([]);
   const [canContactRefs, setCanContactRefs] = useState(true);
   const [signupRequests, setSignupRequests] = useState<ApplicantRow[]>([]);
+  const [reviewApplicant, setReviewApplicant] = useState<ApplicantReviewData | null>(null);
   const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
   const [submittedRatings, setSubmittedRatings] = useState<RefRatingRow[]>([]);
   const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
@@ -378,6 +391,7 @@ export default function OrganizerDashboardClient() {
   const [ratingCutoffIso, setRatingCutoffIso] = useState("");
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
+  const [offerSending, setOfferSending] = useState(false);
   const [inviteRef, setInviteRef] = useState<DirectoryRef | null>(null);
   const [contactRefId, setContactRefId] = useState<string | null>(null);
   const [contactSubject] = useState("Availability inquiry");
@@ -483,7 +497,16 @@ export default function OrganizerDashboardClient() {
 
     const applicantsRes = await fetch("/api/organizer/applicants");
     const applicantsJson = (await applicantsRes.json()) as { applicants?: ApplicantRow[] };
-    setSignupRequests(applicantsJson.applicants ?? []);
+    const applicants = applicantsJson.applicants ?? [];
+    const withAvatars = await Promise.all(
+      applicants.map(async (row) => ({
+        ...row,
+        avatarUrl: row.avatarPath
+          ? await resolveProfilePhotoUrl(supabase, row.avatarPath)
+          : null,
+      }))
+    );
+    setSignupRequests(withAvatars);
 
     let { data: offers, error: offersError } = await supabase
       .from("assignment_offers")
@@ -560,6 +583,77 @@ export default function OrganizerDashboardClient() {
       if (panel === "marketplace") marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [loading, searchParams]);
+
+  useEffect(() => {
+    if (loading || signupRequests.length === 0 || reviewApplicant) return;
+    const requestId = searchParams.get("request");
+    if (requestId) {
+      const match = signupRequests.find((row) => row.id === requestId);
+      if (match) {
+        setReviewApplicant({
+          id: match.id,
+          eventId: match.eventId,
+          refMemberId: match.refMemberId,
+          gotrefsId: match.gotrefsId,
+          displayName: null,
+          primarySport: match.primarySport,
+          additionalSports: match.additionalSports,
+          certificationLevel: match.certificationLevel,
+          avatarUrl: match.avatarUrl,
+          eventTitle: match.eventTitle,
+          eventPlace: match.eventPlace,
+          eventWhen: match.eventWhen,
+          eventPayLabel: match.eventPayLabel,
+          refRateLabel: match.refRateLabel,
+          ratingAverage: match.ratingAverage,
+          ratingCount: match.ratingCount,
+          reviews: match.reviews,
+        });
+        return;
+      }
+    }
+    const seenKey = `gotrefs-org-request-popup-seen:${accountEmail || "org"}`;
+    const seen = window.localStorage.getItem(seenKey) || "";
+    const next = signupRequests.find((row) => !seen.split(",").includes(row.id));
+    if (next) {
+      setReviewApplicant({
+        id: next.id,
+        eventId: next.eventId,
+        refMemberId: next.refMemberId,
+        gotrefsId: next.gotrefsId,
+        displayName: null,
+        primarySport: next.primarySport,
+        additionalSports: next.additionalSports,
+        certificationLevel: next.certificationLevel,
+        avatarUrl: next.avatarUrl,
+        eventTitle: next.eventTitle,
+        eventPlace: next.eventPlace,
+        eventWhen: next.eventWhen,
+        eventPayLabel: next.eventPayLabel,
+        refRateLabel: next.refRateLabel,
+        ratingAverage: next.ratingAverage,
+        ratingCount: next.ratingCount,
+        reviews: next.reviews,
+      });
+      window.localStorage.setItem(seenKey, `${seen},${next.id}`.replace(/^,/, "").slice(-800));
+    }
+  }, [loading, signupRequests, searchParams, accountEmail, reviewApplicant]);
+
+  async function decideApplicant(applicantId: string, action: "accept" | "decline") {
+    const res = await fetch(`/api/organizer/applicants/${applicantId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const j = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      setMsg(j.error || `Could not ${action} this application.`);
+      return false;
+    }
+    setMsg(action === "accept" ? "Ref approved for this game." : "Request denied.");
+    await load();
+    return true;
+  }
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
@@ -984,9 +1078,7 @@ export default function OrganizerDashboardClient() {
       const levelLabel = gameLevelLabel(draft.gameLevel);
       if (levelLabel) contactParts.push(`Level: ${levelLabel}`);
       if (draft.clubName.trim()) contactParts.push(`Club: ${draft.clubName.trim()}`);
-      if (draft.contactName.trim()) contactParts.push(`Contact: ${draft.contactName.trim()}`);
-      if (draft.contactEmail.trim()) contactParts.push(draft.contactEmail.trim());
-      if (draft.contactPhone.trim()) contactParts.push(draft.contactPhone.trim());
+      // No personal names, emails, or phones on ref-facing event notes.
       if (draft.refInstructions.trim()) contactParts.push(`Notes for refs: ${draft.refInstructions.trim()}`);
       const res = await fetch("/api/events", {
         method: "POST",
@@ -999,6 +1091,10 @@ export default function OrganizerDashboardClient() {
           city: draft.city.trim() || null,
           state: draft.state.trim() || null,
           zip_code: zipVal,
+          venue_street: draft.street.trim() || null,
+          venue_unit: draft.unit.trim() || null,
+          venue_lat: draft.lat,
+          venue_lng: draft.lng,
           officials_needed: draft.officialsNeeded,
           pay_offer:
             draft.rateType === "range" && Number.isFinite(minNum as number)
@@ -1116,59 +1212,52 @@ export default function OrganizerDashboardClient() {
   }
 
   async function sendOfferFromRequest(applicant: ApplicantRow) {
-    const res = await fetch(`/api/organizer/applicants/${applicant.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "accept" }),
-    });
-    const j = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setMsg(j.error || "Could not accept this application.");
-      return;
-    }
-    setMsg("Invite sent — waiting for the ref to accept.");
-    await load();
+    const ok = await decideApplicant(applicant.id, "accept");
+    if (ok) setMsg("Ref approved — they’ll see the full address under Upcoming games.");
   }
 
   async function declineApplicant(applicant: ApplicantRow) {
-    const res = await fetch(`/api/organizer/applicants/${applicant.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "decline" }),
-    });
-    const j = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setMsg(j.error || "Could not decline this application.");
-      return;
-    }
-    setMsg("Application declined.");
-    await load();
+    await decideApplicant(applicant.id, "decline");
   }
 
   async function sendOffer(refMemberId = offerRef, eventId = offerEvent) {
-    if (!requireOrganizerOnboarding()) return;
+    if (!requireOrganizerOnboarding()) return false;
     if (!eventId || !refMemberId) {
       setMsg("Pick an event and a referee before sending the request.");
-      return;
+      return false;
     }
-    const event = events.find((e) => e.id === eventId);
-    const res = await fetch("/api/offers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventId,
-        refMemberId,
-        offeredPay: event?.pay_offer ?? null,
-        message: "We'd love for you to ref for our upcoming event.",
-      }),
-    });
-    const j = (await res.json()) as { error?: string };
-    setMsg(res.ok ? "Request sent to referee. They will see it in their notification inbox." : j.error || "Could not send request.");
-    if (res.ok) {
-      setOfferRef("");
-      setOfferEvent("");
+    if (offerSending) return false;
+    setOfferSending(true);
+    try {
+      const event = events.find((e) => e.id === eventId);
+      const res = await fetch("/api/offers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId,
+          refMemberId,
+          offeredPay: event?.pay_offer ?? null,
+          message: "We'd love for you to ref for our upcoming event.",
+        }),
+      });
+      const j = (await res.json()) as { error?: string };
+      setMsg(
+        res.ok
+          ? "Request sent. The ref gets a dashboard invite and email to accept or decline."
+          : j.error || "Could not send request."
+      );
+      if (res.ok) {
+        setOfferRef("");
+        // Keep the selected event so organizers can request additional refs for the same game.
+      }
+      await load();
+      return res.ok;
+    } catch {
+      setMsg("Could not reach the server. Refresh and try again.");
+      return false;
+    } finally {
+      setOfferSending(false);
     }
-    await load();
   }
 
   async function startStripeCheckout(eventId: string) {
@@ -1762,7 +1851,7 @@ export default function OrganizerDashboardClient() {
       )}
 
       {msg && (
-        <div className="fixed right-4 top-20 z-40 max-w-sm rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-xl">
+        <div className="fixed right-4 top-20 z-[70] max-w-sm rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-xl">
           {msg}
         </div>
       )}
@@ -1942,7 +2031,7 @@ export default function OrganizerDashboardClient() {
                     onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                     className="block w-full rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm hover:bg-neutral-50"
                   >
-                    Official {sr.gotrefsId} requested {sr.eventTitle}
+                    Ref {sr.gotrefsId} requested {sr.eventTitle}
                   </button>
                 ))}
                 {respondedSentOffers.slice(0, 3).map((offer) => {
@@ -2245,11 +2334,12 @@ export default function OrganizerDashboardClient() {
             +
           </button>
         </div>
-        <div className="mt-4 hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-3 border-b border-neutral-200 pb-2 text-xs font-semibold text-neutral-500 sm:grid">
+        <div className="mt-4 hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] gap-3 border-b border-neutral-200 pb-2 text-xs font-semibold text-neutral-500 sm:grid">
           <span>Listing</span>
           <span>Type</span>
           <span>Location</span>
           <span>Status</span>
+          <span className="text-right">Actions</span>
         </div>
         <div className="divide-y divide-neutral-100">
           {events.map((e) => {
@@ -2265,13 +2355,15 @@ export default function OrganizerDashboardClient() {
                 : { dot: "bg-red-500", label: "Action required" };
             const visual = sportListingVisual(e.sport);
             return (
-              <button
+              <div
                 key={e.id}
-                type="button"
-                onClick={() => openStaffingForEvent(e.id)}
-                className="grid w-full grid-cols-1 items-center gap-3 py-3 text-left transition hover:bg-neutral-50 sm:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr]"
+                className="grid w-full grid-cols-1 items-center gap-3 py-3 sm:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto]"
               >
-                <span className="flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openStaffingForEvent(e.id)}
+                  className="flex min-w-0 items-center gap-3 text-left transition hover:opacity-80 sm:col-span-1"
+                >
                   <span
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-xl ${visual.gradient}`}
                     aria-hidden
@@ -2282,7 +2374,7 @@ export default function OrganizerDashboardClient() {
                     <span className="block truncate text-sm font-semibold text-neutral-900">{e.title}</span>
                     <span className="block text-xs text-neutral-500">{formatEventDateTime(e.starts_at)}</span>
                   </span>
-                </span>
+                </button>
                 <span className="text-sm text-neutral-600">{e.sport}</span>
                 <span className="text-sm text-neutral-600">{loc || `ZIP ${e.zip_code}`}</span>
                 <span className="flex items-center gap-2 text-sm text-neutral-700">
@@ -2292,7 +2384,23 @@ export default function OrganizerDashboardClient() {
                     · {hiredCount}/{e.officials_needed} refs
                   </span>
                 </span>
-              </button>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => openStaffingForEvent(e.id)}
+                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+                  >
+                    Staff
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => browseRefsForEvent(e.id)}
+                    className="rounded-lg bg-[var(--red)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--red-dark)]"
+                  >
+                    Request refs
+                  </button>
+                </div>
+              </div>
             );
           })}
           {events.length === 0 && (
@@ -2397,11 +2505,11 @@ export default function OrganizerDashboardClient() {
             {signupRequests.map((sr) => (
               <AirbnbAcceptProfile
                 key={sr.id}
-                photoUrls={acceptPhotosForSport("Basketball")}
+                photoUrls={acceptPhotosForSport(sr.primarySport || "Basketball", sr.avatarUrl)}
                 photoAlt={`Official ${sr.gotrefsId}`}
-                sportForVisual="Basketball"
+                sportForVisual={sr.primarySport || "Basketball"}
                 eyebrow="Ref application"
-                title={`Official ${sr.gotrefsId}`}
+                title={`Ref ${sr.gotrefsId}`}
                 subtitle={`Requested to work ${sr.eventTitle}`}
                 refMemberId={sr.refMemberId}
                 ratingAverage={sr.ratingAverage}
@@ -2411,15 +2519,36 @@ export default function OrganizerDashboardClient() {
                   score: review.score,
                   comment: review.comment,
                   createdAt: review.createdAt,
-                  authorLabel: review.authorLabel ?? "Host",
+                  authorLabel: "Host",
                 }))}
                 metaRows={[
+                  sr.gotrefsId ? `GotREFS ID ${sr.gotrefsId}` : null,
                   sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}
-                primaryLabel="Accept"
-                secondaryLabel="Decline"
-                onPrimary={() => void sendOfferFromRequest(sr)}
+                primaryLabel="Review & decide"
+                secondaryLabel="Deny"
+                onPrimary={() =>
+                  setReviewApplicant({
+                    id: sr.id,
+                    eventId: sr.eventId,
+                    refMemberId: sr.refMemberId,
+                    gotrefsId: sr.gotrefsId,
+                    displayName: null,
+                    primarySport: sr.primarySport,
+                    additionalSports: sr.additionalSports,
+                    certificationLevel: sr.certificationLevel,
+                    avatarUrl: sr.avatarUrl,
+                    eventTitle: sr.eventTitle,
+                    eventPlace: sr.eventPlace,
+                    eventWhen: sr.eventWhen,
+                    eventPayLabel: sr.eventPayLabel,
+                    refRateLabel: sr.refRateLabel,
+                    ratingAverage: sr.ratingAverage,
+                    ratingCount: sr.ratingCount,
+                    reviews: sr.reviews,
+                  })
+                }
                 onSecondary={() => void declineApplicant(sr)}
               />
             ))}
@@ -2432,20 +2561,44 @@ export default function OrganizerDashboardClient() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Hire verified refs</h2>
-            <p className="mt-1 text-sm text-neutral-500">Browse by ID, rating, and pay fit.</p>
+            <p className="mt-1 text-sm text-neutral-500">
+              Pick an event, then tap <strong>Request this ref</strong>. They get a Trips invite plus email.
+            </p>
           </div>
-          {selectedOfferEvent && (
-            <button
-              type="button"
-              onClick={() => {
-                setOfferEvent("");
-                setOfferRef("");
-              }}
-              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
-            >
-              Clear event filter
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {events.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <span className="font-semibold">Event</span>
+                <select
+                  value={offerEvent}
+                  onChange={(e) => {
+                    setOfferEvent(e.target.value);
+                    setOfferRef("");
+                  }}
+                  className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900"
+                >
+                  <option value="">All refs (pick game on invite)</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.title} · {formatEventDateTime(event.starts_at)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {selectedOfferEvent && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOfferEvent("");
+                  setOfferRef("");
+                }}
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+              >
+                Clear event
+              </button>
+            )}
+          </div>
         </div>
         <AirbnbMarketplaceSearch
           searchLabel="Search refs"
@@ -2502,13 +2655,17 @@ export default function OrganizerDashboardClient() {
                       reviewSnippet={r.reviews?.[0]?.comment}
                       availabilityLabel={availabilityLabel}
                       priceFits={selectedOfferEvent ? priceFits : undefined}
-                      inviteDisabled={selectedOfferEvent ? !priceFits : false}
+                      inviteDisabled={
+                        offerSending || (selectedOfferEvent ? !priceFits : false)
+                      }
                       inviteLabel={
-                        selectedOfferEvent
-                          ? priceFits
-                            ? "Request this ref"
-                            : "Outside pay range"
-                          : "Invite to game"
+                        offerSending
+                          ? "Sending…"
+                          : selectedOfferEvent
+                            ? priceFits
+                              ? "Request this ref"
+                              : "Outside pay range"
+                            : "Request this ref"
                       }
                       onMessage={() => {
                         setContactRefId(contactRefId === r.id ? null : r.id);
@@ -2522,6 +2679,10 @@ export default function OrganizerDashboardClient() {
                             return;
                           }
                           void sendOffer(r.id, selectedOfferEvent.id);
+                          return;
+                        }
+                        if (events.length === 0) {
+                          setMsg("Post an event first, then request a ref for it.");
                           return;
                         }
                         setInviteRef(r);
@@ -2581,7 +2742,27 @@ export default function OrganizerDashboardClient() {
               <button
                 key={sr.id}
                 type="button"
-                onClick={() => openStaffingForEvent(sr.eventId)}
+                onClick={() =>
+                  setReviewApplicant({
+                    id: sr.id,
+                    eventId: sr.eventId,
+                    refMemberId: sr.refMemberId,
+                    gotrefsId: sr.gotrefsId,
+                    displayName: null,
+                    primarySport: sr.primarySport,
+                    additionalSports: sr.additionalSports,
+                    certificationLevel: sr.certificationLevel,
+                    avatarUrl: sr.avatarUrl,
+                    eventTitle: sr.eventTitle,
+                    eventPlace: sr.eventPlace,
+                    eventWhen: sr.eventWhen,
+                    eventPayLabel: sr.eventPayLabel,
+                    refRateLabel: sr.refRateLabel,
+                    ratingAverage: sr.ratingAverage,
+                    ratingCount: sr.ratingCount,
+                    reviews: sr.reviews,
+                  })
+                }
                 className={`flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
               >
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
@@ -2589,10 +2770,10 @@ export default function OrganizerDashboardClient() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-neutral-900">
-                    Official {sr.gotrefsId}
+                    Ref {sr.gotrefsId}
                   </span>
                   <span className="block truncate text-xs text-neutral-500">
-                    Requested to work {sr.eventTitle} — tap to review and reply
+                    Requested to work {sr.eventTitle} — tap to review
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
@@ -2653,58 +2834,75 @@ export default function OrganizerDashboardClient() {
         </section>
       )}
       {inviteRef && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onClick={() => setInviteRef(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onClick={() => !offerSending && setInviteRef(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Invite referee</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Request referee</p>
                 <h3 className="mt-1 text-2xl font-black text-[var(--navy)]">Official {inviteRef.gotrefsId}</h3>
               </div>
-              <button type="button" className="rounded-full border border-[var(--border)] px-3 py-1 text-sm" onClick={() => setInviteRef(null)}>
+              <button
+                type="button"
+                className="rounded-full border border-[var(--border)] px-3 py-1 text-sm"
+                disabled={offerSending}
+                onClick={() => setInviteRef(null)}
+              >
                 Close
               </button>
             </div>
             <p className="mt-3 text-sm text-[var(--muted)]">Select the game you want this referee to work.</p>
-            <div className="mt-4 grid gap-2">
-              {events.map((event) => {
-                const priceFits = refPriceFitsEvent(inviteRef, event);
-                return (
-                <button
-                  key={event.id}
-                  type="button"
-                  onClick={() => {
-                    setOfferEvent(event.id);
-                    setOfferRef(inviteRef.id);
-                  }}
-                  className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
-                    offerEvent === event.id ? "border-[var(--red)] bg-[var(--red-light)]" : "border-[var(--border)] hover:border-[var(--blue)]"
-                  }`}
-                >
-                  <p className="font-bold text-[var(--navy)]">{event.title}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">{formatEventDateTime(event.starts_at)} · {event.sport}</p>
-                  <p className={`mt-1 text-xs font-semibold ${priceFits ? "text-green-700" : "text-amber-700"}`}>
-                    {priceFits ? "Pay range matches this ref" : "Outside this ref's hourly rate"}
-                  </p>
-                </button>
-              );
-              })}
-            </div>
+            {events.length === 0 ? (
+              <p className="mt-4 rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-4 text-sm text-[var(--muted)]">
+                Post an event first, then you can request this ref.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-2">
+                {events.map((event) => {
+                  const priceFits = refPriceFitsEvent(inviteRef, event);
+                  return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    disabled={offerSending}
+                    onClick={() => {
+                      setOfferEvent(event.id);
+                      setOfferRef(inviteRef.id);
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                      offerEvent === event.id ? "border-[var(--red)] bg-[var(--red-light)]" : "border-[var(--border)] hover:border-[var(--blue)]"
+                    }`}
+                  >
+                    <p className="font-bold text-[var(--navy)]">{event.title}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{formatEventDateTime(event.starts_at)} · {event.sport}</p>
+                    <p className={`mt-1 text-xs font-semibold ${priceFits ? "text-green-700" : "text-amber-700"}`}>
+                      {priceFits ? "Pay range matches this ref" : "Outside this ref's hourly rate"}
+                    </p>
+                  </button>
+                );
+                })}
+              </div>
+            )}
             <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 p-3 text-sm">
               We&apos;d love for you to ref for our upcoming event.
             </div>
             <button
               type="button"
               disabled={
+                offerSending ||
                 !offerEvent ||
                 !events.some((event) => event.id === offerEvent && refPriceFitsEvent(inviteRef, event))
               }
               onClick={() => {
-                void sendOffer();
-                setInviteRef(null);
+                const eventId = offerEvent;
+                const refId = inviteRef.id;
+                void (async () => {
+                  const ok = await sendOffer(refId, eventId);
+                  if (ok) setInviteRef(null);
+                })();
               }}
               className="mt-4 w-full rounded-full bg-[var(--red)] px-4 py-3 text-sm font-black text-white transition-all duration-200 hover:bg-[var(--red-dark)] disabled:opacity-50"
             >
-              Send request
+              {offerSending ? "Sending…" : "Request this ref"}
             </button>
           </div>
         </div>
@@ -2730,12 +2928,25 @@ export default function OrganizerDashboardClient() {
           }))}
           hiredCount={acceptedOffersByEvent[staffingEvent.id] || 0}
           onClose={() => setStaffingEventId(null)}
+          onBrowseMarketplace={() => {
+            const eventId = staffingEvent.id;
+            setStaffingEventId(null);
+            browseRefsForEvent(eventId);
+          }}
           onInviteApplicant={async (applicant) => {
             await sendOfferFromRequest(applicant as ApplicantRow);
           }}
           onInviteRef={async (refId) => {
             await sendOffer(refId, staffingEvent.id);
           }}
+        />
+      )}
+
+      {reviewApplicant && (
+        <ApplicantReviewModal
+          applicant={reviewApplicant}
+          onClose={() => setReviewApplicant(null)}
+          onDecide={(action) => decideApplicant(reviewApplicant.id, action)}
         />
       )}
     </div>

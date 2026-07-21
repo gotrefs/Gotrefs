@@ -78,6 +78,9 @@ export type RefWorkBooking = {
         city: string | null;
         state: string | null;
         zip_code: string;
+        venue_street?: string | null;
+        venue_unit?: string | null;
+        notes?: string | null;
       }
     | {
         title: string;
@@ -87,6 +90,9 @@ export type RefWorkBooking = {
         city: string | null;
         state: string | null;
         zip_code: string;
+        venue_street?: string | null;
+        venue_unit?: string | null;
+        notes?: string | null;
       }[]
     | null;
 };
@@ -96,6 +102,28 @@ type WorkSubTab = "invites" | "applied" | "confirmed";
 function eventFromJoin<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+/** Keep organizer notes for confirmed refs, but strip email addresses and phone numbers. */
+function organizerInfoForRef(notes: string | null | undefined): string {
+  if (!notes?.trim()) return "";
+  return notes
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      if (/^contact:/i.test(part)) return "";
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(part)) return "";
+      if (/^(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}$/.test(part.replace(/\s/g, ""))) return "";
+      return part
+        .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "")
+        .replace(/(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[\s,;:·-]+|[\s,;:·-]+$/g, "")
+        .trim();
+    })
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function RefMyWorkPanel({
@@ -145,7 +173,7 @@ export function RefMyWorkPanel({
   const subTabs: { id: WorkSubTab; label: string; count: number }[] = [
     { id: "invites", label: "Invites", count: pendingInvites.length },
     { id: "applied", label: "Applied", count: pendingApplications.length },
-    { id: "confirmed", label: "Confirmed", count: confirmedBookings.length },
+    { id: "confirmed", label: "Upcoming", count: confirmedBookings.length },
   ];
 
   return (
@@ -189,19 +217,18 @@ export function RefMyWorkPanel({
             pendingInvites.map((offer) => {
               const ev = eventFromJoin(offer.scheduled_events);
               const loc = ev ? formatEventLocation(ev.city, ev.state, ev.zip_code) : "";
-              const hostName = offer.organizer?.displayName?.trim() || "your host";
               const sport = ev?.sport || "Game";
               return (
                 <AirbnbAcceptProfile
                   key={offer.id}
                   photoUrls={acceptPhotosForSport(sport, offer.organizer?.profilePictureUrl)}
-                  photoAlt={`${hostName} game invite`}
+                  photoAlt={`${sport} game invite`}
                   sportForVisual={sport}
                   eyebrow="Organizer invite"
-                  title={`Hey, I'm ${hostName.split(" ")[0] || hostName}`}
+                  title="Organizer invite"
                   subtitle={ev?.title ? `Invited you to ${ev.title}` : "Invited you to referee a game"}
-                  emptyReviewsLabel="New host"
-                  reviewsTitle="About this host"
+                  emptyReviewsLabel="Host"
+                  reviewsTitle="About this game"
                   reviews={[]}
                   metaRows={[
                     [sport, ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : null, loc]
@@ -252,19 +279,33 @@ export function RefMyWorkPanel({
         {subTab === "confirmed" &&
           (confirmedBookings.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-500">
-              No confirmed games yet. Accept an organizer invite to add games to your schedule.
+              No upcoming games yet. When an organizer approves your request, the full address and details show up here.
             </p>
           ) : (
             confirmedBookings.map((booking) => {
               const ev = eventFromJoin(booking.scheduled_events);
+              const street = [ev?.venue_street, ev?.venue_unit].filter(Boolean).join(", ");
+              const cityLine = formatEventLocation(ev?.city ?? null, ev?.state ?? null, ev?.zip_code ?? "");
+              const organizerInfo = organizerInfoForRef(ev?.notes);
               return (
-                <article key={booking.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Confirmed</p>
+                <article key={booking.id} className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Upcoming game</p>
                   <p className="mt-1 text-lg font-semibold text-neutral-900">{ev?.title ?? "Game"}</p>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <p className="mt-1 text-sm text-neutral-600">
                     {ev?.sport}
                     {ev?.starts_at ? ` · ${new Date(ev.starts_at).toLocaleString()}` : ""}
                   </p>
+                  <div className="mt-3 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm text-neutral-800">
+                    <p className="font-semibold text-neutral-900">Address</p>
+                    <p className="mt-0.5">{street || "Address shared by organizer"}</p>
+                    {cityLine ? <p className="text-neutral-600">{cityLine}</p> : null}
+                  </div>
+                  {organizerInfo ? (
+                    <div className="mt-3 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">
+                      <p className="font-semibold text-neutral-900">Organizer info</p>
+                      <p className="mt-0.5 whitespace-pre-wrap">{organizerInfo}</p>
+                    </div>
+                  ) : null}
                 </article>
               );
             })

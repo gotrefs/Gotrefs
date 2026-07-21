@@ -42,7 +42,7 @@ export function VenuePinMap({
         if (!mapRef.current) {
           mapRef.current = new google.maps.Map(mapElRef.current, {
             center,
-            zoom: 15,
+            zoom: approximate ? 9 : 15,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
@@ -88,11 +88,13 @@ export function VenuePinMap({
     }
 
     if (approximate) {
+      const privacyRadiusMeters = 75 * 1609.344; // ~75 miles — hides exact venue from browsing refs
+      map.setZoom(Math.min(map.getZoom() ?? 9, 9));
       if (!circleRef.current) {
         circleRef.current = new google.maps.Circle({
           map,
           center,
-          radius: 450,
+          radius: privacyRadiusMeters,
           strokeColor: "#717171",
           strokeOpacity: 0.35,
           strokeWeight: 1,
@@ -103,6 +105,7 @@ export function VenuePinMap({
       } else {
         circleRef.current.setMap(map);
         circleRef.current.setCenter(center);
+        circleRef.current.setRadius(privacyRadiusMeters);
       }
     } else if (circleRef.current) {
       circleRef.current.setMap(null);

@@ -291,6 +291,8 @@ export function OrganizerListingWizard({
   const [accountNumber, setAccountNumber] = useState("");
   const [accountNumberConfirm, setAccountNumberConfirm] = useState("");
   const [savingPayout, setSavingPayout] = useState(false);
+  /** After the first post, skip venue/pay/ID and only collect the next game's schedule. */
+  const [quickRepost, setQuickRepost] = useState(false);
   const [draft, setDraft] = useState<OrganizerWizardDraft>({
     venueType: "",
     accessType: "",
@@ -358,6 +360,10 @@ export function OrganizerListingWizard({
 
   function goBack() {
     setError(null);
+    if (quickRepost && screen === "schedule") {
+      setScreen("done");
+      return;
+    }
     const idx = ALL_SCREENS.indexOf(screen);
     if (idx > 0) setScreen(ALL_SCREENS[idx - 1]);
   }
@@ -402,6 +408,13 @@ export function OrganizerListingWizard({
       }
       if (draft.eventEnd.trim() && draft.eventEnd < draft.eventStart) {
         setError("The end time can't be before the start time.");
+        return;
+      }
+      if (quickRepost && onCreateEvent) {
+        setError(null);
+        const posted = await onCreateEvent(draft);
+        if (!posted) return;
+        setScreen("done");
         return;
       }
     }
@@ -477,15 +490,32 @@ export function OrganizerListingWizard({
       }
     }
     setPayoutStage(null);
-    onComplete(draft);
+    if (payoutOnly) {
+      onComplete(draft);
+      return;
+    }
+    // Stay on the done screen so hosts can post another game at the same venue (Airbnb-style).
+  }
+
+  function startAnotherEvent() {
+    setQuickRepost(true);
+    setError(null);
+    patch({
+      eventTitle: "",
+      eventStart: "",
+      eventEnd: "",
+    });
+    setScreen("schedule");
   }
 
   const nextLabel =
     screen === "finalDetails"
       ? "Post event"
-      : screen.startsWith("intro")
-        ? "Get started"
-        : "Next";
+      : screen === "schedule" && quickRepost
+        ? "Post this game"
+        : screen.startsWith("intro")
+          ? "Get started"
+          : "Next";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
@@ -681,7 +711,8 @@ export function OrganizerListingWizard({
               </h1>
               <p className="mt-2 max-w-2xl text-neutral-600">
                 We only share your address after refs book through GotREFS. Until then, they&apos;ll see an
-                approximate location on the map — so they can&apos;t go around the platform to find you.
+                approximate location within about <strong>75 miles</strong> on the map — so they can&apos;t go
+                around the platform to find you at a specific park or gym.
               </p>
               <div className="mt-6">
                 <VenuePinMap
@@ -718,9 +749,13 @@ export function OrganizerListingWizard({
           {screen === "schedule" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                When is your event?
+                {quickRepost ? "Add another game" : "When is your event?"}
               </h1>
-              <p className="mt-2 text-neutral-500">Refs see the date and time so they can match their availability.</p>
+              <p className="mt-2 text-neutral-500">
+                {quickRepost
+                  ? `Same venue (${draft.city || "your city"}) · ${draft.sport || "sport"} · pay stays the same. Only set the new time.`
+                  : "Refs see the date and time so they can match their availability."}
+              </p>
               <div className="mt-8 space-y-4">
                 <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
                   <span className="text-xs text-neutral-500">Event name (optional)</span>
@@ -1205,14 +1240,20 @@ export function OrganizerListingWizard({
 
           {screen === "done" && (
             <div className="mx-auto max-w-2xl">
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Your listing</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+                {quickRepost ? "Game posted" : "Your listing"}
+              </h1>
+              <p className="mt-2 text-neutral-500">
+                Hosting a full weekend? Keep the same venue and post the next game in one step — or finish and manage
+                everything from your dashboard (CSV bulk import is there too).
+              </p>
               <div className="mt-6 max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-neutral-200">
                 <div className="relative">
                   <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-6xl`}>
                     {visual.emoji}
                   </div>
                   <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-neutral-800">
-                    ● Action required
+                    ● Posted
                   </span>
                 </div>
                 <div className="p-4">
@@ -1222,6 +1263,24 @@ export function OrganizerListingWizard({
                   </p>
                 </div>
               </div>
+              {payoutStage === null && (
+                <div className="mt-8 flex max-w-sm flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={startAnotherEvent}
+                    className="w-full rounded-lg bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white hover:bg-neutral-800"
+                  >
+                    Post another game at this venue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onComplete(draft)}
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
+                  >
+                    Done — go to dashboard
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

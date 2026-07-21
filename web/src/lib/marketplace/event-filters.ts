@@ -10,6 +10,8 @@ export type OpenEventRecord = {
   city: string | null;
   state: string | null;
   zip_code: string;
+  venue_street?: string | null;
+  venue_unit?: string | null;
   officials_needed: number;
   pay_offer: number | null;
   pay_type?: "exact" | "range" | null;
@@ -20,6 +22,11 @@ export type OpenEventRecord = {
   boosts?: string[] | null;
   /** Boosts that currently apply for the ref viewing this event. */
   active_boosts?: AppliedBoost[];
+  /** This ref already requested to work this event (pending). */
+  already_requested?: boolean;
+  /** Pre-jittered map pin (~7 mi from true venue). Never the exact street. */
+  map_lat?: number | null;
+  map_lng?: number | null;
 };
 
 export type RefProfileForMatch = {

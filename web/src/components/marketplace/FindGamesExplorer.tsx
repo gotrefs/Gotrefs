@@ -45,13 +45,15 @@ export function FindGamesExplorer({
   const [refProfile, setRefProfile] = useState<RefProfileForMatch | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [mapPins, setMapPins] = useState<MapGamePin[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
+    setMsg(null);
     const params = new URLSearchParams();
     if (sport.trim()) params.set("sport", sport.trim());
     if (dateFrom) params.set("startsAfter", new Date(dateFrom).toISOString());
@@ -63,14 +65,17 @@ export function FindGamesExplorer({
         error?: string;
       };
       if (!res.ok) {
-        setMsg(json.error || "Could not load open games.");
+        setMsg({ text: json.error || "Could not load open games.", tone: "err" });
         setEvents([]);
         return;
       }
       setEvents(json.events ?? []);
       setRefProfile(json.refProfile ?? null);
+      setRequestedIds(
+        new Set((json.events ?? []).filter((event) => event.already_requested).map((event) => event.id))
+      );
     } catch {
-      setMsg("Could not reach the server.");
+      setMsg({ text: "Could not reach the server.", tone: "err" });
       setEvents([]);
     } finally {
       setLoading(false);
@@ -92,9 +97,22 @@ export function FindGamesExplorer({
 
       let pins: MapGamePin[] = [];
       for (const event of events) {
+        if (
+          typeof event.map_lat === "number" &&
+          typeof event.map_lng === "number" &&
+          Number.isFinite(event.map_lat) &&
+          Number.isFinite(event.map_lng)
+        ) {
+          pins.push({
+            ...event,
+            coords: { lat: event.map_lat, lng: event.map_lng },
+            coordsPrivacyApplied: true,
+          });
+          continue;
+        }
         const zipKey = event.zip_code.trim().slice(0, 5);
         const coords = coordsByZip.get(zipKey);
-        if (coords) pins.push({ ...event, coords });
+        if (coords) pins.push({ ...event, coords, coordsPrivacyApplied: false });
       }
 
       if (wherePlace) {
@@ -128,17 +146,26 @@ export function FindGamesExplorer({
     setMsg(null);
     if (!canApplyToEvents) {
       if (applicationPending) {
-        setMsg("Application pending — you can apply once GotREFS approves your verification.");
+        setMsg({
+          text: "Application pending — you can apply once GotREFS approves your verification.",
+          tone: "err",
+        });
         return;
       }
       if (applicationRejected) {
-        setMsg("Verification not approved. Check your notification inbox.");
+        setMsg({ text: "Verification not approved. Check your notification inbox.", tone: "err" });
         return;
       }
+      setMsg({ text: "Complete verification before you can request to work games.", tone: "err" });
       onRequireProfile?.();
       return;
     }
+    if (event.already_requested || requestedIds.has(event.id)) {
+      setMsg({ text: "You already requested to work this game.", tone: "ok" });
+      return;
+    }
     setSubmittingId(event.id);
+    setRequestedIds((prev) => new Set(prev).add(event.id));
     try {
       const res = await fetch("/api/events/apply", {
         method: "POST",
@@ -147,13 +174,32 @@ export function FindGamesExplorer({
       });
       const json = (await res.json()) as { error?: string; eventTitle?: string };
       if (!res.ok) {
-        setMsg(json.error || "Could not apply.");
+        setRequestedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(event.id);
+          return next;
+        });
+        setMsg({ text: json.error || "Could not apply.", tone: "err" });
         return;
       }
-      setMsg(`Request sent for "${json.eventTitle ?? event.title}".`);
+      setEvents((prev) =>
+        prev.map((row) => (row.id === event.id ? { ...row, already_requested: true } : row))
+      );
+      setMapPins((prev) =>
+        prev.map((pin) => (pin.id === event.id ? { ...pin, already_requested: true } : pin))
+      );
+      setMsg({
+        text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotREFS ID.`,
+        tone: "ok",
+      });
       onApplied?.();
     } catch {
-      setMsg("Could not reach the server.");
+      setRequestedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(event.id);
+        return next;
+      });
+      setMsg({ text: "Could not reach the server.", tone: "err" });
     } finally {
       setSubmittingId(null);
     }
@@ -162,11 +208,6 @@ export function FindGamesExplorer({
   const showSplit = view === "split" || view === "map";
   const showGrid = view === "list" || view === "split";
   const displayEvents = wherePlace ? visibleEvents : events;
-
-  const selectedEvent = useMemo(
-    () => displayEvents.find((event) => event.id === selectedMapId) ?? null,
-    [displayEvents, selectedMapId]
-  );
 
   return (
     <div className="space-y-6">
@@ -223,8 +264,14 @@ export function FindGamesExplorer({
       )}
 
       {msg && (
-        <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-800">
-          {msg}
+        <p
+          className={`rounded-xl border px-4 py-3 text-sm font-semibold shadow-sm ${
+            msg.tone === "err"
+              ? "border-red-200 bg-red-50 text-red-950"
+              : "border-emerald-200 bg-emerald-50 text-emerald-950"
+          }`}
+        >
+          {msg.text}
         </p>
       )}
 
@@ -293,6 +340,7 @@ export function FindGamesExplorer({
                 {displayEvents.map((event) => {
                   const slotsLeft = Math.max(0, event.officials_needed - (event.booked_count ?? 0));
                   const isSelected = selectedMapId === event.id;
+                  const alreadyRequested = event.already_requested || requestedIds.has(event.id);
                   return (
                     <div
                       key={event.id}
@@ -303,8 +351,8 @@ export function FindGamesExplorer({
                         event={event}
                         payBadge={payMatchLabel(refProfile, event)}
                         slotsLeft={slotsLeft}
-                        ctaLabel="Request to work"
-                        ctaDisabled={slotsLeft === 0}
+                        ctaLabel={alreadyRequested ? "Requested to work" : "Request to work"}
+                        ctaDisabled={slotsLeft === 0 || alreadyRequested}
                         ctaLoading={submittingId === event.id}
                         onAction={() => void applyToEvent(event)}
                       />
@@ -326,13 +374,10 @@ export function FindGamesExplorer({
                 center={wherePlace ? { lat: wherePlace.lat, lng: wherePlace.lng } : null}
                 selectedId={selectedMapId}
                 onSelect={setSelectedMapId}
+                requestedIds={requestedIds}
+                requestingId={submittingId}
                 onRequest={(event) => void applyToEvent(event)}
               />
-            )}
-            {selectedEvent && (
-              <p className="mt-3 text-sm text-neutral-600">
-                Selected: <span className="font-semibold text-neutral-900">{selectedEvent.title}</span>
-              </p>
             )}
           </div>
         )}

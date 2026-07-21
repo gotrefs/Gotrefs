@@ -18,3 +18,43 @@ export function distanceMiles(
 
 /** Default browse radius when a Where place is selected. */
 export const DEFAULT_SEARCH_RADIUS_MILES = 40;
+
+/**
+ * Privacy radius for open-game browse pins.
+ * Pin is jittered within this radius; circle matches preview copy (~7 mi area).
+ * Exact venue stays hidden until the organizer confirms the ref.
+ */
+export const EVENT_PRIVACY_RADIUS_MILES = 7;
+export const EVENT_PRIVACY_RADIUS_METERS = EVENT_PRIVACY_RADIUS_MILES * 1609.344;
+
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Deterministic jittered point within `radiusMiles` of the true/ZIP coords.
+ * Uniform-in-disk sampling so the pin is not the exact venue, but stable across renders.
+ */
+export function approximateEventCoords(
+  coords: { lat: number; lng: number },
+  seed: string,
+  radiusMiles = EVENT_PRIVACY_RADIUS_MILES
+): { lat: number; lng: number } {
+  const h1 = hashSeed(seed);
+  const h2 = hashSeed(`${seed}:r`);
+  const angle = (h1 / 0xffffffff) * 2 * Math.PI;
+  // sqrt for uniform distribution over disk area
+  const offsetMiles = radiusMiles * Math.sqrt(h2 / 0xffffffff);
+  const latOffset = (offsetMiles / 69) * Math.cos(angle);
+  const cosLat = Math.cos((coords.lat * Math.PI) / 180) || 0.01;
+  const lngOffset = (offsetMiles / (69 * cosLat)) * Math.sin(angle);
+  return {
+    lat: coords.lat + latOffset,
+    lng: coords.lng + lngOffset,
+  };
+}

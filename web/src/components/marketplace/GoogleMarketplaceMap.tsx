@@ -4,20 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
 import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/maps/google-maps-loader";
-import { formatPayRangeLabel } from "@/lib/pay-range";
+import {
+  approximateEventCoords,
+  EVENT_PRIVACY_RADIUS_METERS,
+  EVENT_PRIVACY_RADIUS_MILES,
+} from "@/lib/maps/geo";
 
 const DEFAULT_CENTER = { lat: 34.05, lng: -118.25 };
 
-function formatPay(event: OpenEventRecord) {
-  return (
-    formatPayRangeLabel({
-      type: event.pay_type === "range" ? "range" : "exact",
-      exact: event.pay_offer,
-      min: event.pay_min,
-      max: event.pay_max,
-      unit: "hour",
-    }) ?? "Pay TBD"
-  );
+function approxCenter(pin: MapGamePin) {
+  return pin.coordsPrivacyApplied ? pin.coords : approximateEventCoords(pin.coords, pin.id);
 }
 
 export function GoogleMarketplaceMap({
@@ -25,12 +21,12 @@ export function GoogleMarketplaceMap({
   selectedId,
   center,
   onSelect,
-  onRequest,
   className = "h-[min(70vh,640px)] w-full rounded-2xl",
 }: {
   pins: MapGamePin[];
   selectedId?: string | null;
   center?: { lat: number; lng: number } | null;
+  requestedIds?: Set<string>;
   onSelect?: (id: string) => void;
   onRequest?: (event: OpenEventRecord) => void;
   className?: string;
@@ -38,7 +34,7 @@ export function GoogleMarketplaceMap({
   const mapElRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
-  const infoRef = useRef<google.maps.InfoWindow | null>(null);
+  const circlesRef = useRef<google.maps.Circle[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,13 +48,12 @@ export function GoogleMarketplaceMap({
         if (!mapRef.current) {
           mapRef.current = new google.maps.Map(mapElRef.current, {
             center: center ?? DEFAULT_CENTER,
-            zoom: center ? 11 : 9,
+            zoom: center ? 10 : 9,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: true,
             zoomControl: true,
           });
-          infoRef.current = new google.maps.InfoWindow();
         }
         setReady(true);
         setError(null);
@@ -81,60 +76,66 @@ export function GoogleMarketplaceMap({
 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
+    circlesRef.current.forEach((circle) => circle.setMap(null));
+    circlesRef.current = [];
+
+    const approxPins = pins.map((pin) => ({ pin, center: approxCenter(pin) }));
 
     if (center) {
       map.panTo(center);
+      map.setZoom(10);
+    } else if (approxPins.length === 1) {
+      map.panTo(approxPins[0].center);
       map.setZoom(11);
-    } else if (pins.length === 1) {
-      map.panTo(pins[0].coords);
-      map.setZoom(11);
-    } else if (pins.length > 1) {
+    } else if (approxPins.length > 1) {
       const bounds = new google.maps.LatLngBounds();
-      pins.forEach((pin) => bounds.extend(pin.coords));
+      const padDeg = EVENT_PRIVACY_RADIUS_MILES / 69;
+      for (const { center: c } of approxPins) {
+        bounds.extend(c);
+        bounds.extend({ lat: c.lat + padDeg, lng: c.lng });
+        bounds.extend({ lat: c.lat - padDeg, lng: c.lng });
+      }
       map.fitBounds(bounds, 48);
     } else {
       map.panTo(DEFAULT_CENTER);
       map.setZoom(9);
     }
 
-    for (const pin of pins) {
+    for (const { pin, center: pinCenter } of approxPins) {
       const isActive = pin.id === selectedId;
+      const selectPin = () => onSelect?.(pin.id);
+
+      const circle = new google.maps.Circle({
+        map,
+        center: pinCenter,
+        radius: EVENT_PRIVACY_RADIUS_METERS,
+        fillColor: isActive ? "#111827" : "#d81d24",
+        fillOpacity: isActive ? 0.22 : 0.14,
+        strokeColor: isActive ? "#111827" : "#d81d24",
+        strokeOpacity: 0.75,
+        strokeWeight: isActive ? 2.5 : 2,
+        clickable: true,
+      });
+      circle.addListener("click", selectPin);
+      circlesRef.current.push(circle);
+
       const marker = new google.maps.Marker({
         map,
-        position: pin.coords,
+        position: pinCenter,
         title: pin.title,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: isActive ? 11 : 9,
+          scale: isActive ? 7 : 5,
           fillColor: isActive ? "#111827" : "#d81d24",
-          fillOpacity: 1,
+          fillOpacity: 0.95,
           strokeColor: "#ffffff",
           strokeWeight: 2,
         },
       });
-      marker.addListener("click", () => {
-        onSelect?.(pin.id);
-        const place = [pin.city, pin.state].filter(Boolean).join(", ") || pin.zip_code;
-        const content = document.createElement("div");
-        content.className = "p-1";
-        content.innerHTML = `
-          <p style="margin:0;font-weight:700;font-size:13px">${pin.title}</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#555">${pin.sport} · ${place}</p>
-          <p style="margin:4px 0 8px;font-size:12px;color:#555">${formatPay(pin)}</p>
-        `;
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = "Request to work";
-        btn.style.cssText =
-          "border:0;border-radius:999px;background:#d81d24;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer";
-        btn.onclick = () => onRequest?.(pin);
-        content.appendChild(btn);
-        infoRef.current?.setContent(content);
-        infoRef.current?.open({ map, anchor: marker });
-      });
+      marker.addListener("click", selectPin);
       markersRef.current.push(marker);
     }
-  }, [ready, pins, selectedId, center, onSelect, onRequest]);
+  }, [ready, pins, selectedId, center, onSelect]);
 
   if (!isGoogleMapsConfigured()) {
     return (
@@ -170,6 +171,9 @@ export function GoogleMarketplaceMap({
         </div>
       )}
       <div ref={mapElRef} className="h-full w-full" />
+      <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-neutral-700 shadow">
+        Pins show approximate areas (~{EVENT_PRIVACY_RADIUS_MILES} mi) — exact address after booking
+      </p>
     </div>
   );
 }
