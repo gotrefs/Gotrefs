@@ -1290,7 +1290,7 @@ export default function RefereeDashboardClient() {
             applicationRejected={verificationRejected}
             onRequireProfile={() => {
               if (showPendingReviewView) return;
-              const next = missingStatuses[0];
+              const next = missingActions[0];
               if (next) openProfileWizard(next.field);
             }}
             onReload={load}

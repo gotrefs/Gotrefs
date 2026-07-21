@@ -105,7 +105,11 @@ export function FindGamesExplorer({
         ) {
           pins.push({
             ...event,
-            coords: { lat: event.map_lat, lng: event.map_lng },
+            coords: {
+              lat: event.map_lat,
+              lng: event.map_lng,
+              place: [event.city, event.state].filter(Boolean).join(", ") || event.zip_code,
+            },
             coordsPrivacyApplied: true,
           });
           continue;
