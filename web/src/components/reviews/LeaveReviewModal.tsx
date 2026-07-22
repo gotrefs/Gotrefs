@@ -37,13 +37,16 @@ export function LeaveReviewModal({
 
   useEffect(() => {
     if (!open) return;
-    setStep(1);
-    setScore(0);
-    setComment("");
-    setError(null);
+    const frame = window.requestAnimationFrame(() => {
+      setStep(1);
+      setScore(0);
+      setComment("");
+      setError(null);
+    });
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      window.cancelAnimationFrame(frame);
       document.body.style.overflow = prev;
     };
   }, [open]);
@@ -69,7 +72,11 @@ export function LeaveReviewModal({
       setError("Write a short public review — just like Airbnb, reviews need a comment.");
       return;
     }
-    await onSubmit({ score, comment: comment.trim() });
+    try {
+      await onSubmit({ score, comment: comment.trim() });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not publish review. Try again.");
+    }
   }
 
   return (

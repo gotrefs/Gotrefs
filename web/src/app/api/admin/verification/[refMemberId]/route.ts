@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/auth/require-admin-api";
+import { activateQueuedSignupRequests } from "@/lib/activate-queued-signups";
 import { notifyInBackground, notifyVerificationDecision } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { normalizeFixRequiredSteps } from "@/lib/ref-verification-steps";
@@ -122,6 +123,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         .eq("ref_member_id", refMemberId);
     }
 
+    const siteUrl = emailSiteUrl(request.url);
+    let queuedActivated = 0;
+
+    if (action === "approve") {
+      const flushed = await activateQueuedSignupRequests({
+        admin,
+        refMemberId,
+        siteUrl,
+      });
+      queuedActivated = flushed.activated;
+    }
+
     if (action === "approve" || action === "reject") {
       notifyInBackground(() =>
         notifyVerificationDecision({
@@ -129,7 +142,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
           refMemberId,
           approved: action === "approve",
           adminNotes,
-          siteUrl: emailSiteUrl(request.url),
+          siteUrl,
         })
       );
     }
@@ -139,6 +152,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       status,
       adminNotes,
       fixRequiredSteps: action === "approve" ? [] : fixRequiredSteps,
+      queuedActivated,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update verification.";

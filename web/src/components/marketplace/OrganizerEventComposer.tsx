@@ -389,7 +389,8 @@ export function OrganizerEventComposer({
           {csvOpen ? (
             <div className="mt-3 space-y-2">
               <p className="text-xs text-neutral-500">
-                Columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer
+                Columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer.
+                After upload you&apos;ll review each game one by one and can fix dates before publishing.
               </p>
               <input
                 type="file"

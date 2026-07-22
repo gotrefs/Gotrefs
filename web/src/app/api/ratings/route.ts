@@ -10,6 +10,22 @@ type RatingBody = {
   comment?: string | null;
 };
 
+function averageFromScores(scores: number[]): number | null {
+  if (scores.length === 0) return null;
+  const sum = scores.reduce((total, score) => total + score, 0);
+  // One decimal place keeps marketplace cards readable (e.g. 3.0, 4.5).
+  return Number((sum / scores.length).toFixed(1));
+}
+
+function isMissingRatingsTable(message: string | undefined) {
+  const text = message ?? "";
+  return (
+    /Could not find the table ['"]?public\.ref_ratings['"]?/i.test(text) ||
+    /relation ['"]?public\.ref_ratings['"]? does not exist/i.test(text) ||
+    (/ref_ratings/i.test(text) && /schema cache/i.test(text) && /could not find/i.test(text))
+  );
+}
+
 /** Public reviews for a referee (Airbnb-style profile reviews). */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,9 +43,7 @@ export async function GET(request: Request) {
 
   const { data: ratings, error } = await admin
     .from("ref_ratings")
-    .select(
-      "id, score, comment, created_at, organizer_member_id, event_id, skipped, members!ref_ratings_organizer_member_id_fkey ( display_name ), scheduled_events ( title )"
-    )
+    .select("id, score, comment, created_at, organizer_member_id, event_id, skipped")
     .eq("ref_member_id", refMemberId)
     .eq("skipped", false)
     .not("score", "is", null)
@@ -37,67 +51,43 @@ export async function GET(request: Request) {
     .limit(100);
 
   if (error) {
-    // Fallback without embeds if FK names differ
-    const fallback = await admin
-      .from("ref_ratings")
-      .select("id, score, comment, created_at, organizer_member_id, event_id, skipped")
-      .eq("ref_member_id", refMemberId)
-      .eq("skipped", false)
-      .not("score", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (fallback.error) {
-      return NextResponse.json({ error: fallback.error.message }, { status: 400 });
+    if (isMissingRatingsTable(error.message)) {
+      return NextResponse.json({
+        refMemberId,
+        average: null,
+        count: 0,
+        reviews: [],
+        setupRequired: true,
+        error: "Ratings table is not set up yet in Supabase.",
+      });
     }
-
-    const orgIds = [...new Set((fallback.data ?? []).map((r) => r.organizer_member_id))];
-    const eventIds = [...new Set((fallback.data ?? []).map((r) => r.event_id))];
-    const [{ data: orgs }, { data: events }] = await Promise.all([
-      orgIds.length
-        ? admin.from("members").select("id, display_name").in("id", orgIds)
-        : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
-      eventIds.length
-        ? admin.from("scheduled_events").select("id, title").in("id", eventIds)
-        : Promise.resolve({ data: [] as { id: string; title: string }[] }),
-    ]);
-    const orgMap = new Map((orgs ?? []).map((o) => [o.id, o.display_name]));
-    const eventMap = new Map((events ?? []).map((e) => [e.id, e.title]));
-
-    const reviews = (fallback.data ?? []).map((r) => ({
-      id: r.id,
-      score: r.score as number,
-      comment: r.comment ?? null,
-      createdAt: r.created_at,
-      authorLabel: orgMap.get(r.organizer_member_id)?.trim() || "Host",
-      eventTitle: eventMap.get(r.event_id) ?? null,
-    }));
-
-    const count = reviews.length;
-    const average = count
-      ? Number((reviews.reduce((sum, r) => sum + r.score, 0) / count).toFixed(2))
-      : null;
-
-    return NextResponse.json({ refMemberId, average, count, reviews });
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const reviews = (ratings ?? []).map((r) => {
-    const member = Array.isArray(r.members) ? r.members[0] : r.members;
-    const event = Array.isArray(r.scheduled_events) ? r.scheduled_events[0] : r.scheduled_events;
-    return {
-      id: r.id as string,
-      score: r.score as number,
-      comment: (r.comment as string | null) ?? null,
-      createdAt: r.created_at as string,
-      authorLabel: (member as { display_name?: string } | null)?.display_name?.trim() || "Host",
-      eventTitle: (event as { title?: string } | null)?.title ?? null,
-    };
-  });
+  const orgIds = [...new Set((ratings ?? []).map((r) => r.organizer_member_id))];
+  const eventIds = [...new Set((ratings ?? []).map((r) => r.event_id))];
+  const [{ data: orgs }, { data: events }] = await Promise.all([
+    orgIds.length
+      ? admin.from("members").select("id, display_name").in("id", orgIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
+    eventIds.length
+      ? admin.from("scheduled_events").select("id, title").in("id", eventIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ]);
+  const orgMap = new Map((orgs ?? []).map((o) => [o.id, o.display_name]));
+  const eventMap = new Map((events ?? []).map((e) => [e.id, e.title]));
+
+  const reviews = (ratings ?? []).map((r) => ({
+    id: r.id as string,
+    score: r.score as number,
+    comment: (r.comment as string | null) ?? null,
+    createdAt: r.created_at as string,
+    authorLabel: orgMap.get(r.organizer_member_id)?.trim() || "Host",
+    eventTitle: eventMap.get(r.event_id) ?? null,
+  }));
 
   const count = reviews.length;
-  const average = count
-    ? Number((reviews.reduce((sum, r) => sum + r.score, 0) / count).toFixed(2))
-    : null;
+  const average = averageFromScores(reviews.map((r) => r.score));
 
   return NextResponse.json({ refMemberId, average, count, reviews });
 }
@@ -142,7 +132,14 @@ export async function POST(request: Request) {
     comment = rawComment.slice(0, 1000);
   }
 
-  const { data: event, error: eventError } = await supabase
+  let admin;
+  try {
+    admin = createServiceClient();
+  } catch {
+    return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+  }
+
+  const { data: event, error: eventError } = await admin
     .from("scheduled_events")
     .select("id, organizer_member_id, ends_at")
     .eq("id", body.eventId)
@@ -156,27 +153,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ratings open after the game ends." }, { status: 400 });
   }
 
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id")
-    .eq("event_id", body.eventId)
-    .eq("ref_member_id", body.refMemberId)
-    .eq("organizer_member_id", user.id)
-    .maybeSingle();
-
-  const { data: acceptedOffer } = await supabase
-    .from("assignment_offers")
-    .select("id")
-    .eq("event_id", body.eventId)
-    .eq("ref_member_id", body.refMemberId)
-    .eq("status", "accepted")
-    .maybeSingle();
+  const [{ data: booking }, { data: acceptedOffer }] = await Promise.all([
+    admin
+      .from("bookings")
+      .select("id")
+      .eq("event_id", body.eventId)
+      .eq("ref_member_id", body.refMemberId)
+      .eq("organizer_member_id", user.id)
+      .maybeSingle(),
+    admin
+      .from("assignment_offers")
+      .select("id")
+      .eq("event_id", body.eventId)
+      .eq("ref_member_id", body.refMemberId)
+      .eq("status", "accepted")
+      .maybeSingle(),
+  ]);
 
   if (!booking && !acceptedOffer) {
     return NextResponse.json({ error: "Only booked refs can be rated." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("ref_ratings").upsert(
+  const { error } = await admin.from("ref_ratings").upsert(
     {
       event_id: body.eventId,
       ref_member_id: body.refMemberId,
@@ -190,8 +188,34 @@ export async function POST(request: Request) {
   );
 
   if (error) {
+    if (isMissingRatingsTable(error.message)) {
+      return NextResponse.json(
+        {
+          error:
+            "Reviews are not set up in the database yet. Run supabase/RUN_RATINGS_SETUP.sql in the Supabase SQL Editor, then try again.",
+          setupRequired: true,
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Return the updated average so the UI can refresh cards immediately.
+  const { data: allScores } = await admin
+    .from("ref_ratings")
+    .select("score")
+    .eq("ref_member_id", body.refMemberId)
+    .eq("skipped", false)
+    .not("score", "is", null);
+
+  const scores = (allScores ?? [])
+    .map((row) => row.score)
+    .filter((value): value is number => typeof value === "number");
+
+  return NextResponse.json({
+    ok: true,
+    average: averageFromScores(scores),
+    count: scores.length,
+  });
 }

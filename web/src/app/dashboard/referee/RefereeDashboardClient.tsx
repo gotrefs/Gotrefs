@@ -547,33 +547,66 @@ export default function RefereeDashboardClient() {
 
   useEffect(() => {
     if (loading || !memberId || profileWizard || verificationNotice || applicationDecisionNotice) return;
+
+    const decisionId = searchParams.get("decision");
+    const outcomeParam = searchParams.get("outcome");
+    const storageKey = `gotrefs-ref-application-decision-seen:${memberId}`;
+    const seen = new Set((window.localStorage.getItem(storageKey) || "").split(",").filter(Boolean));
+
+    const showNotice = (app: (typeof applications)[number]) => {
+      const ev = Array.isArray(app.scheduled_events) ? app.scheduled_events[0] : app.scheduled_events;
+      const title = ev?.title || "your game";
+      const when = ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : "";
+      const place = [ev?.city, ev?.state].filter(Boolean).join(", ") || ev?.zip_code || "";
+      if (app.status === "accepted") {
+        setApplicationDecisionNotice({
+          type: "accepted",
+          title: `You've been approved for ${title}`,
+          message: `You're approved${place ? ` in ${place}` : ""}${when ? ` · ${when}` : ""}. Open Trips → Upcoming for the full address and organizer info.`,
+        });
+      } else {
+        setApplicationDecisionNotice({
+          type: "declined",
+          title: `Not selected for ${title}`,
+          message:
+            "This organizer didn't approve your request for that game. It won't show on your open games list anymore — keep browsing other games.",
+        });
+      }
+      seen.add(app.id);
+      window.localStorage.setItem(storageKey, Array.from(seen).slice(-40).join(","));
+    };
+
+    if (decisionId) {
+      const matched = applications.find((app) => app.id === decisionId);
+      if (matched && (matched.status === "accepted" || matched.status === "declined")) {
+        showNotice(matched);
+        return;
+      }
+      if (outcomeParam === "accepted" || outcomeParam === "declined") {
+        setApplicationDecisionNotice({
+          type: outcomeParam,
+          title:
+            outcomeParam === "accepted"
+              ? "You've been approved"
+              : "Your request was not approved",
+          message:
+            outcomeParam === "accepted"
+              ? "The organizer approved your request. Open Trips → Upcoming for game details."
+              : "The organizer did not select you for this game. Keep browsing other open games.",
+        });
+        seen.add(decisionId);
+        window.localStorage.setItem(storageKey, Array.from(seen).slice(-40).join(","));
+        return;
+      }
+    }
+
     const decided = applications.filter(
       (app) => app.status === "accepted" || app.status === "declined"
     );
     if (decided.length === 0) return;
-    const storageKey = `gotrefs-ref-application-decision-seen:${memberId}`;
-    const seen = new Set((window.localStorage.getItem(storageKey) || "").split(",").filter(Boolean));
     const next = decided.find((app) => !seen.has(app.id));
     if (!next) return;
-    const ev = Array.isArray(next.scheduled_events) ? next.scheduled_events[0] : next.scheduled_events;
-    const title = ev?.title || "your game";
-    const when = ev?.starts_at ? new Date(ev.starts_at).toLocaleString() : "";
-    const place = [ev?.city, ev?.state].filter(Boolean).join(", ") || ev?.zip_code || "";
-    if (next.status === "accepted") {
-      setApplicationDecisionNotice({
-        type: "accepted",
-        title: `Approved for ${title}`,
-        message: `You're approved${place ? ` in ${place}` : ""}${when ? ` · ${when}` : ""}. Open Trips → Upcoming for the full address and organizer info.`,
-      });
-    } else {
-      setApplicationDecisionNotice({
-        type: "declined",
-        title: `Not selected for ${title}`,
-        message: "This organizer didn't approve your request for that game. It won't show on your open games list anymore — keep browsing other games.",
-      });
-    }
-    seen.add(next.id);
-    window.localStorage.setItem(storageKey, Array.from(seen).slice(-40).join(","));
+    showNotice(next);
   }, [
     loading,
     memberId,
@@ -581,6 +614,7 @@ export default function RefereeDashboardClient() {
     verificationNotice,
     applicationDecisionNotice,
     applications,
+    searchParams,
   ]);
 
   async function downloadIdCardPdf(): Promise<boolean> {
@@ -1067,6 +1101,10 @@ export default function RefereeDashboardClient() {
               onClick={() => {
                 const wasAccepted = applicationDecisionNotice.type === "accepted";
                 setApplicationDecisionNotice(null);
+                const url = new URL(window.location.href);
+                url.searchParams.delete("decision");
+                url.searchParams.delete("outcome");
+                window.history.replaceState({}, "", url.pathname + url.search);
                 if (wasAccepted) {
                   router.push("/dashboard/referee?panel=trips");
                 }

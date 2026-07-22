@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
+import {
+  QUEUED_PENDING_VERIFICATION_MESSAGE,
+  isQueuedSignupHold,
+} from "@/lib/activate-queued-signups";
 import { notifyInBackground, notifyOrganizerNewApplication } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { refOfferEligible } from "@/lib/ref-eligibility";
@@ -9,6 +13,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 type ApplyBody = {
   eventId?: string;
 };
+
+const PENDING_STATUS_MESSAGE =
+  "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically for this game.";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -31,7 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "eventId is required." }, { status: 400 });
   }
 
-  let admin;
+  let admin: ReturnType<typeof createServiceClient>;
   try {
     admin = createServiceClient();
   } catch {
@@ -60,17 +67,9 @@ export async function POST(request: Request) {
     verificationSubmissionStatus: submission?.status,
   });
 
-  if (!eligible) {
-    const pending = ["submitted", "under_review"].includes(submission?.status ?? "");
-    return NextResponse.json(
-      {
-        error: pending
-          ? "Application Pending — you'll be able to request games once GotREFS approves your verification."
-          : "Your verification must be approved before you can request to work games.",
-      },
-      { status: 403 }
-    );
-  }
+  // Eligible refs go straight to the organizer. Everyone else can still apply —
+  // the request is queued until GotREFS admin approval, then organizers are emailed.
+  const queueUntilApproved = !eligible;
 
   const { data: event, error: eventError } = await admin
     .from("scheduled_events")
@@ -82,19 +81,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This event is not available for applications." }, { status: 404 });
   }
 
+  const eventId = event.id;
+  const eventTitle = event.title;
+  const refMemberId = user.id;
+
   const { data: existing } = await admin
     .from("event_signup_requests")
-    .select("id, status")
-    .eq("event_id", event.id)
-    .eq("ref_member_id", user.id)
+    .select("id, status, message")
+    .eq("event_id", eventId)
+    .eq("ref_member_id", refMemberId)
     .maybeSingle();
 
-  if (existing?.status === "pending") {
+  if (existing && (existing.status === "pending" || existing.status === "queued")) {
+    const held = isQueuedSignupHold(existing);
     return NextResponse.json({
       ok: true,
-      eventTitle: event.title,
+      eventTitle,
       applicationId: existing.id,
       alreadyRequested: true,
+      pendingVerification: held,
+      status: held ? PENDING_STATUS_MESSAGE : undefined,
     });
   }
 
@@ -112,37 +118,69 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: upserted, error } = await admin
-    .from("event_signup_requests")
-    .upsert(
-      {
-        event_id: event.id,
-        ref_member_id: user.id,
-        status: "pending",
-        message: "Ref applied from the open games calendar",
-      },
-      { onConflict: "event_id,ref_member_id" }
-    )
-    .select("id")
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  async function upsertRequest(status: "queued" | "pending", message: string) {
+    return admin
+      .from("event_signup_requests")
+      .upsert(
+        {
+          event_id: eventId,
+          ref_member_id: refMemberId,
+          status,
+          message,
+        },
+        { onConflict: "event_id,ref_member_id" }
+      )
+      .select("id")
+      .single();
   }
 
-  notifyInBackground(() =>
-    notifyOrganizerNewApplication({
-      admin,
-      eventId: event.id,
-      refMemberId: user.id,
-      applicationId: upserted?.id,
-      siteUrl: emailSiteUrl(request.url),
-    })
-  );
+  let upserted: { id: string } | null = null;
+  let usedQueuedStatus = false;
+
+  if (queueUntilApproved) {
+    const queuedTry = await upsertRequest(
+      "queued",
+      "Ref requested while verification pending — held until GotREFS approval"
+    );
+    if (queuedTry.error && /queued|check|constraint/i.test(queuedTry.error.message)) {
+      // DB migration not applied yet — hold as pending with a marker organizers filter out.
+      const fallback = await upsertRequest("pending", QUEUED_PENDING_VERIFICATION_MESSAGE);
+      if (fallback.error) {
+        return NextResponse.json({ error: fallback.error.message }, { status: 400 });
+      }
+      upserted = fallback.data;
+    } else if (queuedTry.error) {
+      return NextResponse.json({ error: queuedTry.error.message }, { status: 400 });
+    } else {
+      upserted = queuedTry.data;
+      usedQueuedStatus = true;
+    }
+  } else {
+    const live = await upsertRequest("pending", "Ref applied from the open games marketplace");
+    if (live.error) {
+      return NextResponse.json({ error: live.error.message }, { status: 400 });
+    }
+    upserted = live.data;
+  }
+
+  if (!queueUntilApproved) {
+    notifyInBackground(() =>
+      notifyOrganizerNewApplication({
+        admin,
+        eventId,
+        refMemberId,
+        applicationId: upserted?.id,
+        siteUrl: emailSiteUrl(request.url),
+      })
+    );
+  }
 
   return NextResponse.json({
     ok: true,
-    eventTitle: event.title,
+    eventTitle,
     applicationId: upserted?.id ?? null,
+    pendingVerification: queueUntilApproved,
+    queuedStatus: usedQueuedStatus ? "queued" : queueUntilApproved ? "pending_hold" : "pending",
+    status: queueUntilApproved ? PENDING_STATUS_MESSAGE : undefined,
   });
 }

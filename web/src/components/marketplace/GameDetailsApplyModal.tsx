@@ -39,12 +39,11 @@ function formatEstCompensation(event: OpenEventRecord) {
     unit: "game",
   });
   if (!label) return "Pay TBD";
-  // Exact offers read as a game total on browse; ranges keep the /game unit.
   if (type !== "range") return label.replace(/\/game$/, " total");
   return label;
 }
 
-export function GamePinPreviewDrawer({
+export function GameDetailsApplyModal({
   event,
   alreadyRequested,
   requesting,
@@ -69,38 +68,31 @@ export function GamePinPreviewDrawer({
   if (!event) return null;
 
   const requested = Boolean(alreadyRequested);
-  const ctaLabel = requested
+  const slotsLeft = Math.max(0, event.officials_needed - (event.booked_count ?? 0));
+  const applyLabel = requested
     ? "Requested to work"
     : requesting
       ? "Submitting…"
       : "Apply";
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 flex items-end justify-center sm:items-end sm:justify-end sm:p-4">
-      <button
-        type="button"
-        aria-label="Dismiss game preview"
-        className="pointer-events-auto absolute inset-0 bg-black/25 sm:bg-transparent"
-        onClick={onClose}
-      />
-      <aside
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 sm:items-center">
+      <button type="button" aria-label="Dismiss" className="absolute inset-0" onClick={onClose} />
+      <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`pin-preview-title-${event.id}`}
-        className="pointer-events-auto relative w-full max-w-md translate-y-0 rounded-t-2xl border border-neutral-200 bg-white shadow-2xl transition-transform duration-200 ease-out sm:mb-0 sm:rounded-2xl"
+        aria-labelledby={`game-details-title-${event.id}`}
+        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
       >
-        <div className="flex justify-center pt-2 sm:hidden">
-          <span className="h-1 w-10 rounded-full bg-neutral-300" />
-        </div>
-        <div className="space-y-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
+        <div className="space-y-4 p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 {event.sport}
               </p>
               <h3
-                id={`pin-preview-title-${event.id}`}
-                className="text-lg font-semibold leading-snug text-neutral-900"
+                id={`game-details-title-${event.id}`}
+                className="text-xl font-semibold leading-snug text-neutral-900"
               >
                 {event.title}
               </h3>
@@ -122,7 +114,7 @@ export function GamePinPreviewDrawer({
             </button>
           </div>
 
-          <dl className="space-y-2 text-sm">
+          <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Time & Date
@@ -148,11 +140,27 @@ export function GamePinPreviewDrawer({
                 {formatEstCompensation(event)}
               </dd>
             </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Openings
+              </dt>
+              <dd className="mt-0.5 font-medium text-neutral-900">
+                {slotsLeft} official slot{slotsLeft === 1 ? "" : "s"} available
+              </dd>
+            </div>
+            {event.notes ? (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                  Notes
+                </dt>
+                <dd className="mt-0.5 text-neutral-700">{event.notes}</dd>
+              </div>
+            ) : null}
           </dl>
 
           <button
             type="button"
-            disabled={requested || requesting}
+            disabled={requested || requesting || slotsLeft === 0}
             onClick={() => onApply(event)}
             className={`mt-1 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
               requested
@@ -160,10 +168,10 @@ export function GamePinPreviewDrawer({
                 : "bg-[#d81d24] hover:bg-[#c01820] disabled:opacity-60"
             }`}
           >
-            {ctaLabel}
+            {slotsLeft === 0 && !requested ? "No openings left" : applyLabel}
           </button>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
   for (const row of myRequests ?? []) {
     if (row.status === "declined" || row.status === "accepted" || row.status === "withdrawn") {
       hideEventIds.add(row.event_id);
-    } else if (row.status === "pending") {
+    } else if (row.status === "pending" || row.status === "queued") {
       pendingEventIds.add(row.event_id);
     }
   }

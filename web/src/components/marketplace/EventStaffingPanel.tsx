@@ -77,7 +77,6 @@ export function EventStaffingPanel({
   refs,
   hiredCount,
   onClose,
-  onBrowseMarketplace,
   onInviteApplicant,
   onInviteRef,
 }: {
@@ -86,7 +85,6 @@ export function EventStaffingPanel({
   refs: DirectoryRef[];
   hiredCount: number;
   onClose: () => void;
-  onBrowseMarketplace?: () => void;
   onInviteApplicant: (applicant: Applicant) => Promise<void>;
   onInviteRef: (refId: string) => Promise<void>;
 }) {
@@ -148,15 +146,13 @@ export function EventStaffingPanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {onBrowseMarketplace && (
-              <button
-                type="button"
-                onClick={onBrowseMarketplace}
-                className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white"
-              >
-                Browse & request refs
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setTab("suggested")}
+              className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white"
+            >
+              Find matching refs
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -192,7 +188,7 @@ export function EventStaffingPanel({
           {tab === "applicants" &&
             (eventApplicants.length === 0 ? (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-                No refs have applied yet. Check Suggested refs or browse the marketplace.
+                No refs have applied yet. Open Suggested refs to invite someone who matches this game, or wait for requests from Find Games.
               </p>
             ) : (
               eventApplicants.map((applicant) => (
@@ -225,7 +221,7 @@ export function EventStaffingPanel({
           {tab === "suggested" &&
             (suggestedRefs.length === 0 ? (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-                No refs match availability, sport, ZIP, and pay for this game. Use Browse & request refs to invite from the marketplace, or wait for refs to apply from Find Games.
+                No refs match availability, sport, ZIP, and pay for this game yet. Wait for refs to apply from Find Games, or widen pay/ZIP on the listing.
               </p>
             ) : (
               suggestedRefs.map((ref) => (

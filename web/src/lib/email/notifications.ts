@@ -177,6 +177,7 @@ export async function notifyApplicationDecision(opts: {
   refMemberId: string;
   eventId: string;
   accepted: boolean;
+  applicationId?: string | null;
   siteUrl?: string;
 }) {
   const siteUrl = opts.siteUrl || emailSiteUrl();
@@ -185,6 +186,11 @@ export async function notifyApplicationDecision(opts: {
     eventSummary(opts.admin, opts.eventId),
   ]);
   if (!ref || !event) return false;
+
+  const decisionParam = opts.applicationId
+    ? `decision=${encodeURIComponent(opts.applicationId)}&outcome=${opts.accepted ? "accepted" : "declined"}`
+    : `outcome=${opts.accepted ? "accepted" : "declined"}`;
+  const decisionUrl = `${dashboardUrl(siteUrl, "/dashboard/referee")}?${decisionParam}`;
 
   if (opts.accepted) {
     const notesBlock = event.notes
@@ -205,8 +211,8 @@ export async function notifyApplicationDecision(opts: {
           ${notesBlock}
           <p>These details are also saved under Upcoming games in your dashboard. Organizer names, emails, and phone numbers are never shared.</p>
         `,
-        ctaLabel: "View upcoming games",
-        ctaUrl: `${dashboardUrl(siteUrl, "/dashboard/referee")}?panel=trips`,
+        ctaLabel: "View your approval",
+        ctaUrl: decisionUrl,
       }),
     });
   }
@@ -221,8 +227,8 @@ export async function notifyApplicationDecision(opts: {
         <p>No worries — you weren’t selected for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.place)} · ${escapeHtml(event.startsAt)}) this time.</p>
         <p>You can check out more events on your dashboard and keep requesting games that fit your schedule.</p>
       `,
-      ctaLabel: "See upcoming event games",
-      ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
+      ctaLabel: "View decision details",
+      ctaUrl: decisionUrl,
     }),
   });
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ALL_SPORTS } from "@/data/sports";
 import { AirbnbMarketplaceSearch } from "@/components/marketplace/AirbnbMarketplaceSearch";
+import { GameDetailsApplyModal } from "@/components/marketplace/GameDetailsApplyModal";
 import { GameListingCard } from "@/components/marketplace/GameListingCard";
 import { MarketplaceMapView } from "@/components/marketplace/MarketplaceMapView";
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
@@ -18,10 +19,6 @@ import { geocodeZipBatch } from "@/lib/marketplace/zip-geocode";
 
 export function FindGamesExplorer({
   view,
-  canApplyToEvents,
-  applicationPending,
-  applicationRejected,
-  onRequireProfile,
   onApplied,
   pendingInviteCount = 0,
   onOpenTrips,
@@ -50,6 +47,7 @@ export function FindGamesExplorer({
   const [mapPins, setMapPins] = useState<MapGamePin[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  const [detailsEvent, setDetailsEvent] = useState<OpenEventRecord | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,22 +146,6 @@ export function FindGamesExplorer({
 
   async function applyToEvent(event: OpenEventRecord) {
     setMsg(null);
-    if (!canApplyToEvents) {
-      if (applicationPending) {
-        setMsg({
-          text: "Application pending — you can apply once GotREFS approves your verification.",
-          tone: "err",
-        });
-        return;
-      }
-      if (applicationRejected) {
-        setMsg({ text: "Verification not approved. Check your notification inbox.", tone: "err" });
-        return;
-      }
-      setMsg({ text: "Complete verification before you can request to work games.", tone: "err" });
-      onRequireProfile?.();
-      return;
-    }
     if (event.already_requested || requestedIds.has(event.id)) {
       setMsg({ text: "You already requested to work this game.", tone: "ok" });
       return;
@@ -176,7 +158,12 @@ export function FindGamesExplorer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId: event.id }),
       });
-      const json = (await res.json()) as { error?: string; eventTitle?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        eventTitle?: string;
+        pendingVerification?: boolean;
+        status?: string;
+      };
       if (!res.ok) {
         setRequestedIds((prev) => {
           const next = new Set(prev);
@@ -192,10 +179,22 @@ export function FindGamesExplorer({
       setMapPins((prev) =>
         prev.map((pin) => (pin.id === event.id ? { ...pin, already_requested: true } : pin))
       );
-      setMsg({
-        text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotREFS ID.`,
-        tone: "ok",
-      });
+      setDetailsEvent((prev) =>
+        prev?.id === event.id ? { ...prev, already_requested: true } : prev
+      );
+      if (json.pendingVerification) {
+        setMsg({
+          text:
+            json.status ||
+            "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically.",
+          tone: "ok",
+        });
+      } else {
+        setMsg({
+          text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotREFS ID.`,
+          tone: "ok",
+        });
+      }
       onApplied?.();
     } catch {
       setRequestedIds((prev) => {
@@ -355,10 +354,10 @@ export function FindGamesExplorer({
                         event={event}
                         payBadge={payMatchLabel(refProfile, event)}
                         slotsLeft={slotsLeft}
-                        ctaLabel={alreadyRequested ? "Requested to work" : "Request to work"}
-                        ctaDisabled={slotsLeft === 0 || alreadyRequested}
-                        ctaLoading={submittingId === event.id}
-                        onAction={() => void applyToEvent(event)}
+                        ctaLabel={alreadyRequested ? "View request" : "View details"}
+                        ctaDisabled={false}
+                        ctaLoading={false}
+                        onAction={() => setDetailsEvent(event)}
                       />
                     </div>
                   );
@@ -386,6 +385,17 @@ export function FindGamesExplorer({
           </div>
         )}
       </div>
+
+      <GameDetailsApplyModal
+        event={detailsEvent}
+        alreadyRequested={Boolean(
+          detailsEvent &&
+            (detailsEvent.already_requested || requestedIds.has(detailsEvent.id))
+        )}
+        requesting={Boolean(detailsEvent && submittingId === detailsEvent.id)}
+        onClose={() => setDetailsEvent(null)}
+        onApply={(event) => void applyToEvent(event)}
+      />
     </div>
   );
 }

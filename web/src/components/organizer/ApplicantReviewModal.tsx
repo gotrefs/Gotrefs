@@ -35,7 +35,7 @@ export function ApplicantReviewModal({
 }: {
   applicant: ApplicantReviewData;
   onClose: () => void;
-  onDecide: (action: "accept" | "decline") => Promise<boolean>;
+  onDecide: (action: "accept" | "decline") => Promise<boolean | string>;
 }) {
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [done, setDone] = useState<"accept" | "decline" | null>(null);
@@ -45,13 +45,21 @@ export function ApplicantReviewModal({
     setBusy(action);
     setError(null);
     try {
-      const ok = await onDecide(action);
-      if (!ok) {
-        setError("Could not save your decision. Try again.");
+      const result = await onDecide(action);
+      if (result !== true) {
+        setError(
+          typeof result === "string"
+            ? result
+            : action === "accept"
+              ? "Could not approve this ref. Try again."
+              : "Could not deny this request. Try again."
+        );
         return;
       }
       setDone(action);
       window.setTimeout(() => onClose(), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your decision. Try again.");
     } finally {
       setBusy(null);
     }

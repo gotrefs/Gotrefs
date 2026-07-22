@@ -63,10 +63,6 @@ function formatEventPay(event: CalendarEvent, decimals = 2) {
 }
 
 export function RefEventCalendar({
-  canApplyToEvents = true,
-  applicationPending = false,
-  applicationRejected = false,
-  onRequireProfile,
   embedded = false,
 }: {
   canApplyToEvents?: boolean;
@@ -193,7 +189,7 @@ export function RefEventCalendar({
     if (offer?.status === "pending") return "invited";
     if (offer?.status === "accepted") return "confirmed";
     const request = requests.find((row) => row.event_id === eventId);
-    if (request?.status === "pending") return "applied";
+    if (request?.status === "pending" || request?.status === "queued") return "applied";
     return "open";
   }
 
@@ -213,19 +209,6 @@ export function RefEventCalendar({
 
   async function requestSignup(event: CalendarEvent) {
     setMsg(null);
-    if (!canApplyToEvents) {
-      if (applicationPending) {
-        setMsg("Application Pending — you'll be able to request games once GotREFS approves your verification.");
-        return;
-      }
-      if (applicationRejected) {
-        setMsg("Your verification was not approved. Check your notification inbox for details from GotREFS.");
-        return;
-      }
-      setMsg("Finish your referee profile first so organizers know who is applying.");
-      onRequireProfile?.();
-      return;
-    }
     setSubmitting(true);
     const {
       data: { user },
@@ -247,14 +230,26 @@ export function RefEventCalendar({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventId: event.id }),
     });
-    const json = (await res.json()) as { error?: string; eventTitle?: string };
+    const json = (await res.json()) as {
+      error?: string;
+      eventTitle?: string;
+      pendingVerification?: boolean;
+      status?: string;
+    };
 
     setSubmitting(false);
     if (!res.ok) {
       setMsg(json.error || "Could not send your application.");
       return;
     }
-    setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
+    if (json.pendingVerification) {
+      setMsg(
+        json.status ||
+          "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically."
+      );
+    } else {
+      setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
+    }
     await load();
   }
 
@@ -420,29 +415,23 @@ export function RefEventCalendar({
             <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={
-                  submitting ||
-                  !canApplyToEvents ||
-                  eventWorkStatus(selected.id) !== "open"
-                }
+                disabled={submitting || eventWorkStatus(selected.id) !== "open"}
                 onClick={() => void requestSignup(selected)}
                 className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
-                  !canApplyToEvents && applicationPending
-                    ? "bg-amber-600"
-                    : eventWorkStatus(selected.id) === "applied"
-                      ? "bg-green-600"
-                      : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
+                  eventWorkStatus(selected.id) === "applied"
+                    ? "bg-green-600"
+                    : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
                 }`}
               >
-                {!canApplyToEvents && applicationPending
-                  ? "Application Pending"
-                  : eventWorkStatus(selected.id) === "applied"
-                    ? "✓ Applied"
-                    : eventWorkStatus(selected.id) === "invited"
-                      ? "Invited — check My Work"
-                      : eventWorkStatus(selected.id) === "confirmed"
-                        ? "✓ Confirmed"
-                        : "Request to Work Game"}
+                {eventWorkStatus(selected.id) === "applied"
+                  ? "✓ Applied"
+                  : eventWorkStatus(selected.id) === "invited"
+                    ? "Invited — check My Work"
+                    : eventWorkStatus(selected.id) === "confirmed"
+                      ? "✓ Confirmed"
+                      : submitting
+                        ? "Submitting…"
+                        : "Apply"}
               </button>
             </div>
           </div>

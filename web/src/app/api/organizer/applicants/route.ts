@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isQueuedSignupHold } from "@/lib/activate-queued-signups";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { payBounds } from "@/lib/pay-range";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,8 @@ type ApplicantRow = {
   event_id: string;
   ref_member_id: string;
   created_at: string;
+  status?: string | null;
+  message?: string | null;
   scheduled_events: EventJoin | EventJoin[] | null;
 };
 
@@ -69,9 +72,9 @@ export async function GET() {
   }
 
   const selectFull =
-    "id, event_id, ref_member_id, created_at, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, pay_type, pay_min, pay_max, organizer_member_id )";
+    "id, event_id, ref_member_id, created_at, status, message, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, pay_type, pay_min, pay_max, organizer_member_id )";
   const selectBase =
-    "id, event_id, ref_member_id, created_at, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, organizer_member_id )";
+    "id, event_id, ref_member_id, created_at, status, message, scheduled_events!inner ( title, sport, starts_at, city, state, zip_code, pay_offer, organizer_member_id )";
 
   let rows: ApplicantRow[] | null = null;
   let error: { message?: string } | null = null;
@@ -101,6 +104,7 @@ export async function GET() {
   }
 
   const applicants = (rows ?? []).filter((row) => {
+    if (isQueuedSignupHold(row)) return false;
     const event = eventFromJoin(row.scheduled_events);
     return event?.organizer_member_id === user.id;
   });
