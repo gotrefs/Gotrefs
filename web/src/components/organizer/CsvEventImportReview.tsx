@@ -170,7 +170,7 @@ export function CsvEventImportReview({
               value={current.sport}
               onChange={(e) => patchCurrent({ sport: e.target.value })}
             >
-              {!ALL_SPORTS.includes(current.sport) && current.sport ? (
+              {!(ALL_SPORTS as readonly string[]).includes(current.sport) && current.sport ? (
                 <option value={current.sport}>{current.sport}</option>
               ) : null}
               {ALL_SPORTS.map((s) => (
