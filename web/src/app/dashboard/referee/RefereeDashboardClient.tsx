@@ -160,6 +160,8 @@ export default function RefereeDashboardClient() {
     title?: string;
     message: string;
     items?: string[];
+    /** When true, show approval-only popup (no download CTA). */
+    cardAlreadyDownloaded?: boolean;
   } | null>(null);
   const [applicationDecisionNotice, setApplicationDecisionNotice] = useState<{
     type: "accepted" | "declined";
@@ -516,13 +518,28 @@ export default function RefereeDashboardClient() {
     if (window.localStorage.getItem(storageKey) === fingerprint) return;
 
     if (refVerificationApproved(verificationStatus)) {
-      setVerificationNotice({
-        type: "approved",
-        title: "Download your GotREFS ID card",
-        message:
-          verificationAdminNotes ||
-          "You're approved. Download your digital ID card to show organizers — it's valid for one year from today.",
-      });
+      const cardAlreadyDownloaded = Boolean(
+        window.localStorage.getItem(`gotrefs-ref-id-card-downloaded:${memberId}`)
+      );
+      if (cardAlreadyDownloaded) {
+        setVerificationNotice({
+          type: "approved",
+          cardAlreadyDownloaded: true,
+          title: "You've been approved",
+          message:
+            verificationAdminNotes ||
+            "Your GotREFS verification is approved. You can now request to work games and receive invites from organizers.",
+        });
+      } else {
+        setVerificationNotice({
+          type: "approved",
+          cardAlreadyDownloaded: false,
+          title: "Download your GotREFS ID card",
+          message:
+            verificationAdminNotes ||
+            "You're approved. Download your digital ID card to show organizers — it's valid for one year from today.",
+        });
+      }
       return;
     }
 
@@ -617,6 +634,11 @@ export default function RefereeDashboardClient() {
     searchParams,
   ]);
 
+  function markIdCardDownloaded() {
+    if (!memberId) return;
+    window.localStorage.setItem(`gotrefs-ref-id-card-downloaded:${memberId}`, "1");
+  }
+
   async function downloadIdCardPdf(): Promise<boolean> {
     setDownloadingCard(true);
     try {
@@ -648,6 +670,7 @@ export default function RefereeDashboardClient() {
         },
         `GotREFS-ID-${safeName.replace(/\s+/g, "-")}.pdf`
       );
+      markIdCardDownloaded();
       setMsg("ID card downloaded. Valid for one year from your approval date.");
       return true;
     } catch (err) {
@@ -660,8 +683,8 @@ export default function RefereeDashboardClient() {
   }
 
   async function downloadIdCardAndGoToGames() {
-    await downloadIdCardPdf();
-    dismissVerificationNotice();
+    const ok = await downloadIdCardPdf();
+    if (ok) dismissVerificationNotice();
   }
 
   function dismissVerificationNotice() {
@@ -1149,7 +1172,10 @@ export default function RefereeDashboardClient() {
             </p>
             <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
               {verificationNotice.type === "approved"
-                ? verificationNotice.title || "Download your GotREFS ID card"
+                ? verificationNotice.title ||
+                  (verificationNotice.cardAlreadyDownloaded
+                    ? "You've been approved"
+                    : "Download your GotREFS ID card")
                 : verificationNotice.type === "fix_required"
                   ? verificationNotice.title || "Please fix and resubmit your application"
                   : "Verification not approved"}
@@ -1160,7 +1186,7 @@ export default function RefereeDashboardClient() {
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
-            {verificationNotice.type === "approved" && (
+            {verificationNotice.type === "approved" && !verificationNotice.cardAlreadyDownloaded && (
               <p className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-900">
                 Valid for 1 year from your approval date
                 {verificationReviewedAt
@@ -1176,7 +1202,7 @@ export default function RefereeDashboardClient() {
                 ))}
               </ul>
             )}
-            {verificationNotice.type === "approved" ? (
+            {verificationNotice.type === "approved" && !verificationNotice.cardAlreadyDownloaded ? (
               <div className="mt-5 space-y-2">
                 <button
                   type="button"
@@ -1199,12 +1225,18 @@ export default function RefereeDashboardClient() {
                 type="button"
                 onClick={dismissVerificationNotice}
                 className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
-                  verificationNotice.type === "fix_required" ? "bg-amber-600" : "bg-[var(--red)]"
+                  verificationNotice.type === "approved"
+                    ? "bg-green-600"
+                    : verificationNotice.type === "fix_required"
+                      ? "bg-amber-600"
+                      : "bg-[var(--red)]"
                 }`}
               >
-                {verificationNotice.type === "fix_required"
-                  ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
-                  : "Got it"}
+                {verificationNotice.type === "approved"
+                  ? "Got it — browse games"
+                  : verificationNotice.type === "fix_required"
+                    ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
+                    : "Got it"}
               </button>
             )}
           </div>

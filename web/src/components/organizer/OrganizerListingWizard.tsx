@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
 import { VenuePinMap } from "@/components/organizer/VenuePinMap";
 import { SportsFields } from "@/components/SportsFields";
@@ -149,15 +149,46 @@ function StepperRow({
   label,
   value,
   min = 1,
-  max = 50,
+  max,
   onChange,
 }: {
   label: string;
   value: number;
   min?: number;
+  /** Omit for no upper limit. */
   max?: number;
   onChange: (next: number) => void;
 }) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  function clamp(n: number) {
+    let next = Math.max(min, n);
+    if (typeof max === "number") next = Math.min(max, next);
+    return next;
+  }
+
+  function commit(raw: string) {
+    const digits = raw.replace(/[^\d]/g, "");
+    if (!digits) {
+      onChange(min);
+      setText(String(min));
+      return;
+    }
+    const parsed = Number.parseInt(digits, 10);
+    if (!Number.isFinite(parsed)) {
+      onChange(min);
+      setText(String(min));
+      return;
+    }
+    const next = clamp(parsed);
+    onChange(next);
+    setText(String(next));
+  }
+
   return (
     <div className="flex items-center justify-between gap-4 border-b border-neutral-200 py-6 last:border-b-0">
       <p className="text-lg font-medium text-neutral-900">{label}</p>
@@ -166,17 +197,37 @@ function StepperRow({
           type="button"
           aria-label={`Decrease ${label}`}
           disabled={value <= min}
-          onClick={() => onChange(Math.max(min, value - 1))}
+          onClick={() => onChange(clamp(value - 1))}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 text-xl text-neutral-700 transition hover:border-neutral-900 disabled:opacity-30"
         >
           −
         </button>
-        <span className="min-w-6 text-center text-base font-medium text-neutral-900">{value}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          aria-label={label}
+          value={text}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/[^\d]/g, "");
+            setText(digits);
+            if (!digits) return;
+            const parsed = Number.parseInt(digits, 10);
+            if (!Number.isFinite(parsed)) return;
+            onChange(clamp(parsed));
+          }}
+          onBlur={() => commit(text)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          className="w-14 min-w-6 border-0 bg-transparent p-0 text-center text-base font-medium text-neutral-900 outline-none focus:ring-0"
+        />
         <button
           type="button"
           aria-label={`Increase ${label}`}
-          disabled={value >= max}
-          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={typeof max === "number" && value >= max}
+          onClick={() => onChange(clamp(value + 1))}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 text-xl text-neutral-700 transition hover:border-neutral-900 disabled:opacity-30"
         >
           +
@@ -711,7 +762,7 @@ export function OrganizerListingWizard({
               </h1>
               <p className="mt-2 max-w-2xl text-neutral-600">
                 We only share your address after refs book through GotREFS. Until then, they&apos;ll see an
-                approximate location within about <strong>75 miles</strong> on the map — so they can&apos;t go
+                approximate location within about <strong>7 miles</strong> on the map — so they can&apos;t go
                 around the platform to find you at a specific park or gym.
               </p>
               <div className="mt-6">
@@ -739,7 +790,6 @@ export function OrganizerListingWizard({
                   label="Refs needed"
                   value={draft.officialsNeeded}
                   min={1}
-                  max={30}
                   onChange={(officialsNeeded) => patch({ officialsNeeded })}
                 />
               </div>

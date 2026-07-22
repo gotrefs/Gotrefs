@@ -19,9 +19,9 @@ function recoveryCallbackUrl(siteUrl: string, tokenHash: string) {
 }
 
 async function sendRecoveryEmail(to: string, resetUrl: string) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = serverEnv.resendApiKey();
   const from =
-    process.env.RESEND_FROM_EMAIL?.trim() || "GotREFS <onboarding@resend.dev>";
+    serverEnv.resendFromEmail() || "GotREFS <onboarding@resend.dev>";
   if (!apiKey) return false;
 
   const res = await fetch("https://api.resend.com/emails", {

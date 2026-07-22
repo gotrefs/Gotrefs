@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/maps/google-maps-loader";
+import { EVENT_PRIVACY_RADIUS_METERS } from "@/lib/maps/geo";
 
 type VenuePinMapProps = {
   center: { lat: number; lng: number };
@@ -42,7 +43,7 @@ export function VenuePinMap({
         if (!mapRef.current) {
           mapRef.current = new google.maps.Map(mapElRef.current, {
             center,
-            zoom: approximate ? 9 : 15,
+            zoom: approximate ? 11 : 15,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
@@ -88,13 +89,13 @@ export function VenuePinMap({
     }
 
     if (approximate) {
-      const privacyRadiusMeters = 75 * 1609.344; // ~75 miles — hides exact venue from browsing refs
-      map.setZoom(Math.min(map.getZoom() ?? 9, 9));
+      // ~7 miles — same privacy radius refs see when browsing open games
+      map.setZoom(Math.min(map.getZoom() ?? 11, 11));
       if (!circleRef.current) {
         circleRef.current = new google.maps.Circle({
           map,
           center,
-          radius: privacyRadiusMeters,
+          radius: EVENT_PRIVACY_RADIUS_METERS,
           strokeColor: "#717171",
           strokeOpacity: 0.35,
           strokeWeight: 1,
@@ -105,7 +106,7 @@ export function VenuePinMap({
       } else {
         circleRef.current.setMap(map);
         circleRef.current.setCenter(center);
-        circleRef.current.setRadius(privacyRadiusMeters);
+        circleRef.current.setRadius(EVENT_PRIVACY_RADIUS_METERS);
       }
     } else if (circleRef.current) {
       circleRef.current.setMap(null);

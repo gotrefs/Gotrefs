@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { BRAND_NAME } from "@/lib/brand";
@@ -10,6 +10,7 @@ import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sport
 import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
 import { signupDashboardLabel, type SignupDashboardPath } from "@/lib/auth/email-confirmation";
 import { formatHourlyRateRange } from "@/lib/pay-range";
+import { PasswordField } from "@/components/auth/PasswordField";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -98,6 +99,23 @@ export function AuthFlow() {
   const [pendingRedirect, setPendingRedirect] = useState<SignupDashboardPath>("/dashboard/referee");
   const [resendCooldown, setResendCooldown] = useState(false);
   const oauthMode = searchParams.get("oauth") === "1";
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const emailAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailCheckInFlight = useRef(false);
+
+  useEffect(() => {
+    if (step !== "password") return;
+    const frame = window.requestAnimationFrame(() => {
+      passwordInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [step]);
+
+  useEffect(() => {
+    return () => {
+      if (emailAdvanceTimer.current) clearTimeout(emailAdvanceTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!oauthMode) return;
@@ -158,19 +176,21 @@ export function AuthFlow() {
     );
   }
 
-  async function continueWithEmail(e: React.FormEvent) {
-    e.preventDefault();
+  async function continueWithEmail(e?: React.FormEvent, emailOverride?: string) {
+    e?.preventDefault();
+    if (emailCheckInFlight.current) return;
     setError(null);
     setNotice(null);
     if (!isSupabaseConfigured()) {
       setError(SUPABASE_SETUP_HINT);
       return;
     }
-    const normalized = email.trim().toLowerCase();
-    if (!normalized || !normalized.includes("@")) {
+    const normalized = (emailOverride ?? email).trim().toLowerCase();
+    if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
       setError("Enter a valid email address.");
       return;
     }
+    emailCheckInFlight.current = true;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/check-email", {
@@ -188,11 +208,59 @@ export function AuthFlow() {
     } catch {
       setError("Could not reach the server. Check your local environment and try again.");
     } finally {
+      emailCheckInFlight.current = false;
       setLoading(false);
     }
   }
 
+  async function autoAdvanceToPasswordIfAccountExists(normalizedEmail: string) {
+    if (emailCheckInFlight.current || step !== "email") return;
+    if (!isSupabaseConfigured()) return;
+    emailCheckInFlight.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      const json = (await res.json()) as { exists?: boolean; error?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not check this email.");
+        return;
+      }
+      if (!json.exists) return;
+      setEmail(normalizedEmail);
+      setStep("password");
+    } catch {
+      // Keep the user on the email step; they can still press Continue.
+    } finally {
+      emailCheckInFlight.current = false;
+      setLoading(false);
+    }
+  }
+
+  function clearEmailAdvanceTimer() {
+    if (emailAdvanceTimer.current) {
+      clearTimeout(emailAdvanceTimer.current);
+      emailAdvanceTimer.current = null;
+    }
+  }
+
+  function onLoginEmailChange(value: string) {
+    setEmail(value);
+    if (step !== "email" || loading || emailCheckInFlight.current) return;
+    clearEmailAdvanceTimer();
+    const normalized = value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return;
+    emailAdvanceTimer.current = setTimeout(() => {
+      void autoAdvanceToPasswordIfAccountExists(normalized);
+    }, 400);
+  }
+
   function startSignup() {
+    clearEmailAdvanceTimer();
     setError(null);
     setNotice(null);
     const normalized = email.trim().toLowerCase();
@@ -547,7 +615,7 @@ export function AuthFlow() {
 
         {step === "email" && (
           <div className="space-y-4">
-            <form onSubmit={continueWithEmail} className="space-y-4">
+            <form onSubmit={(event) => void continueWithEmail(event)} className="space-y-4">
               <label className="block text-sm font-bold text-[var(--navy)]">
                 Email
                 <input
@@ -555,7 +623,7 @@ export function AuthFlow() {
                   required
                   autoComplete="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => onLoginEmailChange(event.target.value)}
                   placeholder="you@example.com"
                   className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
                 />
@@ -579,6 +647,7 @@ export function AuthFlow() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearEmailAdvanceTimer();
                     setError(null);
                     setNotice(null);
                     const normalized = email.trim().toLowerCase();
@@ -608,17 +677,14 @@ export function AuthFlow() {
                 <p className="text-xs font-black uppercase tracking-wide text-slate-500">Existing account</p>
                 <p className="mt-1 font-bold text-[var(--navy)]">{email}</p>
               </div>
-              <label className="block text-sm font-bold text-[var(--navy)]">
-                Password
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-[var(--navy)] focus:ring-2 focus:ring-[var(--navy)]/10"
-                />
-              </label>
+              <PasswordField
+                ref={passwordInputRef}
+                label="Password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
               <button type="submit" disabled={loading} className="w-full rounded-xl bg-[var(--navy)] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
                 {loading ? "Signing in..." : "Log in"}
               </button>
@@ -1264,10 +1330,13 @@ function LocationAndAccount({
         </div>
       </div>
       {!oauthMode && (
-        <label className="block text-sm font-bold text-[var(--navy)]">
-          Create password
-          <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-        </label>
+        <PasswordField
+          label="Create password"
+          value={password}
+          onChange={(event) => onPassword(event.target.value)}
+          autoComplete="new-password"
+          placeholder="At least 8 characters, with a letter and number"
+        />
       )}
     </div>
   );
@@ -1318,10 +1387,13 @@ function AccountFields({
         <input type="tel" value={phone} onChange={(event) => onPhone(event.target.value)} placeholder="(555) 123-4567" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
       </label>
       {!oauthMode && (
-        <label className="block text-sm font-bold text-[var(--navy)]">
-          Create password
-          <input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="new-password" placeholder="At least 8 characters, with a letter and number" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-        </label>
+        <PasswordField
+          label="Create password"
+          value={password}
+          onChange={(event) => onPassword(event.target.value)}
+          autoComplete="new-password"
+          placeholder="At least 8 characters, with a letter and number"
+        />
       )}
     </div>
   );

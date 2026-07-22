@@ -1,4 +1,6 @@
+import "server-only";
 import { BRAND_NAME } from "@/lib/brand";
+import { resolveSiteUrl, serverEnv } from "@/lib/env/server";
 
 export type SendEmailInput = {
   to: string;
@@ -9,9 +11,9 @@ export type SendEmailInput = {
 
 /** Send via Resend. Returns false if not configured or the API call fails (never throws). */
 export async function sendEmail(input: SendEmailInput): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = serverEnv.resendApiKey();
   const from =
-    process.env.RESEND_FROM_EMAIL?.trim() || `${BRAND_NAME} <onboarding@resend.dev>`;
+    serverEnv.resendFromEmail() || `${BRAND_NAME} <onboarding@resend.dev>`;
   const to = input.to.trim().toLowerCase();
   if (!apiKey || !to.includes("@")) {
     if (!apiKey) {
@@ -50,21 +52,21 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
 
 /** Public site URL for email CTAs (prefer production domain). */
 export function emailSiteUrl(requestUrl?: string | null): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
-  if (configured && !configured.includes("localhost")) return configured;
-
+  let requestOrigin: string | null = null;
   if (requestUrl) {
     try {
-      const origin = new URL(requestUrl).origin.replace(/\/$/, "");
-      if (origin && !origin.includes("localhost")) return origin;
+      requestOrigin = new URL(requestUrl).origin;
     } catch {
       // ignore
     }
   }
 
+  const resolved = resolveSiteUrl(requestOrigin);
+  if (!resolved.includes("localhost")) return resolved;
+
   if (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
     return "https://gotrefs.org";
   }
 
-  return configured || "http://localhost:3000";
+  return resolved;
 }

@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, SUPABASE_SETUP_HINT } from "@/lib/supabase/config";
+import { PasswordField } from "@/components/auth/PasswordField";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginForm() {
   const searchParams = useSearchParams();
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(() => {
@@ -22,6 +26,14 @@ export function LoginForm() {
     return "Email link expired or could not be verified. Request a new password reset and open the newest email right away.";
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!EMAIL_RE.test(email.trim())) return;
+    const timer = window.setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [email]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,17 +97,16 @@ export function LoginForm() {
             autoComplete="email"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue-text)]">Password</span>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border border-[var(--border)] px-3 py-2"
-            autoComplete="current-password"
-          />
-        </label>
+        <PasswordField
+          ref={passwordInputRef}
+          label="Password"
+          labelClassName="flex flex-col gap-1 text-sm font-medium text-[var(--blue-text)]"
+          inputClassName="w-full rounded-lg border border-[var(--border)] py-2 pl-3 pr-12"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"

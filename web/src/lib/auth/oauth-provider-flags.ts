@@ -1,7 +1,9 @@
 import type { OAuthProvider } from "@/lib/auth/oauth-providers";
 
-function readPublicFlag(name: string, defaultValue: boolean): boolean {
-  const value = process.env[name];
+/**
+ * Next.js only inlines NEXT_PUBLIC_* with static access — never process.env[name].
+ */
+function flag(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined || value === "") return defaultValue;
   return value === "1" || value.toLowerCase() === "true";
 }
@@ -10,11 +12,11 @@ function readPublicFlag(name: string, defaultValue: boolean): boolean {
 export function isOAuthProviderEnabled(provider: OAuthProvider): boolean {
   switch (provider) {
     case "google":
-      return readPublicFlag("NEXT_PUBLIC_OAUTH_GOOGLE_ENABLED", false);
+      return flag(process.env.NEXT_PUBLIC_OAUTH_GOOGLE_ENABLED, false);
     case "apple":
-      return readPublicFlag("NEXT_PUBLIC_OAUTH_APPLE_ENABLED", false);
+      return flag(process.env.NEXT_PUBLIC_OAUTH_APPLE_ENABLED, false);
     case "facebook":
-      return readPublicFlag("NEXT_PUBLIC_OAUTH_FACEBOOK_ENABLED", false);
+      return flag(process.env.NEXT_PUBLIC_OAUTH_FACEBOOK_ENABLED, false);
   }
 }
 
