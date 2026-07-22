@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { maskEmail } from "@/lib/mask-email";
 import { isOrganizerMember } from "@/lib/organizer-access";
+import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { sportEmoji } from "@/lib/sport-emoji";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 type AvailabilitySlot = { start_at: string; end_at: string };
+
+type RefProfileRow = {
+  primary_sport?: string | null;
+  additional_sports?: string[] | null;
+  rate_per_game?: number | null;
+  rate_type?: string | null;
+  rate_min?: number | null;
+  rate_max?: number | null;
+  gotrefs_id?: string | null;
+  rate_unit?: string | null;
+  travel_radius_miles?: number | null;
+  certification_level?: string | null;
+};
 
 export async function GET() {
   const supabase = await createClient();
@@ -34,40 +48,27 @@ export async function GET() {
 
   const membersResult = await admin
     .from("members")
-    .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game, rate_type, rate_min, rate_max, gotrefs_id, rate_unit )")
+    .select(
+      "id, display_name, home_zip, profile_picture_url, ref_profiles ( primary_sport, additional_sports, rate_per_game, rate_type, rate_min, rate_max, gotrefs_id, rate_unit, travel_radius_miles, certification_level )"
+    )
     .eq("role", "ref");
   let members: Array<{
     id: string;
     display_name: string;
     home_zip: string | null;
-    ref_profiles:
-      | Array<{
-          primary_sport?: string | null;
-          rate_per_game?: number | null;
-          rate_type?: string | null;
-          rate_min?: number | null;
-          rate_max?: number | null;
-          gotrefs_id?: string | null;
-          rate_unit?: string | null;
-        }>
-      | {
-          primary_sport?: string | null;
-          rate_per_game?: number | null;
-          rate_type?: string | null;
-          rate_min?: number | null;
-          rate_max?: number | null;
-          gotrefs_id?: string | null;
-          rate_unit?: string | null;
-        }
-      | null;
-  }> | null = membersResult.data;
+    profile_picture_url?: string | null;
+    ref_profiles: RefProfileRow[] | RefProfileRow | null;
+  }> | null = membersResult.data as typeof members;
   let memErr = membersResult.error;
-  if (memErr?.message.includes("rate_type")) {
+
+  if (memErr) {
     const fallback = await admin
       .from("members")
-      .select("id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game )")
+      .select(
+        "id, display_name, home_zip, ref_profiles ( primary_sport, rate_per_game, rate_type, rate_min, rate_max, gotrefs_id, rate_unit )"
+      )
       .eq("role", "ref");
-    members = fallback.data;
+    members = (fallback.data as typeof members) ?? null;
     memErr = fallback.error;
   }
 
@@ -77,12 +78,29 @@ export async function GET() {
   }
 
   const refIds = (members ?? []).map((m) => m.id);
-  const { data: availability } = await admin
-    .from("ref_availability")
-    .select("ref_member_id, start_at, end_at")
-    .in("ref_member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"])
-    .gte("end_at", new Date().toISOString())
-    .order("start_at", { ascending: true });
+  const emptyId = "00000000-0000-0000-0000-000000000000";
+  const idFilter = refIds.length > 0 ? refIds : [emptyId];
+
+  const [{ data: availability }, { data: ratings }, { data: bookings }] = await Promise.all([
+    admin
+      .from("ref_availability")
+      .select("ref_member_id, start_at, end_at")
+      .in("ref_member_id", idFilter)
+      .gte("end_at", new Date().toISOString())
+      .order("start_at", { ascending: true }),
+    admin
+      .from("ref_ratings")
+      .select("ref_member_id, score, comment, created_at, organizer_member_id, skipped")
+      .in("ref_member_id", idFilter)
+      .eq("skipped", false)
+      .not("score", "is", null)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("bookings")
+      .select("ref_member_id, status")
+      .in("ref_member_id", idFilter)
+      .in("status", ["confirmed", "completed"]),
+  ]);
 
   const availByRef = new Map<string, AvailabilitySlot[]>();
   for (const slot of availability ?? []) {
@@ -91,13 +109,10 @@ export async function GET() {
     availByRef.set(slot.ref_member_id, list);
   }
 
-  const { data: ratings } = await admin
-    .from("ref_ratings")
-    .select("ref_member_id, score, comment, created_at, organizer_member_id, skipped")
-    .in("ref_member_id", refIds.length > 0 ? refIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("skipped", false)
-    .not("score", "is", null)
-    .order("created_at", { ascending: false });
+  const gamesByRef = new Map<string, number>();
+  for (const booking of bookings ?? []) {
+    gamesByRef.set(booking.ref_member_id, (gamesByRef.get(booking.ref_member_id) ?? 0) + 1);
+  }
 
   const orgIds = [...new Set((ratings ?? []).map((r) => r.organizer_member_id).filter(Boolean))];
   const { data: orgMembers } =
@@ -142,6 +157,7 @@ export async function GET() {
 
     const rp = Array.isArray(m.ref_profiles) ? m.ref_profiles[0] : m.ref_profiles;
     const primarySport = rp?.primary_sport ?? "Basketball";
+    const additionalSports = Array.isArray(rp?.additional_sports) ? rp.additional_sports : [];
 
     const { data: authUser } = await admin.auth.admin.getUserById(m.id);
     const email = authUser?.user?.email ?? "";
@@ -152,12 +168,15 @@ export async function GET() {
         : `GR-${m.id.slice(0, 8).toUpperCase()}`);
     const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
     const rating = ratingByRef.get(m.id);
+    const avatarUrl = await resolveProfilePhotoUrl(admin, m.profile_picture_url ?? null);
 
     refs.push({
       id: m.id,
       gotrefsId,
       displayName: m.display_name,
       primarySport,
+      additionalSports,
+      certificationLevel: rp?.certification_level ?? null,
       sportEmoji: sportEmoji(primarySport),
       ratePerGame: rp?.rate_per_game ?? null,
       rateType: rp?.rate_type === "range" ? "range" : "exact",
@@ -165,11 +184,15 @@ export async function GET() {
       rateMax: rp?.rate_max ?? null,
       rateUnit: rp?.rate_unit === "game" ? "game" : "hour",
       homeZip: m.home_zip,
+      travelRadiusMiles:
+        typeof rp?.travel_radius_miles === "number" ? rp.travel_radius_miles : null,
       availability: availByRef.get(m.id) ?? [],
       maskedEmail,
+      avatarUrl,
       ratingAverage: rating?.count ? Number((rating.total / rating.count).toFixed(1)) : null,
       ratingCount: rating?.count ?? 0,
       reviews: rating?.reviews ?? [],
+      gamesCompleted: gamesByRef.get(m.id) ?? 0,
     });
   }
 

@@ -151,22 +151,22 @@ export async function notifyOfferInvite(opts: {
 
   return sendEmail({
     to: ref.email,
-    subject: `${BRAND_NAME}: New game invite — ${event.title}`,
+    subject: `New Request: ${event.organizerName} requested you for ${event.title}`,
     html: emailLayout({
-      title: "An organizer wants you to ref",
+      title: "New referee request",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
-        <p>An event organizer invited you to officiate:</p>
+        <p><strong>${escapeHtml(event.organizerName)}</strong> requested you for an upcoming game:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
-          <li>${escapeHtml(event.place)}</li>
+          <li>General area: ${escapeHtml(event.place)}</li>
           <li>Offered pay: ${escapeHtml(pay)}</li>
         </ul>
         ${note}
-        <p>Open your dashboard to accept or decline. Names, emails, and phone numbers are never shared.</p>
+        <p>Exact street address and contact details stay hidden until you accept. Open your dashboard to review this request.</p>
       `,
-      ctaLabel: "Open referee dashboard",
+      ctaLabel: "Review request",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
@@ -267,6 +267,45 @@ export async function notifyOfferResponseToOrganizer(opts: {
       `,
       ctaLabel: "Open organizer dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer"),
+    }),
+  });
+}
+
+/** Sent to the ref after they accept — unlocks exact venue details. */
+export async function notifyOfferAcceptedToRef(opts: {
+  admin: SupabaseClient;
+  refMemberId: string;
+  eventId: string;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const [ref, event] = await Promise.all([
+    emailForMemberId(opts.admin, opts.refMemberId),
+    eventSummary(opts.admin, opts.eventId),
+  ]);
+  if (!ref || !event) return false;
+
+  const notesBlock = event.notes
+    ? `<p><strong>Notes:</strong> ${escapeHtml(event.notes)}</p>`
+    : "";
+
+  return sendEmail({
+    to: ref.email,
+    subject: `${BRAND_NAME}: You're confirmed for ${event.title}`,
+    html: emailLayout({
+      title: "You're confirmed",
+      bodyHtml: `
+        <p>Hi ${escapeHtml(ref.displayName)},</p>
+        <p>You accepted the request for <strong>${escapeHtml(event.title)}</strong>. Venue details are now unlocked:</p>
+        <ul>
+          <li><strong>When:</strong> ${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
+          <li><strong>Address:</strong> ${escapeHtml(event.address)}</li>
+        </ul>
+        ${notesBlock}
+        <p>This game is also saved under Upcoming games in your dashboard.</p>
+      `,
+      ctaLabel: "Open referee dashboard",
+      ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
 }

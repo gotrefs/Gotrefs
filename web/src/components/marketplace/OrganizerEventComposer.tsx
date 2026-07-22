@@ -265,62 +265,29 @@ export function OrganizerEventComposer({
           <section className="space-y-2">
             <p className="text-sm font-semibold text-neutral-900">Pay</p>
             <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3">
-              <div className="mb-3 flex gap-2">
-                {(["exact", "range"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => patch({ payType: type })}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                      values.payType === type
-                        ? "bg-neutral-900 text-white"
-                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-              {values.payType === "exact" ? (
-                <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-800">
-                    Amount per official
-                  </span>
+              <label className="block">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-800">
+                  Base pay per official
+                </span>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-base font-semibold text-neutral-900">$</span>
                   <input
                     type="number"
                     min={0}
-                    className={`${inputClass} mt-1`}
+                    className={inputClass}
                     value={values.pay}
-                    onChange={(e) => patch({ pay: e.target.value })}
+                    onChange={(e) =>
+                      patch({
+                        pay: e.target.value,
+                        payType: "exact",
+                        payMin: "",
+                        payMax: "",
+                      })
+                    }
                     placeholder="45"
                   />
-                </label>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-800">Min</span>
-                    <input
-                      type="number"
-                      min={0}
-                      className={`${inputClass} mt-1`}
-                      value={values.payMin}
-                      onChange={(e) => patch({ payMin: e.target.value })}
-                      placeholder="40"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-800">Max</span>
-                    <input
-                      type="number"
-                      min={0}
-                      className={`${inputClass} mt-1`}
-                      value={values.payMax}
-                      onChange={(e) => patch({ payMax: e.target.value })}
-                      placeholder="60"
-                    />
-                  </label>
                 </div>
-              )}
+              </label>
             </div>
           </section>
 

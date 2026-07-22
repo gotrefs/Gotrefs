@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/auth/PasswordField";
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("");
@@ -103,29 +104,21 @@ export default function UpdatePasswordPage() {
           <p className="mt-6 text-sm text-[var(--muted)]">Checking your reset link…</p>
         ) : (
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <label className="block text-sm font-bold text-[var(--navy)]">
-              New password
-              <input
-                type="password"
-                required
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 8 characters, with a letter and number"
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-              />
-            </label>
-            <label className="block text-sm font-bold text-[var(--navy)]">
-              Confirm password
-              <input
-                type="password"
-                required
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-              />
-            </label>
+            <PasswordField
+              label="New password"
+              required
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="At least 8 characters, with a letter and number"
+            />
+            <PasswordField
+              label="Confirm password"
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
             {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
             <button
               type="submit"

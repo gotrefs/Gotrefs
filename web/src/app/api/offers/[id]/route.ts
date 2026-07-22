@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   notifyInBackground,
+  notifyOfferAcceptedToRef,
   notifyOfferCanceledToRef,
   notifyOfferResponseToOrganizer,
 } from "@/lib/email/notifications";
@@ -186,16 +187,22 @@ export async function PATCH(
     const admin = createServiceClient();
     const siteUrl = emailSiteUrl(request.url);
     if (action === "accept" && isRef && organizerMemberId) {
-      notifyInBackground(() =>
-        notifyOfferResponseToOrganizer({
+      notifyInBackground(async () => {
+        await notifyOfferResponseToOrganizer({
           admin,
           organizerMemberId,
           refMemberId: offer.ref_member_id,
           eventId: offer.event_id,
           accepted: true,
           siteUrl,
-        })
-      );
+        });
+        await notifyOfferAcceptedToRef({
+          admin,
+          refMemberId: offer.ref_member_id,
+          eventId: offer.event_id,
+          siteUrl,
+        });
+      });
     } else if (action === "decline" && isRef && organizerMemberId) {
       notifyInBackground(() =>
         notifyOfferResponseToOrganizer({

@@ -25,8 +25,9 @@ export function OrganizerProfileShowcaseSection() {
             typicalPay="45"
             bio="Weekend tournaments and seasonal league play across the metro area."
             eventsCount={3}
-            idUploaded
             logoUploaded
+            brandHexPrimary="#0D1B2A"
+            brandHexSecondary="#7F1D1D"
           />
         </div>
         <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-8 inline-flex w-full sm:w-auto">

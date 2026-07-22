@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
 import { VenuePinMap } from "@/components/organizer/VenuePinMap";
 import { SportsFields } from "@/components/SportsFields";
-import { EVENT_BOOSTS } from "@/lib/boosts";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 
 export type OrganizerWizardDraft = {
@@ -28,7 +27,8 @@ export type OrganizerWizardDraft = {
   rateMin: string;
   rateMax: string;
   bio: string;
-  discounts: string[];
+  brandHexPrimary: string;
+  brandHexSecondary: string;
   billingStreet: string;
   billingUnit: string;
   billingCity: string;
@@ -67,7 +67,6 @@ type WizardScreen =
   | "bio"
   | "intro3"
   | "prices"
-  | "discounts"
   | "contact"
   | "finalDetails"
   | "done";
@@ -84,7 +83,7 @@ const STEP1_SCREENS: WizardScreen[] = [
   "schedule",
 ];
 const STEP2_SCREENS: WizardScreen[] = ["intro2", "gameLevel", "sport", "refInstructions", "bio"];
-const STEP3_SCREENS: WizardScreen[] = ["intro3", "prices", "discounts", "contact", "finalDetails"];
+const STEP3_SCREENS: WizardScreen[] = ["intro3", "prices", "contact", "finalDetails"];
 const ALL_SCREENS: WizardScreen[] = [...STEP1_SCREENS, ...STEP2_SCREENS, ...STEP3_SCREENS, "done"];
 
 const GAME_LEVELS = [
@@ -120,11 +119,6 @@ const ACCESS_TYPES = [
   { id: "shared", title: "A shared facility", subtitle: "Your game shares the venue with other activities.", emoji: "🚪" },
   { id: "outdoor", title: "An outdoor field or court", subtitle: "Open-air space — fields, courts, tracks, parks.", emoji: "🌿" },
 ] as const;
-
-const DISCOUNT_OPTIONS = EVENT_BOOSTS.map((boost) => ({
-  ...boost,
-  percentLabel: `${boost.percent}%`,
-}));
 
 function parseUsAddress(label: string): Partial<OrganizerWizardDraft> {
   const cleaned = label.replace(/,?\s*USA$/i, "").trim();
@@ -205,8 +199,10 @@ function StepperRow({
         <input
           type="text"
           inputMode="numeric"
-          aria-label={label}
+          aria-label={`${label} (click to type)`}
+          title="Click to type a number"
           value={text}
+          onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => {
             const digits = e.target.value.replace(/[^\d]/g, "");
             setText(digits);
@@ -221,7 +217,7 @@ function StepperRow({
               e.currentTarget.blur();
             }
           }}
-          className="w-14 min-w-6 border-0 bg-transparent p-0 text-center text-base font-medium text-neutral-900 outline-none focus:ring-0"
+          className="w-14 min-w-6 cursor-text rounded-lg border border-transparent bg-transparent px-1 py-1 text-center text-base font-medium text-neutral-900 outline-none transition hover:border-neutral-300 hover:bg-neutral-50 focus:border-neutral-900 focus:bg-white focus:ring-2 focus:ring-neutral-900/10"
         />
         <button
           type="button"
@@ -298,15 +294,11 @@ type PayoutStage = "prompt" | "method" | "holder" | "bank" | null;
 export function OrganizerListingWizard({
   organizationName,
   saving,
-  idDocPath,
   logoPath,
-  avatarPath = null,
   initialDraft,
   payoutOnly = false,
   onSaveProfile,
-  onUploadId,
   onUploadLogo,
-  onUploadAvatar,
   onSavePayoutMethod,
   onCreateEvent,
   onSaveAndExit,
@@ -314,16 +306,12 @@ export function OrganizerListingWizard({
 }: {
   organizationName?: string;
   saving?: boolean;
-  idDocPath: string | null;
   logoPath: string | null;
-  avatarPath?: string | null;
   initialDraft?: Partial<OrganizerWizardDraft>;
   /** Skip the listing flow and open straight into the payout-method steps. */
   payoutOnly?: boolean;
   onSaveProfile: (draft: OrganizerWizardDraft) => Promise<boolean>;
-  onUploadId: (file: File) => Promise<void>;
   onUploadLogo: (file: File) => Promise<void>;
-  onUploadAvatar?: (file: File) => Promise<void>;
   onSavePayoutMethod?: (payload: PayoutMethodPayload) => Promise<boolean>;
   onCreateEvent?: (draft: OrganizerWizardDraft) => Promise<boolean>;
   onSaveAndExit?: (draft: OrganizerWizardDraft) => void;
@@ -365,7 +353,8 @@ export function OrganizerListingWizard({
     rateMin: "",
     rateMax: "",
     bio: "",
-    discounts: ["new_listing"],
+    brandHexPrimary: "",
+    brandHexSecondary: "",
     billingStreet: "",
     billingUnit: "",
     billingCity: "",
@@ -389,7 +378,7 @@ export function OrganizerListingWizard({
     return `${venue} in ${place}`;
   }, [draft.city, draft.state, draft.venueType]);
 
-  const basePrice = Number(draft.rateType === "range" ? draft.rateMin : draft.ratePerOfficial) || 0;
+  const basePrice = Number(draft.ratePerOfficial) || 0;
   const similarLow = basePrice > 0 ? Math.max(15, Math.round(basePrice * 0.7)) : 25;
   const similarHigh = basePrice > 0 ? Math.round(basePrice * 1.4) : 75;
 
@@ -486,12 +475,16 @@ export function OrganizerListingWizard({
       if (!saved) return;
     }
     if (screen === "prices") {
-      const ok = draft.rateType === "range" ? Boolean(draft.rateMin.trim()) : Boolean(draft.ratePerOfficial.trim());
-      if (!ok) {
+      if (!draft.ratePerOfficial.trim() || !(Number(draft.ratePerOfficial) > 0)) {
         setError("Set a base pay per official.");
         return;
       }
-      const saved = await onSaveProfile(draft);
+      const saved = await onSaveProfile({
+        ...draft,
+        rateType: "exact",
+        rateMin: "",
+        rateMax: "",
+      });
       if (!saved) return;
     }
     if (screen === "contact") {
@@ -509,8 +502,8 @@ export function OrganizerListingWizard({
       }
     }
     if (screen === "finalDetails") {
-      if (!idDocPath || !logoPath) {
-        setError("Upload your ID and organization logo to create your listing.");
+      if (!logoPath) {
+        setError("Upload your organization logo to create your listing.");
         return;
       }
       const saved = await onSaveProfile(draft);
@@ -956,8 +949,8 @@ export function OrganizerListingWizard({
                   Finish up and publish
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
-                  Finally, you&apos;ll set your pay, add boosts to stand out, and confirm a few final details to
-                  publish your listing.
+                  Finally, you&apos;ll set your pay per official and confirm a few final details to publish your
+                  listing.
                 </p>
               </div>
               <div className={`overflow-hidden rounded-[2rem] bg-gradient-to-br ${visual.gradient}`}>
@@ -972,77 +965,30 @@ export function OrganizerListingWizard({
                 Now, set your prices
               </h1>
               <p className="mt-2 text-neutral-500">
-                These suggestions are based on ref demand for similar games in your area.
+                Set a base pay per official. These suggestions are based on similar games in your area.
               </p>
               <div className="mt-8 space-y-3">
-                <div className="flex gap-2">
-                  {(["exact", "range"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => patch({ rateType: type })}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${
-                        draft.rateType === type ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-                {draft.rateType === "exact" ? (
-                  <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                    <span className="text-xs text-neutral-500">Base pay per official</span>
-                    <div className="mt-1 flex items-baseline gap-1">
-                      <span className="text-3xl font-semibold text-neutral-900">$</span>
-                      <input
-                        type="number"
-                        min={0}
-                        className="w-full border-0 bg-transparent p-0 text-3xl font-semibold text-neutral-900 outline-none"
-                        value={draft.ratePerOfficial}
-                        onChange={(e) => patch({ ratePerOfficial: e.target.value })}
-                        placeholder="45"
-                      />
-                    </div>
-                  </label>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                      <span className="text-xs text-neutral-500">Min</span>
-                      <div className="mt-1 flex items-baseline gap-1">
-                        <span className="text-2xl font-semibold">$</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-full border-0 bg-transparent p-0 text-2xl font-semibold outline-none"
-                          value={draft.rateMin}
-                          onChange={(e) => patch({ rateMin: e.target.value })}
-                        />
-                      </div>
-                    </label>
-                    <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                      <span className="text-xs text-neutral-500">Max</span>
-                      <div className="mt-1 flex items-baseline gap-1">
-                        <span className="text-2xl font-semibold">$</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-full border-0 bg-transparent p-0 text-2xl font-semibold outline-none"
-                          value={draft.rateMax}
-                          onChange={(e) => patch({ rateMax: e.target.value })}
-                        />
-                      </div>
-                    </label>
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Base pay per official</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-3xl font-semibold text-neutral-900">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-full border-0 bg-transparent p-0 text-3xl font-semibold text-neutral-900 outline-none"
+                      value={draft.ratePerOfficial}
+                      onChange={(e) =>
+                        patch({
+                          ratePerOfficial: e.target.value,
+                          rateType: "exact",
+                          rateMin: "",
+                          rateMax: "",
+                        })
+                      }
+                      placeholder="45"
+                    />
                   </div>
-                )}
-                <div className="flex items-center justify-between rounded-2xl border border-neutral-300 px-5 py-4">
-                  <div>
-                    <p className="text-xs text-neutral-500">Weekend adjustment</p>
-                    <p className="text-2xl font-semibold text-neutral-900">+11%</p>
-                  </div>
-                  <p className="text-sm text-neutral-500">
-                    {basePrice > 0 ? `$${Math.round(basePrice * 1.11)} for Fri and Sat` : "Applies Fri and Sat"}
-                  </p>
-                </div>
+                </label>
               </div>
               <div className="mt-6 flex justify-center">
                 <button
@@ -1055,56 +1001,6 @@ export function OrganizerListingWizard({
                   </span>
                   View similar listings
                 </button>
-              </div>
-            </div>
-          )}
-
-          {screen === "discounts" && (
-            <div className="mx-auto max-w-xl">
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">Add boosts</h1>
-              <p className="mt-2 text-neutral-500">
-                Help your event stand out to get staffed faster and earn your first reviews.
-              </p>
-              <div className="mt-8 space-y-3">
-                {DISCOUNT_OPTIONS.map((option) => {
-                  const checked = draft.discounts.includes(option.id);
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() =>
-                        patch({
-                          discounts: checked
-                            ? draft.discounts.filter((id) => id !== option.id)
-                            : [...draft.discounts, option.id],
-                        })
-                      }
-                      className={`flex w-full items-center gap-4 rounded-2xl border px-5 py-5 text-left transition ${
-                        checked ? "border-neutral-300 bg-neutral-50" : "border-neutral-300 bg-white hover:border-neutral-500"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-xl text-base font-semibold ${
-                          checked ? "bg-white ring-1 ring-neutral-300" : "bg-neutral-100"
-                        }`}
-                      >
-                        {option.percentLabel}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-neutral-900">{option.title}</span>
-                        <span className="mt-0.5 block text-sm text-neutral-500">{option.subtitle}</span>
-                      </span>
-                      <span
-                        aria-hidden
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white ${
-                          checked ? "bg-neutral-900" : "border border-neutral-300 bg-white"
-                        }`}
-                      >
-                        {checked ? "✓" : ""}
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}
@@ -1195,71 +1091,20 @@ export function OrganizerListingWizard({
 
               <p className="mt-10 font-semibold text-neutral-900">Verify your organization</p>
               <p className="mt-1 text-sm text-neutral-500">
-                Upload your face photo for your GotREFS ID card, a government ID or league credential, and your logo.
+                Upload your organization logo for your GotREFS ID card. Brand colors are optional.
               </p>
-              {idDocPath && logoPath ? (
+              {logoPath ? (
                 <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
                   <GreenCheck />
                   <div>
                     <p className="font-semibold text-emerald-900">Organization verified</p>
                     <p className="text-sm text-emerald-800">
-                      ID and logo are on file
-                      {avatarPath ? ", and your face photo is on your ID card" : ""}. You&apos;re ready to publish.
+                      Your logo is on file and will show on your GotREFS ID card. You&apos;re ready to publish.
                     </p>
                   </div>
                 </div>
               ) : null}
               <div className="mt-4 space-y-3">
-                {onUploadAvatar ? (
-                  <label
-                    className={`block rounded-2xl border p-5 transition ${
-                      avatarPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-semibold text-neutral-900">Your face photo</p>
-                      {avatarPath ? <GreenCheck size="sm" label="Face photo uploaded" /> : null}
-                    </div>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      className="mt-3 text-sm"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void onUploadAvatar(file);
-                      }}
-                    />
-                    {avatarPath ? (
-                      <p className="mt-2 text-sm font-medium text-emerald-700">Photo will show on your GotREFS ID card</p>
-                    ) : (
-                      <p className="mt-2 text-sm text-neutral-500">JPG, PNG, or WEBP</p>
-                    )}
-                  </label>
-                ) : null}
-                <label
-                  className={`block rounded-2xl border p-5 transition ${
-                    idDocPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-semibold text-neutral-900">Government ID or league credential</p>
-                    {idDocPath ? <GreenCheck size="sm" label="Credential uploaded" /> : null}
-                  </div>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf"
-                    className="mt-3 text-sm"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void onUploadId(file);
-                    }}
-                  />
-                  {idDocPath ? (
-                    <p className="mt-2 text-sm font-medium text-emerald-700">Credential uploaded</p>
-                  ) : (
-                    <p className="mt-2 text-sm text-neutral-500">JPG, PNG, or PDF</p>
-                  )}
-                </label>
                 <label
                   className={`block rounded-2xl border p-5 transition ${
                     logoPath ? "border-emerald-300 bg-emerald-50/40" : "border-neutral-300 bg-white"
@@ -1279,11 +1124,60 @@ export function OrganizerListingWizard({
                     }}
                   />
                   {logoPath ? (
-                    <p className="mt-2 text-sm font-medium text-emerald-700">Logo uploaded</p>
+                    <p className="mt-2 text-sm font-medium text-emerald-700">
+                      Logo uploaded — this photo appears on your GotREFS ID card
+                    </p>
                   ) : (
                     <p className="mt-2 text-sm text-neutral-500">JPG, PNG, WEBP, or SVG</p>
                   )}
                 </label>
+
+                <div className="rounded-2xl border border-neutral-300 bg-white p-5">
+                  <p className="font-semibold text-neutral-900">Brand Hex Colors: Optional</p>
+                  <p className="mt-1 text-sm text-neutral-500">Used on your organizer ID card.</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-xs text-neutral-500">Primary</span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="color"
+                          aria-label="Primary brand color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(draft.brandHexPrimary) ? draft.brandHexPrimary : "#0D1B2A"}
+                          onChange={(e) => patch({ brandHexPrimary: e.target.value.toUpperCase() })}
+                          className="h-10 w-12 cursor-pointer rounded border border-neutral-300 bg-white p-1"
+                        />
+                        <input
+                          type="text"
+                          inputMode="text"
+                          placeholder="#0D1B2A"
+                          value={draft.brandHexPrimary}
+                          onChange={(e) => patch({ brandHexPrimary: e.target.value.trim() })}
+                          className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+                        />
+                      </div>
+                    </label>
+                    <label className="block">
+                      <span className="text-xs text-neutral-500">Secondary</span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="color"
+                          aria-label="Secondary brand color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(draft.brandHexSecondary) ? draft.brandHexSecondary : "#7F1D1D"}
+                          onChange={(e) => patch({ brandHexSecondary: e.target.value.toUpperCase() })}
+                          className="h-10 w-12 cursor-pointer rounded border border-neutral-300 bg-white p-1"
+                        />
+                        <input
+                          type="text"
+                          inputMode="text"
+                          placeholder="#7F1D1D"
+                          value={draft.brandHexSecondary}
+                          onChange={(e) => patch({ brandHexSecondary: e.target.value.trim() })}
+                          className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+                        />
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           )}

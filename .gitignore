@@ -26,3 +26,4 @@ Thumbs.db
 
 # Optional: keep example config in repo
 !officialconnect_config.example.json
+.env*

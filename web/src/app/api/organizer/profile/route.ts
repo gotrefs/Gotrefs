@@ -11,11 +11,52 @@ type ProfileBody = {
   rate_type?: "exact" | "range";
   rate_min?: number | null;
   rate_max?: number | null;
+  brand_hex_primary?: string | null;
+  brand_hex_secondary?: string | null;
 };
 
 function isMissingOrganizerRateColumn(error: { message?: string } | null | undefined) {
   const message = error?.message ?? "";
   return ["rate_type", "rate_min", "rate_max"].some((column) => message.includes(column));
+}
+
+function isMissingBrandHexColumn(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return message.includes("brand_hex_primary") || message.includes("brand_hex_secondary");
+}
+
+function normalizeOptionalHex(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed)) return null;
+  return trimmed.toUpperCase();
+}
+
+async function upsertOrganizerProfile(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { from: (table: string) => any },
+  row: Record<string, unknown>
+) {
+  let payload: Record<string, unknown> = { ...row };
+  let { error } = await client.from("organizer_profiles").upsert(payload, { onConflict: "member_id" });
+  if (isMissingOrganizerRateColumn(error)) {
+    const legacyRow: Record<string, unknown> = { ...payload };
+    delete legacyRow.rate_type;
+    delete legacyRow.rate_min;
+    delete legacyRow.rate_max;
+    const retry = await client.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
+    error = retry.error;
+    payload = legacyRow;
+  }
+  if (isMissingBrandHexColumn(error)) {
+    const legacyRow: Record<string, unknown> = { ...payload };
+    delete legacyRow.brand_hex_primary;
+    delete legacyRow.brand_hex_secondary;
+    const retry = await client.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
+    error = retry.error;
+  }
+  return error as { message?: string } | null;
 }
 
 export async function POST(request: Request) {
@@ -57,6 +98,8 @@ export async function POST(request: Request) {
     rate_type: rateType,
     rate_min: rateType === "range" && Number.isFinite(rateMinNum as number) ? rateMinNum : null,
     rate_max: rateType === "range" && Number.isFinite(rateMaxNum as number) ? rateMaxNum : null,
+    brand_hex_primary: normalizeOptionalHex(body.brand_hex_primary),
+    brand_hex_secondary: normalizeOptionalHex(body.brand_hex_secondary),
     updated_at: new Date().toISOString(),
   };
 
@@ -69,30 +112,14 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    let { error } = await admin.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
-    if (isMissingOrganizerRateColumn(error)) {
-      const legacyRow: Record<string, unknown> = { ...row };
-      delete legacyRow.rate_type;
-      delete legacyRow.rate_min;
-      delete legacyRow.rate_max;
-      const retry = await admin.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
-      error = retry.error;
-    }
+    const error = await upsertOrganizerProfile(admin, row);
     if (error) {
       console.error("[api/organizer/profile]", error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({ ok: true });
   } catch {
-    let { error } = await supabase.from("organizer_profiles").upsert(row, { onConflict: "member_id" });
-    if (isMissingOrganizerRateColumn(error)) {
-      const legacyRow: Record<string, unknown> = { ...row };
-      delete legacyRow.rate_type;
-      delete legacyRow.rate_min;
-      delete legacyRow.rate_max;
-      const retry = await supabase.from("organizer_profiles").upsert(legacyRow, { onConflict: "member_id" });
-      error = retry.error;
-    }
+    const error = await upsertOrganizerProfile(supabase, row);
     if (error) {
       console.error("[api/organizer/profile] client upsert:", error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -7,6 +7,7 @@ import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/Assi
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
+import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueModal";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
@@ -132,6 +133,7 @@ export default function RefereeDashboardClient() {
   }>({});
   const [screening, setScreening] = useState<Screening | null>(null);
   const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [dismissOfferQueue, setDismissOfferQueue] = useState(false);
   const [applications, setApplications] = useState<RefWorkApplication[]>([]);
   const [bookings, setBookings] = useState<RefWorkBooking[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -1636,6 +1638,37 @@ export default function RefereeDashboardClient() {
             })}
           </ul>
         </section>
+      )}
+
+      {!dismissOfferQueue && pendingOffers.length > 0 && (
+        <PendingOfferQueueModal
+          offers={pendingOffers}
+          onClose={() => setDismissOfferQueue(true)}
+          onRespond={async (offerId, action) => {
+            try {
+              const res = await fetch(`/api/offers/${offerId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+              });
+              const json = (await res.json()) as { error?: string };
+              if (!res.ok) {
+                setMsg(json.error || "Could not update this invite.");
+                return false;
+              }
+              setMsg(
+                action === "accept"
+                  ? "Invite accepted — venue details unlocked on your Upcoming games."
+                  : "Invite declined."
+              );
+              await load();
+              return true;
+            } catch {
+              setMsg("Could not reach the server. Try again.");
+              return false;
+            }
+          }}
+        />
       )}
 
     </div>

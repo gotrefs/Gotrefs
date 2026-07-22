@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env/server";
+import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
 
 type CheckoutBody = {
   eventId?: string;
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const platformFeeCents = Math.round(refSubtotalCents * 0.1);
+  const platformFeeCents = calcPlatformFeeCents(refSubtotalCents);
   const origin = serverEnv.siteUrl() || new URL(request.url).origin;
   const stripe = getStripe();
   const eventDate = new Date(event.starts_at).toLocaleDateString(undefined, {
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
           unit_amount: platformFeeCents,
           product_data: {
             name: "GotREFS platform fee",
-            description: "10% marketplace service fee",
+            description: `${PLATFORM_FEE_PERCENT_LABEL} marketplace service fee`,
           },
         },
       },
