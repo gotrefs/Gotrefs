@@ -1222,7 +1222,7 @@ export function OrganizerListingWizard({
               </h1>
               <p className="mt-2 text-neutral-500">
                 Hosting a full weekend? Keep the same venue and post the next game in one step — or finish and manage
-                everything from your dashboard (CSV bulk import is there too).
+                everything from your dashboard.
               </p>
               <div className="mt-6 max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-neutral-200">
                 <div className="relative">

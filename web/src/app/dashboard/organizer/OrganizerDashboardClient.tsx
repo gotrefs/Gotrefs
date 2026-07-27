@@ -19,7 +19,10 @@ import {
   ApplicantReviewModal,
   type ApplicantReviewData,
 } from "@/components/organizer/ApplicantReviewModal";
-import { CsvEventImportReview } from "@/components/organizer/CsvEventImportReview";
+import {
+  AttendingRefsModal,
+  type AttendingRef,
+} from "@/components/organizer/AttendingRefsModal";
 import { LeaveReviewModal } from "@/components/reviews/LeaveReviewModal";
 import { SportsFields } from "@/components/SportsFields";
 import { formatEventLocation, formatPayOffer } from "@/data/sports";
@@ -30,11 +33,6 @@ import {
   textContainsOrganizerContact,
 } from "@/lib/marketplace/notes-for-ref";
 import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
-import {
-  csvDraftToPublishBody,
-  parseEventsCsv,
-  type ParsedCsvEvent,
-} from "@/lib/marketplace/parse-events-csv";
 import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 
 type RefReview = {
@@ -257,9 +255,6 @@ export default function OrganizerDashboardClient() {
   const [brandHexSecondary, setBrandHexSecondary] = useState("");
   const [eventsListPath, setEventsListPath] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState<JustPublishedEvent[]>([]);
-  const [csvImportRows, setCsvImportRows] = useState<ParsedCsvEvent[] | null>(null);
-  const [csvParseErrors, setCsvParseErrors] = useState<string[]>([]);
-  const [csvPublishing, setCsvPublishing] = useState(false);
 
   const [title, setTitle] = useState("");
   const [eventSport, setEventSport] = useState("Basketball");
@@ -294,6 +289,7 @@ export default function OrganizerDashboardClient() {
   const [offerSending, setOfferSending] = useState(false);
   const [checkoutEventId, setCheckoutEventId] = useState<string | null>(null);
   const [staffingEventId, setStaffingEventId] = useState<string | null>(null);
+  const [attendingEventId, setAttendingEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const {
@@ -560,8 +556,13 @@ export default function OrganizerDashboardClient() {
             ? "Request removed. The ref was notified and can request again if the game is still open."
             : "Request denied. The ref was emailed and won’t see this game anymore."
       );
+      const acceptedEventId =
+        action === "accept"
+          ? signupRequests.find((row) => row.id === applicantId)?.eventId ?? null
+          : null;
       setReviewApplicant(null);
       await load();
+      if (acceptedEventId) setAttendingEventId(acceptedEventId);
       return true;
     } catch {
       const detail = "Could not reach the server.";
@@ -835,96 +836,6 @@ export default function OrganizerDashboardClient() {
       return false;
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  async function uploadEventsList(file: File) {
-    if (!file) return;
-    setMsg(null);
-    setEventMsg(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    await ensureOrganizerProfile(user.id);
-
-    const path = `${user.id}/events_list_${crypto.randomUUID()}_${sanitizeFilename(file.name)}`;
-    const { error: upErr } = await supabase.storage.from("verification_documents").upload(path, file);
-    if (upErr) {
-      setMsg(upErr.message);
-      setEventMsg(upErr.message);
-      return;
-    }
-    await supabase.from("organizer_profiles").update({ events_list_path: path }).eq("member_id", user.id);
-    setEventsListPath(path);
-
-    const isCsv =
-      file.name.toLowerCase().endsWith(".csv") ||
-      file.type.includes("csv") ||
-      file.type.includes("text");
-
-    if (!isCsv) {
-      const saved =
-        "Events list file saved. For review-and-publish, upload a .csv with columns: title, sport, starts_at, ends_at, city, state, zip, officials_needed, pay_offer";
-      setMsg(saved);
-      setEventMsg(saved);
-      await load();
-      return;
-    }
-
-    const text = await file.text();
-    const parsed = parseEventsCsv(text);
-    setCsvParseErrors(parsed.errors);
-    if (parsed.events.length === 0) {
-      const fail =
-        parsed.errors[0] ||
-        "Could not read any games from that CSV. Check dates and column headers, then try again.";
-      setMsg(fail);
-      setEventMsg(fail);
-      return;
-    }
-
-    setCsvImportRows(parsed.events);
-    setMsg(
-      `Loaded ${parsed.events.length} game${parsed.events.length === 1 ? "" : "s"} from CSV. Review each one, fix dates if needed, then publish one by one.`
-    );
-    setEventMsg(null);
-  }
-
-  async function publishCsvImportRow(row: ParsedCsvEvent): Promise<boolean> {
-    setCsvPublishing(true);
-    try {
-      await fetch("/api/auth/sync-member", { method: "POST" });
-      const body = csvDraftToPublishBody(row);
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = (await res.json()) as { error?: string; id?: string };
-      if (!res.ok) {
-        setMsg(j.error || "Could not publish this game.");
-        setEventMsg(j.error || "Could not publish this game.");
-        return false;
-      }
-      setJustPublished((current) => [
-        {
-          id: j.id,
-          title: body.title,
-          whenLabel: formatEventDateTime(body.starts_at),
-          whereLabel: formatEventLocation(body.city, body.state, body.zip_code) || `ZIP ${body.zip_code}`,
-        },
-        ...current,
-      ]);
-      setMsg(`Published “${body.title}”. Continue reviewing the rest, or close when finished.`);
-      setEventMsg(null);
-      await load();
-      return true;
-    } catch {
-      setMsg("Could not reach the server.");
-      return false;
-    } finally {
-      setCsvPublishing(false);
     }
   }
 
@@ -1567,7 +1478,7 @@ export default function OrganizerDashboardClient() {
               justPublished={justPublished}
               error={eventMsg}
               onClearError={clearEventFeedback}
-              onImportCsv={(file) => void uploadEventsList(file)}
+              showCsvImport={false}
               eventsListSaved={Boolean(eventsListPath)}
             />
             {justPublished.length === 0 ? (
@@ -2009,19 +1920,6 @@ export default function OrganizerDashboardClient() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="cursor-pointer rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50">
-              Import CSV
-              <input
-                type="file"
-                accept=".csv,text/csv,text/plain"
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadEventsList(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
             <button
               type="button"
               onClick={() => setWizardOpen(true)}
@@ -2105,9 +2003,19 @@ export default function OrganizerDashboardClient() {
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}>
                         {status.label}
                       </span>
-                      <span className="rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-700">
-                        {hiredCount}/{e.officials_needed} hired
-                      </span>
+                      {hiredCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setAttendingEventId(e.id)}
+                          className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                        >
+                          {hiredCount}/{e.officials_needed} hired · View refs
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-700">
+                          {hiredCount}/{e.officials_needed} hired
+                        </span>
+                      )}
                       {payment && payment.totalCents > 0 ? (
                         <button
                           type="button"
@@ -2406,19 +2314,35 @@ export default function OrganizerDashboardClient() {
         />
       )}
 
-      {csvImportRows && csvImportRows.length > 0 && (
-        <CsvEventImportReview
-          rows={csvImportRows}
-          parseErrors={csvParseErrors}
-          publishing={csvPublishing}
-          onClose={() => {
-            setCsvImportRows(null);
-            setCsvParseErrors([]);
-            void load();
-          }}
-          onPublishOne={async (row) => publishCsvImportRow(row)}
-        />
-      )}
+      {attendingEventId &&
+        (() => {
+          const event = events.find((row) => row.id === attendingEventId);
+          if (!event) return null;
+          const attendingRefs: AttendingRef[] = sentOffers
+            .filter((offer) => offer.event_id === attendingEventId && offer.status === "accepted")
+            .map((offer) => {
+              const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
+              return {
+                offerId: offer.id,
+                refMemberId: offer.ref_member_id,
+                gotrefsId:
+                  refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`,
+                primarySport: refMeta?.primarySport ?? event.sport,
+                additionalSports: refMeta?.additionalSports ?? [],
+                certificationLevel: refMeta?.certificationLevel ?? null,
+                avatarUrl: refMeta?.avatarUrl ?? null,
+                offeredPay: offer.offered_pay,
+              };
+            });
+          return (
+            <AttendingRefsModal
+              eventTitle={event.title}
+              eventWhen={formatEventDateTime(event.starts_at)}
+              refs={attendingRefs}
+              onClose={() => setAttendingEventId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
