@@ -1,5 +1,5 @@
 /**
- * Draw a GotREFS official ID card to a PNG blob (no DOM screenshot / CORS issues).
+ * Draw a GotRefs official ID card to a PNG blob (no DOM screenshot / CORS issues).
  */
 
 export type OfficialIdRenderInput = {
@@ -199,7 +199,7 @@ export async function renderOfficialIdPng(input: OfficialIdRenderInput): Promise
   ctx.fillStyle = "rgba(255,255,255,0.75)";
   ctx.font = "600 16px system-ui, -apple-system, Segoe UI, sans-serif";
   ctx.fillText(
-    input.validThrough ? `Valid through ${input.validThrough}` : "GotREFS verified official",
+    input.validThrough ? `Valid through ${input.validThrough}` : "GotRefs verified official",
     36,
     H - 36
   );

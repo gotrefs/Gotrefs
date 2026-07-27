@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ALL_SPORTS, OTHER_SPORT_VALUE } from "@/data/sports";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { CertificationFields } from "@/components/CertificationFields";
 import { RefereeIdCard } from "@/components/RefereeIdCard";
 import { formatHourlyRateRange } from "@/lib/pay-range";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
@@ -74,13 +75,15 @@ export type RefSignupAirbnbWizardProps = {
   loading: boolean;
   error: string | null;
   oauthMode?: boolean;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   photoFile: File | null;
   gotrefsId?: string;
   primarySport: string;
   customPrimarySport: string;
   secondarySport: string;
   certificationLevel: string;
+  additionalCertificationLevels: string[];
   certifiedBy: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
@@ -96,12 +99,14 @@ export type RefSignupAirbnbWizardProps = {
   recommendedAssignorName: string;
   recommendedAssignorEmail: string;
   recommendedAssignorPhone: string;
-  onFullName: (value: string) => void;
+  onFirstName: (value: string) => void;
+  onLastName: (value: string) => void;
   onPhotoFile: (file: File | null) => void;
   onPrimarySport: (value: string) => void;
   onCustomPrimarySport: (value: string) => void;
   onSecondarySport: (value: string) => void;
   onCertificationLevel: (value: string) => void;
+  onAdditionalCertificationLevels: (levels: string[]) => void;
   onCertifiedBy: (value: string) => void;
   onHourlyRateMin: (value: string) => void;
   onHourlyRateMax: (value: string) => void;
@@ -178,13 +183,15 @@ export function RefSignupAirbnbWizard({
   loading,
   error,
   oauthMode = false,
-  fullName,
+  firstName,
+  lastName,
   photoFile,
   gotrefsId,
   primarySport,
   customPrimarySport,
   secondarySport,
   certificationLevel,
+  additionalCertificationLevels,
   certifiedBy,
   hourlyRateMin,
   hourlyRateMax,
@@ -200,12 +207,14 @@ export function RefSignupAirbnbWizard({
   recommendedAssignorName,
   recommendedAssignorEmail,
   recommendedAssignorPhone,
-  onFullName,
+  onFirstName,
+  onLastName,
   onPhotoFile,
   onPrimarySport,
   onCustomPrimarySport,
   onSecondarySport,
   onCertificationLevel,
+  onAdditionalCertificationLevels,
   onCertifiedBy,
   onHourlyRateMin,
   onHourlyRateMax,
@@ -225,6 +234,7 @@ export function RefSignupAirbnbWizard({
   onExit,
   initialScreen = "intro1",
 }: RefSignupAirbnbWizardProps) {
+  const fullName = [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(" ");
   const [screen, setScreen] = useState<WizardScreen>(
     ALL_SCREENS.includes(initialScreen) ? initialScreen : "intro1"
   );
@@ -295,11 +305,15 @@ export function RefSignupAirbnbWizard({
         {
           screen,
           fullName,
+          firstName,
+          lastName,
           email,
           primarySport,
           customPrimarySport,
           secondarySport,
           certificationLevel,
+          additionalCertificationLevels,
+          certifiedBy,
           hourlyRateMin,
           hourlyRateMax,
           baseCity,
@@ -326,13 +340,14 @@ export function RefSignupAirbnbWizard({
   }
 
   const canContinue = (() => {
-    if (screen === "legalName") return Boolean(fullName.trim());
+    if (screen === "legalName") return Boolean(firstName.trim() && lastName.trim());
     if (screen === "photo") return Boolean(photoFile);
     if (screen === "primarySport") {
       if (!primarySport.trim()) return false;
       if (primarySport === OTHER_SPORT_VALUE && !customPrimarySport.trim()) return false;
       return true;
     }
+    if (screen === "certificationLevel") return Boolean(certificationLevel.trim());
     if (screen === "hourlyRate") {
       return (
         Number.isFinite(minVal) &&
@@ -366,16 +381,17 @@ export function RefSignupAirbnbWizard({
   function handleNext() {
     setLocalError(null);
     if (!canContinue) {
-      if (screen === "legalName") setLocalError("Enter your name to continue.");
+      if (screen === "legalName") setLocalError("Enter your first and last name to continue.");
       else if (screen === "photo") setLocalError("Upload a clear photo of your face to continue.");
       else if (screen === "primarySport") setLocalError("Pick the sport you primarily officiate.");
+      else if (screen === "certificationLevel") setLocalError("Add at least one certification to continue.");
       else if (screen === "govId") setLocalError("Upload both the front and back of your government ID to continue.");
       else if (screen === "certDoc") setLocalError("Upload your certification or license document to continue.");
       else if (screen === "baseCity") setLocalError("Enter your base city.");
       else if (screen === "account") {
         if (!email.trim() || !email.includes("@")) setLocalError("Enter a valid email address.");
         else if (!oauthMode && password.trim().length < 8) setLocalError("Create a password with at least 8 characters.");
-        else if (!termsAccepted) setLocalError("Please accept the GotREFS terms to continue.");
+        else if (!termsAccepted) setLocalError("Please accept the GotRefs terms to continue.");
       }
       return;
     }
@@ -455,17 +471,31 @@ export function RefSignupAirbnbWizard({
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
                 What&apos;s your name?
               </h1>
-              <p className="mt-2 text-neutral-500">First name, last name, or both — whichever you go by.</p>
-              <label className="mt-8 block rounded-2xl border border-neutral-300 px-5 py-4">
-                <span className="text-xs text-neutral-500">Name</span>
-                <input
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                  value={fullName}
-                  onChange={(event) => onFullName(event.target.value)}
-                  placeholder="Your name"
-                  autoComplete="name"
-                />
-              </label>
+              <p className="mt-2 text-neutral-500">
+                Use your legal first and last name as they appear on your ID.
+              </p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">First name</span>
+                  <input
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={firstName}
+                    onChange={(event) => onFirstName(event.target.value)}
+                    placeholder="First"
+                    autoComplete="given-name"
+                  />
+                </label>
+                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
+                  <span className="text-xs text-neutral-500">Last name</span>
+                  <input
+                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                    value={lastName}
+                    onChange={(event) => onLastName(event.target.value)}
+                    placeholder="Last"
+                    autoComplete="family-name"
+                  />
+                </label>
+              </div>
             </div>
           )}
 
@@ -475,7 +505,7 @@ export function RefSignupAirbnbWizard({
                 Add a profile photo of your face
               </h1>
               <p className="mt-2 text-neutral-500">
-                Required for your GotREFS ID card. Use a clear, forward-facing photo of yourself — it appears on
+                Required for your GotRefs ID card. Use a clear, forward-facing photo of yourself — it appears on
                 your card as soon as you upload it.
               </p>
               <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
@@ -531,7 +561,7 @@ export function RefSignupAirbnbWizard({
                 </label>
 
                 <div className="mx-auto w-full max-w-[400px]">
-                  <p className="mb-3 text-center text-sm font-semibold text-neutral-600">Your GotREFS ID card</p>
+                  <p className="mb-3 text-center text-sm font-semibold text-neutral-600">Your GotRefs ID card</p>
                   <RefereeIdCard
                     fullName={fullName}
                     gotrefsId={gotrefsId}
@@ -552,6 +582,7 @@ export function RefSignupAirbnbWizard({
                     }
                     additionalSports={secondarySport ? [secondarySport] : []}
                     certificationLevel={certificationLevel || undefined}
+                    additionalCertificationLevels={additionalCertificationLevels}
                     certifiedBy={certifiedBy || certificationLevel || undefined}
                     baseCity={baseCity || undefined}
                     emptyPlaceholders
@@ -679,26 +710,18 @@ export function RefSignupAirbnbWizard({
                 Where were you certified?
               </h1>
               <p className="mt-2 text-neutral-500">
-                This shows on your GotREFS ID card under &quot;Accepted by&quot; for organizers.
+                Add every certification level and association that applies. These show on your GotRefs ID for
+                organizers.
               </p>
-              <label className="mt-8 block rounded-2xl border border-neutral-300 px-5 py-4">
-                <span className="text-xs text-neutral-500">Certified by / association</span>
-                <input
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                  value={certifiedBy}
-                  onChange={(event) => onCertifiedBy(event.target.value)}
-                  placeholder="NFHS, state association, local association, USSF, etc."
-                />
-              </label>
-              <label className="mt-4 block rounded-2xl border border-neutral-300 px-5 py-4">
-                <span className="text-xs text-neutral-500">Certification level</span>
-                <input
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                  value={certificationLevel}
-                  onChange={(event) => onCertificationLevel(event.target.value)}
-                  placeholder="Youth, varsity, Grade 7, etc."
-                />
-              </label>
+              <CertificationFields
+                variant="airbnb"
+                certificationLevel={certificationLevel}
+                additionalCertificationLevels={additionalCertificationLevels}
+                onCertificationLevel={onCertificationLevel}
+                onAdditionalChange={onAdditionalCertificationLevels}
+                certifiedBy={certifiedBy}
+                onCertifiedBy={onCertifiedBy}
+              />
             </div>
           )}
 
@@ -708,7 +731,7 @@ export function RefSignupAirbnbWizard({
                 Now, set your hourly rate range
               </h1>
               <p className="mt-2 text-neutral-500">
-                Drag both ends of the slider. Event organizers only see your GotREFS ID until you accept a game.
+                Drag both ends of the slider. Event organizers only see your GotRefs ID until you accept a game.
               </p>
               <div className="mt-8 rounded-2xl border border-neutral-300 bg-neutral-50 p-5">
                 <p className="text-xl font-semibold text-neutral-900">{formatHourlyRateRange(minVal, maxVal)}</p>
@@ -912,7 +935,7 @@ export function RefSignupAirbnbWizard({
           {screen === "account" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Create your GotREFS account
+                Create your GotRefs account
               </h1>
               <p className="mt-2 text-neutral-500">Confirm your email, set a password, and agree to the terms.</p>
               <div className="mt-8 space-y-4">
@@ -1000,7 +1023,7 @@ export function RefSignupAirbnbWizard({
                 Recommended by an assignor?
               </h1>
               <p className="mt-2 text-neutral-500">
-                If an assignor introduced you to GotREFS, add their name and email or phone so we can credit them.
+                If an assignor introduced you to GotRefs, add their name and email or phone so we can credit them.
                 You can skip this if no one recommended you.
               </p>
               <div className="mt-8 space-y-4">

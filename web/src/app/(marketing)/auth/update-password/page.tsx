@@ -97,7 +97,7 @@ export default function UpdatePasswordPage() {
       <section className="w-full rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
         <h1 className="text-2xl font-black text-[var(--navy)]">Set your password</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-          Choose a password for your GotREFS account. After saving, you can log in with email and password.
+          Choose a password for your GotRefs account. After saving, you can log in with email and password.
         </p>
 
         {checkingSession ? (

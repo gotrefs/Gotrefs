@@ -4,7 +4,7 @@ import { findUserByEmail } from "@/lib/auth/admin-users";
 /**
  * Reserved signup identity for repeatedly testing referee / organizer onboarding.
  * Registering with this email deletes any previous auth user for it first, so you
- * never hit "That email already has a GotREFS account."
+ * never hit "That email already has a GotRefs account."
  */
 export const ONBOARDING_TEST_EMAIL = "onboarding.tester@gotrefs.org";
 

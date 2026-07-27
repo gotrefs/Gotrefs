@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 const HERO_VIDEO_SRC = "/gotrefs-hero-video.mp4";
 
-/** Full-bleed hero background video (GotREFS Hero Video Final). */
+/** Full-bleed hero background video (GotRefs Hero Video Final). */
 export function HeroVideoBackground() {
   const videoRef = useRef<HTMLVideoElement>(null);
 

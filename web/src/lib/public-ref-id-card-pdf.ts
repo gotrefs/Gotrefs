@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { BRAND_NAME } from "@/lib/brand";
 import type { PublicRefIdCard } from "@/lib/public-ref-id-card";
 
 const NAVY: [number, number, number] = [38, 33, 62];
@@ -49,7 +50,7 @@ async function urlToPdfImage(url: string | null | undefined): Promise<{ dataUrl:
 }
 
 /**
- * Build an organizer-friendly GotREFS ID PDF (no legal name).
+ * Build an organizer-friendly GotRefs ID PDF (no legal name).
  * Returned as ArrayBuffer for an inline PDF response.
  */
 export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<ArrayBuffer> {
@@ -66,7 +67,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
     card.baseCity?.trim() ||
     (card.workRegions ?? []).filter(Boolean).slice(0, 2).join(", ") ||
     "—";
-  const typeLabel = card.certificationLevel?.trim() || "GotREFS Accreditation";
+  const typeLabel = card.certificationLevel?.trim() || `${BRAND_NAME} Accreditation`;
   const expire = card.validThrough?.trim() || "Pending approval";
   const years = card.validThrough?.match(/(20\d{2})/)?.[1];
   const validLabel = years ? `Valid ${Number(years) - 1}-${years}` : "Valid pending";
@@ -225,7 +226,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("Scan-verified GotREFS official ID · Photo on file", W / 2, H - 18, {
+  doc.text("Scan-verified GotRefs official ID · Photo on file", W / 2, H - 18, {
     align: "center",
   });
 

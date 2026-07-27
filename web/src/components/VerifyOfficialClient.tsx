@@ -25,9 +25,12 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
   const accepted = useMemo(() => {
     const list = splitList(card.certifiedBy);
     if (list.length) return list;
-    if (card.certificationLevel?.trim()) return [card.certificationLevel.trim()];
+    const levels = [card.certificationLevel, ...(card.additionalCertificationLevels ?? [])]
+      .map((s) => s?.trim())
+      .filter((s): s is string => Boolean(s));
+    if (levels.length) return levels;
     return ["Not listed"];
-  }, [card.certifiedBy, card.certificationLevel]);
+  }, [card.certifiedBy, card.certificationLevel, card.additionalCertificationLevels]);
 
   const city =
     card.baseCity?.trim() ||
@@ -53,8 +56,8 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
             >
               ✓
             </span>
-            <span className="text-sm font-black uppercase tracking-[0.12em] text-emerald-200">
-              {isVerified ? "Verified Official" : "GotREFS Official ID"}
+            <span className="text-sm font-black tracking-[0.08em] text-emerald-200">
+              {isVerified ? "Verified Official" : `${BRAND_NAME} Official ID`}
             </span>
           </div>
           <p className="mt-2 text-sm text-white/65">
@@ -69,6 +72,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
               primarySport={card.primarySport ?? undefined}
               additionalSports={card.additionalSports}
               certificationLevel={card.certificationLevel ?? undefined}
+              additionalCertificationLevels={card.additionalCertificationLevels}
               certifiedBy={card.certifiedBy ?? undefined}
               avatarUrl={card.avatarUrl ?? undefined}
               avatarLabel="ID"
@@ -108,7 +112,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
         </section>
 
         <p className="text-center text-xs text-white/50">
-          No GotREFS login required — this page is for organizers scanning a referee QR.
+          No GotRefs login required — this page is for organizers scanning a referee QR.
         </p>
       </div>
     </main>
@@ -119,7 +123,7 @@ export function VerifyOfficialNotFound({ id }: { id: string }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-neutral-950 px-6 text-center text-white">
       <div>
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-300">{BRAND_NAME}</p>
+        <p className="text-sm font-bold tracking-[0.12em] text-amber-300">{BRAND_NAME}</p>
         <h1 className="mt-3 text-2xl font-black">Official ID not found</h1>
         <p className="mt-2 text-sm text-white/70">
           No public ID card matches <span className="font-semibold text-white">{id}</span>.

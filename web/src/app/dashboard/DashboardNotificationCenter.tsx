@@ -128,7 +128,7 @@ function MessagesPanel({
       </header>
       <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <p className="mb-4 text-sm text-[var(--muted)]">
-          Messages from GotREFS admins, event organizers, and assignors appear here.
+          Messages from GotRefs admins, event organizers, and assignors appear here.
         </p>
         <div className="space-y-3">
           {items.map((item) => (
@@ -164,7 +164,7 @@ function MessagesPanel({
           ))}
           {items.length === 0 && (
             <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-8 text-center text-sm text-[var(--muted)]">
-              No messages yet. When GotREFS or an organizer contacts you, it will show up here.
+              No messages yet. When GotRefs or an organizer contacts you, it will show up here.
             </div>
           )}
         </div>
@@ -291,10 +291,10 @@ export function DashboardNotificationCenter() {
             : status === "rejected"
               ? "Verification not approved"
               : Array.isArray(verification.fix_required_steps) && verification.fix_required_steps.length > 0
-                ? "GotREFS requested updates"
-                : "Message from GotREFS",
+                ? "GotRefs requested updates"
+                : "Message from GotRefs",
         body: verification.admin_notes.trim(),
-        fromLabel: "GotREFS admin",
+        fromLabel: "GotRefs admin",
         createdAt: verification.reviewed_at ?? verification.updated_at ?? null,
         targetUrl: "/dashboard/referee",
         tone,

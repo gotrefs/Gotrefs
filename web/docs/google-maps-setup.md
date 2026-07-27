@@ -1,4 +1,4 @@
-# Google Maps + Places setup (GotREFS)
+# Google Maps + Places setup (GotRefs)
 
 Used for:
 
@@ -8,7 +8,7 @@ Used for:
 ## 1. Create / open a Google Cloud project
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project (or select an existing one), e.g. `GotREFS`
+2. Create a project (or select an existing one), e.g. `GotRefs`
 
 ## 2. Enable APIs
 
@@ -50,7 +50,7 @@ If referrers are wrong, production shows Oops + grey map while localhost may wor
 
 4. Save — wait 1–5 minutes for restrictions to apply
 
-## 5. Add the key to GotREFS
+## 5. Add the key to GotRefs
 
 **Local** — `web/.env.local`:
 

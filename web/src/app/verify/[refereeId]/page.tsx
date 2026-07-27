@@ -10,15 +10,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { refereeId } = await params;
   const id = normalizeGotrefsId(refereeId || "");
   return {
-    title: id ? `GotREFS Verified Official · ${id}` : "GotREFS Verified Official",
-    description: "Scan-verified GotREFS official ID card.",
+    title: id ? `GotRefs Verified Official · ${id}` : "GotRefs Verified Official",
+    description: "Scan-verified GotRefs official ID card.",
     robots: { index: false, follow: false },
   };
 }
 
 /**
  * QR scan destination: public verified-official page.
- * Loads referee data by GotREFS ID — no login required.
+ * Loads referee data by GotRefs ID — no login required.
  */
 export default async function VerifyRefereePage({ params }: PageProps) {
   const { refereeId } = await params;

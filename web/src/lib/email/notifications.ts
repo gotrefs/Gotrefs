@@ -3,6 +3,11 @@ import { BRAND_NAME } from "@/lib/brand";
 import { emailLayout, escapeHtml } from "@/lib/email/layout";
 import { emailSiteUrl, sendEmail } from "@/lib/email/resend";
 import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
+import {
+  formatFixRequiredStepLabels,
+  normalizeFixRequiredSteps,
+  REF_VERIFICATION_STEPS,
+} from "@/lib/ref-verification-steps";
 
 async function emailForMemberId(
   admin: SupabaseClient,
@@ -245,7 +250,7 @@ export async function notifyOfferResponseToOrganizer(opts: {
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>${opts.accepted ? "Your booking is confirmed in GotREFS." : "You can invite another verified official from your dashboard."}</p>
+        <p>${opts.accepted ? "Your booking is confirmed in GotRefs." : "You can invite another verified official from your dashboard."}</p>
       `,
       ctaLabel: "Open organizer dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer"),
@@ -433,7 +438,7 @@ export async function notifyOrganizerNewApplication(opts: {
           <li>${escapeHtml(event.place)}</li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>Review their GotREFS ID card, ratings, and price — then approve or unrequest. Names, emails, and phone numbers are never shared.</p>
+        <p>Review their GotRefs ID card, ratings, and price — then approve or unrequest. Names, emails, and phone numbers are never shared.</p>
       `,
       ctaLabel: "Review this request",
       ctaUrl: reviewUrl,
@@ -470,7 +475,10 @@ export async function notifyVerificationDecision(opts: {
   admin: SupabaseClient;
   refMemberId: string;
   approved: boolean;
+  /** When true, this is an admin “changes needed” request (not a hard reject). */
+  changesRequested?: boolean;
   adminNotes?: string | null;
+  fixRequiredSteps?: string[] | null;
   siteUrl?: string;
 }) {
   const siteUrl = opts.siteUrl || emailSiteUrl();
@@ -482,11 +490,12 @@ export async function notifyVerificationDecision(opts: {
       to: ref.email,
       subject: `${BRAND_NAME}: You're approved — find games now`,
       html: emailLayout({
-        title: "You've been accepted",
+        title: "You're approved",
         bodyHtml: `
           <p>Hi ${escapeHtml(ref.displayName)},</p>
-          <p>Your ${BRAND_NAME} account is approved. You can now request games and receive invites from organizers.</p>
-          <p>Open your referee dashboard to find games near you.</p>
+          <p>Great news — your ${BRAND_NAME} verification is approved.</p>
+          <p>You can now request to work open games and receive invites from event organizers.</p>
+          <p>Open your referee dashboard to start finding games near you.</p>
         `,
         ctaLabel: "Find games now",
         ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
@@ -497,17 +506,34 @@ export async function notifyVerificationDecision(opts: {
   const notes = opts.adminNotes?.trim()
     ? `<p><strong>What to fix:</strong> ${escapeHtml(opts.adminNotes.trim())}</p>`
     : "";
+  const stepKeys = normalizeFixRequiredSteps(opts.fixRequiredSteps);
+  const stepLabels = REF_VERIFICATION_STEPS.filter((step) => stepKeys.includes(step.key)).map(
+    (step) => step.label
+  );
+  const stepsHtml =
+    stepLabels.length > 0
+      ? `<p><strong>Items to update:</strong></p><ul>${stepLabels
+          .map((label) => `<li>${escapeHtml(label)}</li>`)
+          .join("")}</ul>`
+      : formatFixRequiredStepLabels(stepKeys)
+        ? `<p><strong>Items to update:</strong> ${escapeHtml(formatFixRequiredStepLabels(stepKeys))}.</p>`
+        : "";
 
   return sendEmail({
     to: ref.email,
-    subject: `${BRAND_NAME}: Verification needs updates`,
+    subject: `${BRAND_NAME}: Changes needed before approval`,
     html: emailLayout({
-      title: "Verification not approved yet",
+      title: "Changes need to be made",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
-        <p>Your verification needs a few updates before we can approve your account.</p>
+        <p>${
+          opts.changesRequested
+            ? `${BRAND_NAME} reviewed your verification and needs a few changes before we can approve your account.`
+            : `Your verification was not approved yet. Please make the requested changes and resubmit.`
+        }</p>
         ${notes}
-        <p>Sign in to review the feedback and resubmit.</p>
+        ${stepsHtml}
+        <p>Sign in to your referee dashboard, update the flagged items, and resubmit for review.</p>
       `,
       ctaLabel: "Open referee dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),

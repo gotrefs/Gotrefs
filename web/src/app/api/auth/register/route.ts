@@ -29,6 +29,7 @@ type RegisterBody = {
   primarySport?: string;
   additionalSports?: string[];
   certificationLevel?: string;
+  additionalCertificationLevels?: string[];
   certifiedBy?: string;
   rateMin?: number;
   rateMax?: number;
@@ -54,6 +55,7 @@ type ProfileSetupInput = {
   primarySport: string;
   additionalSports: string[];
   certificationLevel: string;
+  additionalCertificationLevels: string[];
   rateMin: number | null;
   rateMax: number | null;
   rateType: "exact" | "range" | null;
@@ -75,6 +77,7 @@ async function setupSignupProfiles(
     primarySport,
     additionalSports,
     certificationLevel,
+    additionalCertificationLevels,
     rateMin,
     rateMax,
     rateType,
@@ -93,6 +96,7 @@ async function setupSignupProfiles(
         primary_sport: primarySport || "Basketball",
         additional_sports: additionalSports,
         certification_level: certificationLevel || "Youth / Recreational",
+        additional_certification_levels: additionalCertificationLevels,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "member_id" }
@@ -110,6 +114,7 @@ async function setupSignupProfiles(
         primary_sport: primarySport || "Basketball",
         additional_sports: additionalSports,
         certification_level: certificationLevel || "Youth / Recreational",
+        additional_certification_levels: additionalCertificationLevels,
         gotrefs_id: gotrefsId || null,
         rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
         rate_min: rateMin,
@@ -191,6 +196,11 @@ export async function POST(request: NextRequest) {
     ? body.additionalSports.filter((sport) => typeof sport === "string" && sport.trim()).map((sport) => sport.trim())
     : [];
   const certificationLevel = (body.certificationLevel ?? "").trim();
+  const additionalCertificationLevels = Array.isArray(body.additionalCertificationLevels)
+    ? body.additionalCertificationLevels
+        .filter((level): level is string => typeof level === "string" && Boolean(level.trim()))
+        .map((level) => level.trim())
+    : [];
   const certifiedBy = (body.certifiedBy ?? "").trim();
   const rateMin =
     typeof body.rateMin === "number" && Number.isFinite(body.rateMin) ? body.rateMin : null;
@@ -243,7 +253,7 @@ export async function POST(request: NextRequest) {
 
   if (!termsAccepted) {
     return NextResponse.json(
-      { error: "You must accept the applicable GotREFS terms and policies before creating an account." },
+      { error: "You must accept the applicable GotRefs terms and policies before creating an account." },
       { status: 400 }
     );
   }
@@ -258,6 +268,7 @@ export async function POST(request: NextRequest) {
     primary_sport: role === "ref" ? primarySport || "Basketball" : null,
     additional_sports: role === "ref" ? additionalSports : [],
     certification_level: role === "ref" ? certificationLevel || "Youth / Recreational" : null,
+    additional_certification_levels: role === "ref" ? additionalCertificationLevels : [],
     certified_by: role === "ref" ? certifiedBy || null : null,
     gotrefs_id: role === "ref" ? gotrefsId || null : null,
     base_city: role === "ref" ? baseCity || null : null,
@@ -305,9 +316,9 @@ export async function POST(request: NextRequest) {
           {
             error: allProviders.includes("google")
               ? isOAuthProviderEnabled("google")
-                ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
-                : "That email already has a GotREFS account connected to Google. Log in and use Forgot password to set an email password."
-              : "That email already has a GotREFS account. Log in instead, or use a different email.",
+                ? "That email already has a GotRefs account connected to Google. Use Continue with Google."
+                : "That email already has a GotRefs account connected to Google. Log in and use Forgot password to set an email password."
+              : "That email already has a GotRefs account. Log in instead, or use a different email.",
           },
           { status: 409 }
         );
@@ -339,6 +350,7 @@ export async function POST(request: NextRequest) {
     primarySport,
     additionalSports,
     certificationLevel,
+    additionalCertificationLevels,
     rateMin,
     rateMax,
     rateType,
@@ -407,7 +419,7 @@ export async function POST(request: NextRequest) {
       {
         error:
           signInError.message.toLowerCase().includes("invalid login credentials")
-            ? "That email may already have a GotREFS account, or the account could not be created. Try logging in, using Continue with Google, or use a different email."
+            ? "That email may already have a GotRefs account, or the account could not be created. Try logging in, using Continue with Google, or use a different email."
             : signInError.message,
       },
       { status: 400 }

@@ -1,5 +1,5 @@
 import type { AppliedBoost } from "@/lib/boosts";
-import { payBounds, payRangesOverlap, type PayRangeInput } from "@/lib/pay-range";
+import { payBounds, eventPayMeetsRefMinimum, type PayRangeInput } from "@/lib/pay-range";
 
 export type OpenEventRecord = {
   id: string;
@@ -119,7 +119,7 @@ export function filterOpenEvents(events: OpenEventRecord[], filters: OpenEventFi
     if (sport && event.sport.trim().toLowerCase() !== sport.toLowerCase()) return false;
     if (zip && event.zip_code.trim() !== zip) return false;
     if (filters.payMatchesRef && refProfile) {
-      if (!payRangesOverlap(refPayInput(refProfile), eventPayInput(event))) return false;
+      if (!eventPayMeetsRefMinimum(refPayInput(refProfile), eventPayInput(event))) return false;
     }
     const booked = event.booked_count ?? 0;
     if (booked >= event.officials_needed) return false;
@@ -132,9 +132,14 @@ export function payMatchLabel(
   event: OpenEventRecord
 ): string | null {
   if (!refProfile) return null;
-  if (!payRangesOverlap(refPayInput(refProfile), eventPayInput(event))) return "Pay outside your rate";
   const refBounds = payBounds(refPayInput(refProfile));
   const eventBounds = payBounds(eventPayInput(event));
   if (refBounds.min == null || eventBounds.min == null) return null;
+  if (!eventPayMeetsRefMinimum(refPayInput(refProfile), eventPayInput(event))) {
+    return "Pay below your rate";
+  }
+  const refMax = refBounds.max ?? refBounds.min;
+  const eventMin = eventBounds.min;
+  if (eventMin > refMax) return "Pay above your listed max";
   return "Pay matches your rate";
 }

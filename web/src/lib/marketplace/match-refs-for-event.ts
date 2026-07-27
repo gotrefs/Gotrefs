@@ -1,7 +1,7 @@
 import { distanceMiles, DEFAULT_SEARCH_RADIUS_MILES } from "@/lib/maps/geo";
 import { geocodeUsZip, geocodeZipBatch } from "@/lib/marketplace/zip-geocode";
 import { refOfficiatesSport } from "@/lib/marketplace/event-filters";
-import { payRangesOverlap } from "@/lib/pay-range";
+import { eventPayMeetsRefMinimum } from "@/lib/pay-range";
 
 export type MatchEventInput = {
   id: string;
@@ -112,7 +112,7 @@ export async function matchRefsForEvent<T extends MatchRefInput>(
     ) {
       continue;
     }
-    if (!payRangesOverlap(refPayInput(ref), eventPayInput(event))) continue;
+    if (!eventPayMeetsRefMinimum(refPayInput(ref), eventPayInput(event))) continue;
     if (requireAvailability && ref.availability.length > 0) {
       const available = ref.availability.some((slot) => slotCoversEvent(slot, event));
       if (!available) continue;

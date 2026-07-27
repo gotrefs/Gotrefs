@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { notifyInBackground, notifyProfileSubmitted } from "@/lib/email/notifications";
+import { notifyProfileSubmitted } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -69,13 +69,11 @@ export async function POST() {
 
   try {
     const admin = createServiceClient();
-    notifyInBackground(() =>
-      notifyProfileSubmitted({
-        admin,
-        refMemberId: user.id,
-        siteUrl: emailSiteUrl(),
-      })
-    );
+    await notifyProfileSubmitted({
+      admin,
+      refMemberId: user.id,
+      siteUrl: emailSiteUrl(),
+    });
   } catch {
     // Email is best-effort.
   }

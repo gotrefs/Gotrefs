@@ -24,7 +24,7 @@ Do **not** use `{{ .ConfirmationURL }}` — that PKCE link fails when opened fro
 
 This uses `token_hash` + `verifyOtp` in `/auth/callback` — works from any device.
 
-If `RESEND_API_KEY` is set on Vercel, GotREFS also sends its own reset email with a token_hash link (preferred).
+If `RESEND_API_KEY` is set on Vercel, GotRefs also sends its own reset email with a token_hash link (preferred).
 
 ---
 

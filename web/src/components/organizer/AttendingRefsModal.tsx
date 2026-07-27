@@ -19,25 +19,35 @@ export function AttendingRefsModal({
   eventWhen,
   refs,
   onClose,
+  initialOfferId = null,
 }: {
   eventTitle: string;
   eventWhen?: string | null;
   refs: AttendingRef[];
   onClose: () => void;
+  /** When set, open directly on that official’s ID card. */
+  initialOfferId?: string | null;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (initialOfferId && refs.some((ref) => ref.offerId === initialOfferId)) {
+      return initialOfferId;
+    }
+    // Single-ref deep link (e.g. Messages → accepted official): skip the list.
+    if (refs.length === 1) return refs[0].offerId;
+    return null;
+  });
   const selected = refs.find((ref) => ref.offerId === selectedId) ?? null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (selectedId) setSelectedId(null);
+        if (selectedId && refs.length > 1) setSelectedId(null);
         else onClose();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, selectedId]);
+  }, [onClose, selectedId, refs.length]);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-4 sm:items-center">
@@ -61,10 +71,13 @@ export function AttendingRefsModal({
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedId(null)}
+                onClick={() => {
+                  if (refs.length <= 1) onClose();
+                  else setSelectedId(null);
+                }}
                 className="shrink-0 rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
               >
-                Back
+                {refs.length <= 1 ? "Close" : "Back"}
               </button>
             </div>
 
@@ -88,7 +101,9 @@ export function AttendingRefsModal({
             </div>
 
             <p className="mt-4 text-center text-xs text-neutral-500">
-              Tap Back to return to the attending list and open another official.
+              {refs.length > 1
+                ? "Tap Back to return to the attending list and open another official."
+                : "This is the official’s GotRefs ID for your event."}
             </p>
           </>
         ) : (

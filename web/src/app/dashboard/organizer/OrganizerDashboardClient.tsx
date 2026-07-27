@@ -223,7 +223,6 @@ function formatCents(cents: number) {
 export default function OrganizerDashboardClient() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
-  const notificationsRef = useRef<HTMLElement | null>(null);
   const applicantsRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [setupStep, setSetupStep] = useState<OrganizerSetupStep>("sport");
@@ -290,6 +289,7 @@ export default function OrganizerDashboardClient() {
   const [checkoutEventId, setCheckoutEventId] = useState<string | null>(null);
   const [staffingEventId, setStaffingEventId] = useState<string | null>(null);
   const [attendingEventId, setAttendingEventId] = useState<string | null>(null);
+  const [attendingFocusOfferId, setAttendingFocusOfferId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const {
@@ -470,8 +470,7 @@ export default function OrganizerDashboardClient() {
     const panel = searchParams.get("panel");
     if (!panel || loading) return;
     window.requestAnimationFrame(() => {
-      if (panel === "requests") applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (panel === "responses") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel === "requests" || panel === "responses") setActiveTab("messages");
       if (panel === "marketplace") setActiveTab("listings");
     });
   }, [loading, searchParams]);
@@ -562,7 +561,10 @@ export default function OrganizerDashboardClient() {
           : null;
       setReviewApplicant(null);
       await load();
-      if (acceptedEventId) setAttendingEventId(acceptedEventId);
+      if (acceptedEventId) {
+        setAttendingFocusOfferId(null);
+        setAttendingEventId(acceptedEventId);
+      }
       return true;
     } catch {
       const detail = "Could not reach the server.";
@@ -749,7 +751,7 @@ export default function OrganizerDashboardClient() {
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
     setLogoUrl(await resolveProfilePhotoUrl(supabase, path));
-    setMsg("Organization logo uploaded — it will show on your GotREFS ID card.");
+    setMsg("Organization logo uploaded — it will show on your GotRefs ID card.");
   }
 
   async function savePayoutMethod(payload: PayoutMethodPayload): Promise<boolean> {
@@ -1213,7 +1215,7 @@ export default function OrganizerDashboardClient() {
 
   const setupActions: { step: OrganizerSetupStep; label: string; done: boolean }[] = [
     { step: "sport", label: "Primary sport", done: Boolean(sport.trim()) },
-    { step: "pay", label: "Typical pay per official", done: hasOrganizerPay() },
+    { step: "pay", label: "Hourly pay for referees", done: hasOrganizerPay() },
     { step: "bio", label: "About your org", done: Boolean(bio.trim()) },
     { step: "events", label: "Add upcoming events", done: events.length > 0 || Boolean(eventsListPath) },
     { step: "identity", label: "Organization logo & brand colors", done: Boolean(logoPath) },
@@ -1383,7 +1385,7 @@ export default function OrganizerDashboardClient() {
         {setupStep === "pay" && (
           <div className="mt-5">
             <label className="flex flex-col gap-1 text-sm">
-              Base pay per official
+              Hourly pay
               <div className="rounded-xl border border-[var(--border)] p-3">
                 <div className="flex items-baseline gap-1">
                   <span className="text-lg font-semibold text-neutral-900">$</span>
@@ -1402,7 +1404,7 @@ export default function OrganizerDashboardClient() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-[var(--muted)]">
-                  This is what each official earns for the game.
+                  This is what each official earns per hour.
                 </p>
               </div>
             </label>
@@ -1502,7 +1504,7 @@ export default function OrganizerDashboardClient() {
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
                 <p className="text-lg font-semibold text-neutral-900">Organization logo</p>
                 <p className="mt-1 text-sm text-neutral-500">
-                  PNG, JPG, SVG, or WEBP — this photo appears on your GotREFS ID card
+                  PNG, JPG, SVG, or WEBP — this photo appears on your GotRefs ID card
                 </p>
                 <input
                   type="file"
@@ -1767,33 +1769,6 @@ export default function OrganizerDashboardClient() {
             </div>
           )}
 
-          {(signupRequests.length > 0 || respondedSentOffers.length > 0) && (
-            <section ref={notificationsRef} className="rounded-2xl border border-neutral-200 bg-white p-5">
-              <h2 className="text-lg font-semibold text-neutral-900">Inbox</h2>
-              <div className="mt-3 space-y-2">
-                {signupRequests.slice(0, 3).map((sr) => (
-                  <button
-                    key={sr.id}
-                    type="button"
-                    onClick={() => applicantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="block w-full rounded-xl border border-neutral-200 px-4 py-3 text-left text-sm hover:bg-neutral-50"
-                  >
-                    Ref {sr.gotrefsId} requested {sr.eventTitle}
-                  </button>
-                ))}
-                {respondedSentOffers.slice(0, 3).map((offer) => {
-                  const ev = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
-                  const refMeta = refs.find((ref) => ref.id === offer.ref_member_id);
-                  const officialId = refMeta?.gotrefsId ?? `GR-${offer.ref_member_id.slice(0, 8).toUpperCase()}`;
-                  return (
-                    <p key={offer.id} className="rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-700">
-                      Official {officialId} {offer.status} {ev?.title ?? "your event"}
-                    </p>
-                  );
-                })}
-              </div>
-            </section>
-          )}
         </>
       )}
 
@@ -1994,7 +1969,7 @@ export default function OrganizerDashboardClient() {
                         {payment && payment.totalCents > 0 ? (
                           <span className="mt-1 block text-xs font-semibold text-neutral-500">
                             Checkout total {formatCents(payment.totalCents)} (includes{" "}
-                            {PLATFORM_FEE_PERCENT_LABEL} GotREFS fee)
+                            {PLATFORM_FEE_PERCENT_LABEL} GotRefs fee)
                           </span>
                         ) : null}
                       </span>
@@ -2006,7 +1981,10 @@ export default function OrganizerDashboardClient() {
                       {hiredCount > 0 ? (
                         <button
                           type="button"
-                          onClick={() => setAttendingEventId(e.id)}
+                          onClick={() => {
+                            setAttendingFocusOfferId(null);
+                            setAttendingEventId(e.id);
+                          }}
                           className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
                         >
                           {hiredCount}/{e.officials_needed} hired · View refs
@@ -2144,7 +2122,7 @@ export default function OrganizerDashboardClient() {
                   authorLabel: "Host",
                 }))}
                 metaRows={[
-                  sr.gotrefsId ? `GotREFS ID ${sr.gotrefsId}` : null,
+                  sr.gotrefsId ? `GotRefs ID ${sr.gotrefsId}` : null,
                   sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}
@@ -2237,7 +2215,14 @@ export default function OrganizerDashboardClient() {
                 <button
                   key={offer.id}
                   type="button"
-                  onClick={() => openStaffingForEvent(offer.event_id)}
+                  onClick={() => {
+                    if (accepted) {
+                      setAttendingFocusOfferId(offer.id);
+                      setAttendingEventId(offer.event_id);
+                      return;
+                    }
+                    openStaffingForEvent(offer.event_id);
+                  }}
                   className={`flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-sm font-semibold text-neutral-700">
@@ -2252,6 +2237,7 @@ export default function OrganizerDashboardClient() {
                       {accepted && offer.offered_pay != null ? ` · $${offer.offered_pay}` : ""}
                       {accepted && (offer.boost_percent ?? 0) > 0 ? ` (includes ${offer.boost_percent}% boost)` : ""}
                       {offer.message ? ` — “${offer.message}”` : ""}
+                      {accepted ? " — tap to view ID" : ""}
                     </span>
                   </span>
                   <span
@@ -2338,8 +2324,16 @@ export default function OrganizerDashboardClient() {
             <AttendingRefsModal
               eventTitle={event.title}
               eventWhen={formatEventDateTime(event.starts_at)}
-              refs={attendingRefs}
-              onClose={() => setAttendingEventId(null)}
+              refs={
+                attendingFocusOfferId
+                  ? attendingRefs.filter((ref) => ref.offerId === attendingFocusOfferId)
+                  : attendingRefs
+              }
+              initialOfferId={attendingFocusOfferId}
+              onClose={() => {
+                setAttendingEventId(null);
+                setAttendingFocusOfferId(null);
+              }}
             />
           );
         })()}

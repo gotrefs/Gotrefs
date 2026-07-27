@@ -8,11 +8,15 @@ const IDB_VERSION = 1;
 export type RefSignupDraftFields = {
   screen: string;
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   primarySport: string;
   customPrimarySport: string;
   secondarySport: string;
   certificationLevel: string;
+  additionalCertificationLevels?: string[];
+  certifiedBy?: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
   baseCity: string;

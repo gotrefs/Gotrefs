@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/signup-draft";
 import { formatHourlyRateRange } from "@/lib/pay-range";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { CertificationFields, normalizeCertificationLevels } from "@/components/CertificationFields";
 import {
   RefSignupAirbnbWizard,
   type RefSignupWizardScreen,
@@ -79,6 +80,8 @@ export function AuthFlow() {
   const [role, setRole] = useState<AudienceRole>(initialRole);
   const [wizardStep, setWizardStep] = useState(0);
   const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [phone, setPhone] = useState("");
@@ -86,6 +89,7 @@ export function AuthFlow() {
   const [customPrimarySport, setCustomPrimarySport] = useState("");
   const [secondarySport, setSecondarySport] = useState("");
   const [certificationLevel, setCertificationLevel] = useState("");
+  const [additionalCertificationLevels, setAdditionalCertificationLevels] = useState<string[]>([]);
   const [certifiedBy, setCertifiedBy] = useState("");
   const [hourlyRateMin, setHourlyRateMin] = useState(String(SIGNUP_HOURLY_RATE_FLOOR));
   const [hourlyRateMax, setHourlyRateMax] = useState("75");
@@ -130,11 +134,24 @@ export function AuthFlow() {
       const fields: RefSignupDraftFields = draft.fields;
       setRole("ref");
       setFullName(fields.fullName || "");
+      const draftFirst =
+        fields.firstName?.trim() ||
+        (fields.fullName ? splitName(fields.fullName).firstName : "");
+      const draftLast =
+        fields.lastName?.trim() ||
+        (fields.fullName ? splitName(fields.fullName).lastName : "");
+      setFirstName(draftFirst);
+      setLastName(draftLast);
+      if (!fields.fullName && (draftFirst || draftLast)) {
+        setFullName([draftFirst, draftLast].filter(Boolean).join(" "));
+      }
       setEmail(fields.email || "");
       setPrimarySport(fields.primarySport || "Basketball");
       setCustomPrimarySport(fields.customPrimarySport || "");
       setSecondarySport(fields.secondarySport || "");
       setCertificationLevel(fields.certificationLevel || "");
+      setAdditionalCertificationLevels(fields.additionalCertificationLevels ?? []);
+      setCertifiedBy(fields.certifiedBy || "");
       setHourlyRateMin(fields.hourlyRateMin || String(SIGNUP_HOURLY_RATE_FLOOR));
       setHourlyRateMax(fields.hourlyRateMax || "75");
       setBaseCity(fields.baseCity || "");
@@ -211,7 +228,10 @@ export function AuthFlow() {
     void bootOAuthSignup();
   }, [oauthMode, searchParams]);
 
-  const gotrefsId = useMemo(() => buildGotrefsId(email || fullName), [email, fullName]);
+  const gotrefsId = useMemo(
+    () => buildGotrefsId(email || [firstName, lastName].filter(Boolean).join(" ") || fullName),
+    [email, firstName, lastName, fullName]
+  );
   const roleCard = ROLE_CARDS.find((item) => item.role === role) ?? ROLE_CARDS[0];
   const progress =
     role === "ref"
@@ -224,6 +244,7 @@ export function AuthFlow() {
     secondarySport.trim() && secondarySport !== resolvedPrimarySport && secondarySport !== OTHER_SPORT_VALUE
       ? [secondarySport.trim()]
       : [];
+  const resolvedCerts = normalizeCertificationLevels(certificationLevel, additionalCertificationLevels);
 
   function toggleRegion(region: string) {
     setWorkRegions((current) =>
@@ -358,8 +379,8 @@ export function AuthFlow() {
 
   function nextWizardStep() {
     setError(null);
-    if (role === "ref" && wizardStep === 0 && !fullName.trim()) {
-      setError("Enter your name to continue.");
+    if (role === "ref" && wizardStep === 0 && (!firstName.trim() || !lastName.trim())) {
+      setError("Enter your first and last name to continue.");
       return;
     }
     if (role === "ref" && wizardStep === 0 && !photoFile) {
@@ -471,22 +492,23 @@ export function AuthFlow() {
     setError(null);
     setNotice(null);
 
-    const { firstName, lastName } = splitName(fullName);
+    const resolvedFirstName = firstName.trim() || splitName(fullName).firstName;
+    const resolvedLastName = lastName.trim() || splitName(fullName).lastName;
     if (role === "ref") {
-      if (!firstName && !lastName) {
-        setError("Enter your name to continue.");
+      if (!resolvedFirstName || !resolvedLastName) {
+        setError("Enter your first and last name to continue.");
         return;
       }
-    } else if (!firstName || !lastName) {
+    } else if (!resolvedFirstName || !resolvedLastName) {
       setError("Enter your first and last name.");
       return;
     }
     if (role === "ref" && !photoFile) {
-      setError("Upload a clear photo of your face for your GotREFS profile.");
+      setError("Upload a clear photo of your face for your GotRefs profile.");
       return;
     }
     if (!termsAccepted) {
-      setError("Please confirm that you accept the GotREFS terms and policies to create your account.");
+      setError("Please confirm that you accept the GotRefs terms and policies to create your account.");
       return;
     }
 
@@ -517,16 +539,17 @@ export function AuthFlow() {
       const isOrganizer = role === "organizer";
       const payload = {
         email,
-        firstName,
-        lastName,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
         role: isOrganizer ? "organizer" : "ref",
         isAssignor: role === "assignor",
         organizationName: isOrganizer ? organizationName.trim() : undefined,
         phone: isOrganizer ? phone.trim() : undefined,
         primarySport: resolvedPrimarySport,
         additionalSports: resolvedAdditionalSports,
-        certificationLevel: certificationLevel.trim() || undefined,
-        certifiedBy: role === "ref" ? certifiedBy.trim() || certificationLevel.trim() || undefined : undefined,
+        certificationLevel: resolvedCerts.certificationLevel || undefined,
+        additionalCertificationLevels: resolvedCerts.additionalCertificationLevels,
+        certifiedBy: role === "ref" ? certifiedBy.trim() || resolvedCerts.certificationLevel || undefined : undefined,
         rateMin: role === "ref" ? Number(hourlyRateMin) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateMax: role === "ref" ? Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateType: role === "ref" ? "range" : undefined,
@@ -572,12 +595,16 @@ export function AuthFlow() {
             await saveRefSignupDraft(
               {
                 screen: "account",
-                fullName,
+                fullName: [firstName, lastName].filter(Boolean).join(" ") || fullName,
+                firstName,
+                lastName,
                 email,
                 primarySport,
                 customPrimarySport,
                 secondarySport,
                 certificationLevel,
+                additionalCertificationLevels,
+                certifiedBy,
                 hourlyRateMin,
                 hourlyRateMax,
                 baseCity,
@@ -632,7 +659,8 @@ export function AuthFlow() {
               {
                 primarySport: resolvedPrimarySport,
                 additionalSports: resolvedAdditionalSports,
-                certificationLevel: certificationLevel.trim() || "Youth / Recreational",
+                certificationLevel: resolvedCerts.certificationLevel || "Youth / Recreational",
+                additionalCertificationLevels: resolvedCerts.additionalCertificationLevels,
               }
             );
             docsUploaded = true;
@@ -650,12 +678,16 @@ export function AuthFlow() {
             await saveRefSignupDraft(
               {
                 screen: "account",
-                fullName,
+                fullName: [firstName, lastName].filter(Boolean).join(" ") || fullName,
+                firstName,
+                lastName,
                 email,
                 primarySport,
                 customPrimarySport,
                 secondarySport,
                 certificationLevel,
+                additionalCertificationLevels,
+                certifiedBy,
                 hourlyRateMin,
                 hourlyRateMax,
                 baseCity,
@@ -713,13 +745,15 @@ export function AuthFlow() {
         error={error}
         oauthMode={oauthMode}
         initialScreen={resumeScreen}
-        fullName={fullName}
+        firstName={firstName}
+        lastName={lastName}
         photoFile={photoFile}
         gotrefsId={gotrefsId}
         primarySport={primarySport}
         customPrimarySport={customPrimarySport}
         secondarySport={secondarySport}
         certificationLevel={certificationLevel}
+        additionalCertificationLevels={additionalCertificationLevels}
         certifiedBy={certifiedBy}
         hourlyRateMin={hourlyRateMin}
         hourlyRateMax={hourlyRateMax}
@@ -735,12 +769,14 @@ export function AuthFlow() {
         recommendedAssignorName={recommendedAssignorName}
         recommendedAssignorEmail={recommendedAssignorEmail}
         recommendedAssignorPhone={recommendedAssignorPhone}
-        onFullName={setFullName}
+        onFirstName={setFirstName}
+        onLastName={setLastName}
         onPhotoFile={setPhotoFile}
         onPrimarySport={setPrimarySport}
         onCustomPrimarySport={setCustomPrimarySport}
         onSecondarySport={setSecondarySport}
         onCertificationLevel={setCertificationLevel}
+        onAdditionalCertificationLevels={setAdditionalCertificationLevels}
         onCertifiedBy={setCertifiedBy}
         onHourlyRateMin={setHourlyRateMin}
         onHourlyRateMax={setHourlyRateMax}
@@ -1042,10 +1078,28 @@ export function AuthFlow() {
 
             {role === "ref" && wizardStep === 0 && (
               <div className="space-y-4">
-                <label className="block text-sm font-bold text-[var(--navy)]">
-                  Name
-                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="First, last, or both" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
-                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-sm font-bold text-[var(--navy)]">
+                    First name
+                    <input
+                      value={firstName}
+                      onChange={(event) => setFirstName(event.target.value)}
+                      placeholder="First"
+                      autoComplete="given-name"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                    />
+                  </label>
+                  <label className="block text-sm font-bold text-[var(--navy)]">
+                    Last name
+                    <input
+                      value={lastName}
+                      onChange={(event) => setLastName(event.target.value)}
+                      placeholder="Last"
+                      autoComplete="family-name"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                    />
+                  </label>
+                </div>
                 <label
                   className={`relative flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition ${
                     photoFile
@@ -1073,7 +1127,7 @@ export function AuthFlow() {
                     <span className="block text-xs text-[var(--muted)]">
                       {photoFile
                         ? "Green check means you’re set — tap to replace anytime."
-                        : "Clear face photo required for your GotREFS ID card."}
+                        : "Clear face photo required for your GotRefs ID card."}
                     </span>
                   </span>
                   <input
@@ -1092,12 +1146,16 @@ export function AuthFlow() {
                 customPrimarySport={customPrimarySport}
                 secondarySport={secondarySport}
                 certificationLevel={certificationLevel}
+                additionalCertificationLevels={additionalCertificationLevels}
+                certifiedBy={certifiedBy}
                 hourlyRateMin={hourlyRateMin}
                 hourlyRateMax={hourlyRateMax}
                 onPrimarySport={setPrimarySport}
                 onCustomPrimarySport={setCustomPrimarySport}
                 onSecondarySport={setSecondarySport}
                 onCertificationLevel={setCertificationLevel}
+                onAdditionalCertificationLevels={setAdditionalCertificationLevels}
+                onCertifiedBy={setCertifiedBy}
                 onHourlyRateMin={setHourlyRateMin}
                 onHourlyRateMax={setHourlyRateMax}
               />
@@ -1347,12 +1405,16 @@ function SportsAndCerts({
   customPrimarySport,
   secondarySport,
   certificationLevel,
+  additionalCertificationLevels,
+  certifiedBy,
   hourlyRateMin,
   hourlyRateMax,
   onPrimarySport,
   onCustomPrimarySport,
   onSecondarySport,
   onCertificationLevel,
+  onAdditionalCertificationLevels,
+  onCertifiedBy,
   onHourlyRateMin,
   onHourlyRateMax,
 }: {
@@ -1360,12 +1422,16 @@ function SportsAndCerts({
   customPrimarySport: string;
   secondarySport: string;
   certificationLevel: string;
+  additionalCertificationLevels: string[];
+  certifiedBy: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
   onPrimarySport: (sport: string) => void;
   onCustomPrimarySport: (value: string) => void;
   onSecondarySport: (sport: string) => void;
   onCertificationLevel: (value: string) => void;
+  onAdditionalCertificationLevels: (levels: string[]) => void;
+  onCertifiedBy: (value: string) => void;
   onHourlyRateMin: (value: string) => void;
   onHourlyRateMax: (value: string) => void;
 }) {
@@ -1435,20 +1501,20 @@ function SportsAndCerts({
       <p className="text-xs text-[var(--muted)]">
         Add another sport you also officiate if you want. You can skip this and continue.
       </p>
-      <label className="block text-sm font-bold text-[var(--navy)]">
-        Certification level
-        <input
-          value={certificationLevel}
-          onChange={(event) => onCertificationLevel(event.target.value)}
-          placeholder="Youth, varsity, NFHS, USSF, etc."
-          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-        />
-      </label>
+      <CertificationFields
+        variant="form"
+        certificationLevel={certificationLevel}
+        additionalCertificationLevels={additionalCertificationLevels}
+        onCertificationLevel={onCertificationLevel}
+        onAdditionalChange={onAdditionalCertificationLevels}
+        certifiedBy={certifiedBy}
+        onCertifiedBy={onCertifiedBy}
+      />
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
           Drag both ends of the slider. The left handle starts at ${SIGNUP_HOURLY_RATE_FLOOR}/hr.
-          Event organizers only see your GotREFS ID until you accept a game.
+          Event organizers only see your GotRefs ID until you accept a game.
         </p>
         <p className="mt-3 text-lg font-black text-[var(--navy)]">
           {formatHourlyRateRange(minVal, maxVal)}

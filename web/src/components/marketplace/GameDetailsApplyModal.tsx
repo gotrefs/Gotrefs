@@ -49,6 +49,8 @@ export function GameDetailsApplyModal({
   alreadyRequested,
   requesting,
   unrequesting,
+  canApply = true,
+  applyBlockedLabel = "Verification required",
   onClose,
   onApply,
   onUnrequest,
@@ -57,6 +59,8 @@ export function GameDetailsApplyModal({
   alreadyRequested?: boolean;
   requesting?: boolean;
   unrequesting?: boolean;
+  canApply?: boolean;
+  applyBlockedLabel?: string;
   onClose: () => void;
   onApply: (event: OpenEventRecord) => void;
   onUnrequest?: (event: OpenEventRecord) => void;
@@ -78,9 +82,13 @@ export function GameDetailsApplyModal({
   const busy = Boolean(requesting || unrequesting);
   const applyLabel = ended
     ? "Game ended"
-    : requesting
-      ? "Submitting…"
-      : "Apply";
+    : slotsLeft === 0
+      ? "No openings left"
+      : !canApply
+        ? applyBlockedLabel
+        : requesting
+          ? "Submitting…"
+          : "Apply";
   const notes = notesForRefDisplay(event.notes);
 
   return (
@@ -183,11 +191,11 @@ export function GameDetailsApplyModal({
           ) : (
             <button
               type="button"
-              disabled={ended || busy || slotsLeft === 0}
+              disabled={ended || busy || slotsLeft === 0 || !canApply}
               onClick={() => onApply(event)}
               className="mt-1 w-full rounded-xl bg-[#d81d24] py-3 text-sm font-semibold text-white transition hover:bg-[#c01820] disabled:opacity-60"
             >
-              {ended ? "Game ended" : slotsLeft === 0 ? "No openings left" : applyLabel}
+              {applyLabel}
             </button>
           )}
         </div>

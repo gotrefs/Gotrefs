@@ -154,7 +154,7 @@ export function ApplicantReviewModal({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-neutral-500">New on GotREFS — no host reviews yet.</p>
+                <p className="mt-2 text-sm text-neutral-500">New on GotRefs — no host reviews yet.</p>
               )}
             </div>
 

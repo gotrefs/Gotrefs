@@ -50,6 +50,21 @@ const SPORT_PHOTO_SETS: Record<string, string[]> = {
     u("photo-1459865264687-595d652de67e"),
     u("photo-1508098682722-e4c0a5a99d2c"),
   ],
+  "tackle football": [
+    u("photo-1560272564-c83b66b1ad12"),
+    u("photo-1459865264687-595d652de67e"),
+    u("photo-1508098682722-e4c0a5a99d2c"),
+  ],
+  "flag football": [
+    u("photo-1560272564-c83b66b1ad12"),
+    u("photo-1459865264687-595d652de67e"),
+    u("photo-1508098682722-e4c0a5a99d2c"),
+  ],
+  "7v7 football": [
+    u("photo-1560272564-c83b66b1ad12"),
+    u("photo-1459865264687-595d652de67e"),
+    u("photo-1508098682722-e4c0a5a99d2c"),
+  ],
   football: [
     u("photo-1560272564-c83b66b1ad12"),
     u("photo-1459865264687-595d652de67e"),
@@ -106,12 +121,14 @@ const SPORT_PHOTO_SETS: Record<string, string[]> = {
     u("photo-1554068865-24cecd4e34b8"),
   ],
   pickleball: [
-    u("photo-1626224582227-157a266fe810"),
+    u("photo-1761644658016-324918bc373c"),
+    u("photo-1747027694225-cbf12dd20826"),
+    u("photo-1779209219762-681ff11296d6"),
   ],
   badminton: [
-    u("photo-1626224582227-157a266fe810"),
     u("photo-1595435934249-5df7ca71e7e9"),
     u("photo-1612872087720-bb876e2e67d1"),
+    u("photo-1554068865-24cecd4e34b8"),
   ],
   wrestling: [
     u("photo-1555597673-b21d5c935865"),

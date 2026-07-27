@@ -80,12 +80,12 @@ const STOP_WORDS = new Set([
 ]);
 
 export const FAQ_QUICK_CHIPS = [
-  "What is GotREFS?",
+  "What is GotRefs?",
   "How do I get verified?",
   "Is it free for referees?",
   "How do organizers find officials?",
   "Are officials background checked?",
-  "What makes GotREFS different?",
+  "What makes GotRefs different?",
 ] as const;
 
 export const FAQ_TAB_SHORT: Record<string, string> = {
@@ -95,7 +95,7 @@ export const FAQ_TAB_SHORT: Record<string, string> = {
   "Verification & Safety": "Safety",
   "Platform Features": "Features",
   Pricing: "Pricing",
-  "Why GotREFS?": "Why GotREFS",
+  "Why GotRefs?": "Why GotRefs",
 };
 
 export const FAQ_VISIBLE_PER_TAB = 10;

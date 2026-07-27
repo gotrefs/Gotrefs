@@ -14,7 +14,7 @@ export function LandingAuthPopup() {
         className="relative grid w-full max-w-5xl overflow-hidden rounded-xl bg-white text-[var(--navy)] shadow-2xl md:grid-cols-[1.05fr_1fr]"
         role="dialog"
         aria-modal="true"
-        aria-label="Create a GotREFS account"
+        aria-label="Create a GotRefs account"
       >
         <button
           type="button"
@@ -42,14 +42,14 @@ export function LandingAuthPopup() {
               </ul>
             </div>
             <p className="mt-10 max-w-sm rounded-2xl bg-black/35 p-4 text-sm font-semibold leading-6 text-white/90 backdrop-blur">
-              GotREFS connects organizers and officials in one marketplace built for trust, speed, and clean scheduling.
+              GotRefs connects organizers and officials in one marketplace built for trust, speed, and clean scheduling.
             </p>
           </div>
         </div>
 
         <div className="flex items-center p-8 md:p-10">
           <div className="w-full">
-            <h1 className="text-2xl font-black tracking-tight md:text-3xl">Welcome to GotREFS</h1>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">Welcome to GotRefs</h1>
             <p className="mt-3 text-base text-[var(--slate)]">
               One clean login and signup flow for refs, organizers, and assignors.{" "}
               <Link href="/auth/login" className="font-bold text-[var(--navy)] underline">
@@ -68,7 +68,7 @@ export function LandingAuthPopup() {
             </p>
 
             <p className="mt-28 text-xs leading-5 text-slate-500 md:mt-32">
-              By joining GotREFS, you agree to our{" "}
+              By joining GotRefs, you agree to our{" "}
               <Link href="/#faq" className="font-bold text-emerald-700 underline">
                 Terms of Service
               </Link>{" "}

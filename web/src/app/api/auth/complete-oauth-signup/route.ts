@@ -14,6 +14,7 @@ type CompleteOAuthBody = {
   primarySport?: string;
   additionalSports?: string[];
   certificationLevel?: string;
+  additionalCertificationLevels?: string[];
   certifiedBy?: string;
   rateMin?: number;
   rateMax?: number;
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   if (lnErr) return NextResponse.json({ error: lnErr }, { status: 400 });
   if (!termsAccepted) {
     return NextResponse.json(
-      { error: "You must accept the applicable GotREFS terms and policies before continuing." },
+      { error: "You must accept the applicable GotRefs terms and policies before continuing." },
       { status: 400 }
     );
   }
@@ -75,6 +76,11 @@ export async function POST(request: NextRequest) {
     ? body.additionalSports.filter((sport) => typeof sport === "string" && sport.trim()).map((sport) => sport.trim())
     : [];
   const certificationLevel = (body.certificationLevel ?? "").trim();
+  const additionalCertificationLevels = Array.isArray(body.additionalCertificationLevels)
+    ? body.additionalCertificationLevels
+        .filter((level): level is string => typeof level === "string" && Boolean(level.trim()))
+        .map((level) => level.trim())
+    : [];
   const certifiedBy = (body.certifiedBy ?? "").trim();
   const rateMin =
     typeof body.rateMin === "number" && Number.isFinite(body.rateMin) ? body.rateMin : null;
@@ -107,6 +113,7 @@ export async function POST(request: NextRequest) {
     primary_sport: role === "ref" ? primarySport || "Basketball" : null,
     additional_sports: role === "ref" ? additionalSports : [],
     certification_level: role === "ref" ? certificationLevel || "Youth / Recreational" : null,
+    additional_certification_levels: role === "ref" ? additionalCertificationLevels : [],
     certified_by: role === "ref" ? certifiedBy || null : null,
     gotrefs_id: role === "ref" ? gotrefsId || null : null,
     base_city: role === "ref" ? baseCity || null : null,
@@ -151,6 +158,7 @@ export async function POST(request: NextRequest) {
         primary_sport: primarySport || "Basketball",
         additional_sports: additionalSports,
         certification_level: certificationLevel || "Youth / Recreational",
+        additional_certification_levels: additionalCertificationLevels,
         gotrefs_id: gotrefsId || null,
         rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
         rate_min: rateMin,

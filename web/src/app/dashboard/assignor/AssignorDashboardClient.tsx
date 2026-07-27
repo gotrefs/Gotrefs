@@ -152,7 +152,7 @@ export default function AssignorDashboardClient() {
             Add your refs once. Staff games faster later.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80">
-            Choose the cleanest path for today: manually add a ref, or upload a roster file and let GotREFS store each
+            Choose the cleanest path for today: manually add a ref, or upload a roster file and let GotRefs store each
             ref in Supabase.
           </p>
         </section>
@@ -216,7 +216,7 @@ export default function AssignorDashboardClient() {
                 <span className="text-sm font-black text-[var(--navy)]">
                   {uploading ? "Importing..." : "Choose CSV or text file"}
                 </span>
-                <span className="mt-2 text-xs text-[var(--muted)]">GotREFS will create roster rows automatically.</span>
+                <span className="mt-2 text-xs text-[var(--muted)]">GotRefs will create roster rows automatically.</span>
                 <input
                   type="file"
                   accept=".csv,.txt,.tsv"
@@ -233,7 +233,7 @@ export default function AssignorDashboardClient() {
                 <p className="font-black">Next automation step</p>
                 <p className="mt-1">
                   For messy PDFs or spreadsheets, send the file to an LLM parser, normalize the refs into this same
-                  roster format, create draft claim profiles, then email each ref: “Your GotREFS profile was created by
+                  roster format, create draft claim profiles, then email each ref: “Your GotRefs profile was created by
                   [assignor name]. Please fill in the missing information to receive future game notifications.”
                 </p>
               </div>

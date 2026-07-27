@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiUser } from "@/lib/auth/require-admin-api";
 import { activateQueuedSignupRequests } from "@/lib/activate-queued-signups";
-import { notifyInBackground, notifyVerificationDecision } from "@/lib/email/notifications";
+import { notifyVerificationDecision } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { normalizeFixRequiredSteps } from "@/lib/ref-verification-steps";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -56,7 +56,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
   const adminNotes =
     adminNotesInput ||
     (action === "approve"
-      ? "Application Approved — you can now request to work games on GotREFS!"
+      ? "Application Approved — you can now request to work games on GotRefs!"
       : action === "reject"
         ? "Your verification was not approved. Please complete the requested fixes and resubmit."
         : null);
@@ -135,16 +135,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       queuedActivated = flushed.activated;
     }
 
-    if (action === "approve" || action === "reject") {
-      notifyInBackground(() =>
-        notifyVerificationDecision({
-          admin,
-          refMemberId,
-          approved: action === "approve",
-          adminNotes,
-          siteUrl,
-        })
-      );
+    if (action === "approve" || action === "reject" || action === "request_info") {
+      // Await so serverless runtimes don't drop the Resend call.
+      await notifyVerificationDecision({
+        admin,
+        refMemberId,
+        approved: action === "approve",
+        changesRequested: action === "request_info",
+        adminNotes,
+        fixRequiredSteps: action === "approve" ? [] : fixRequiredSteps,
+        siteUrl,
+      });
     }
 
     return NextResponse.json({

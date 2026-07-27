@@ -25,6 +25,7 @@ export function PublicOfficialIdCardClient({
         primarySport={card.primarySport ?? undefined}
         additionalSports={card.additionalSports}
         certificationLevel={card.certificationLevel ?? undefined}
+        additionalCertificationLevels={card.additionalCertificationLevels}
         certifiedBy={card.certifiedBy ?? undefined}
         avatarUrl={card.avatarUrl ?? undefined}
         avatarLabel="ID"
@@ -44,7 +45,7 @@ export function PublicOfficialIdNotFound({ id }: { id: string }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-neutral-950 px-6 text-center text-white">
       <div>
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-300">GotREFS</p>
+        <p className="text-sm font-bold tracking-[0.12em] text-amber-300">GotRefs</p>
         <h1 className="mt-3 text-2xl font-black">Official ID not found</h1>
         <p className="mt-2 text-sm text-white/70">
           No public ID card matches <span className="font-semibold text-white">{id}</span>.

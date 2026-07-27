@@ -22,6 +22,7 @@ type RefereeIdCardProps = {
   primarySport?: string;
   additionalSports?: string[];
   certificationLevel?: string;
+  additionalCertificationLevels?: string[];
   certifiedBy?: string;
   rate?: string;
   avatarUrl?: string;
@@ -163,6 +164,7 @@ export function RefereeIdCard({
   primarySport,
   additionalSports = [],
   certificationLevel,
+  additionalCertificationLevels = [],
   certifiedBy,
   avatarUrl,
   avatarLabel = "REF",
@@ -187,7 +189,7 @@ export function RefereeIdCard({
     (emptyPlaceholders ? "" : "Add city");
   const years = validYearRange(validThrough);
   const expireLabel = validThrough?.trim() || (emptyPlaceholders ? "" : "Pending approval");
-  const typeLabel = certificationLevel?.trim() || "GotREFS Accreditation";
+  const typeLabel = certificationLevel?.trim() || `${BRAND_NAME} Accreditation`;
 
   const gamesList = useMemo(() => {
     if (sports.length > 0) return sports;
@@ -196,10 +198,12 @@ export function RefereeIdCard({
 
   const acceptedList = useMemo(() => {
     if (acceptedBy.length > 0) return acceptedBy;
-    const fromLevel = certificationLevel?.trim();
-    if (fromLevel) return [fromLevel];
+    const levels = [certificationLevel, ...additionalCertificationLevels]
+      .map((item) => item?.trim())
+      .filter((item): item is string => Boolean(item));
+    if (levels.length > 0) return levels;
     return emptyPlaceholders ? [] : ["Add where you were certified"];
-  }, [acceptedBy, certificationLevel, emptyPlaceholders]);
+  }, [acceptedBy, certificationLevel, additionalCertificationLevels, emptyPlaceholders]);
 
   const [publicIdUrl, setPublicIdUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -207,7 +211,7 @@ export function RefereeIdCard({
       setPublicIdUrl(null);
       return;
     }
-    // Only ever encode a real http(s) card URL — never the bare GotREFS ID text.
+    // Only ever encode a real http(s) card URL — never the bare GotRefs ID text.
     const url = publicRefIdCardUrl(id);
     setPublicIdUrl(url.startsWith("http") ? url : null);
   }, [id, hideQr]);
@@ -254,7 +258,7 @@ export function RefereeIdCard({
           />
           <div className="min-w-0 flex-1 text-center pr-9 sm:pr-10">
             <p
-              className="truncate text-[8px] font-bold uppercase tracking-[0.2em] text-white/85 sm:text-[9px]"
+              className="truncate text-[8px] font-bold tracking-[0.12em] text-white/85 sm:text-[9px]"
             >
               {BRAND_NAME} Verified Official Network
             </p>
@@ -343,7 +347,7 @@ export function RefereeIdCard({
               >
                 <p style={{ color: C.ink }}>
                   <span className="font-bold">Type: </span>
-                  <span className="font-semibold uppercase">{typeLabel}</span>
+                  <span className="font-semibold normal-case">{typeLabel}</span>
                 </p>
               </button>
 

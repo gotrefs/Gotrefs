@@ -67,6 +67,10 @@ function formatEventPay(event: CalendarEvent, decimals = 2) {
 
 export function RefEventCalendar({
   embedded = false,
+  canApplyToEvents = true,
+  applicationPending = false,
+  applicationRejected = false,
+  onRequireProfile,
 }: {
   canApplyToEvents?: boolean;
   applicationPending?: boolean;
@@ -215,6 +219,17 @@ export function RefEventCalendar({
 
   async function requestSignup(event: CalendarEvent) {
     setMsg(null);
+    if (!canApplyToEvents) {
+      onRequireProfile?.();
+      setMsg(
+        applicationPending
+          ? "Your verification is still under review. You can browse games, but you can’t request to work until GotRefs approves you."
+          : applicationRejected
+            ? "Your verification wasn’t approved. Resolve that before requesting games."
+            : "GotRefs must approve your verification before you can request to work games."
+      );
+      return;
+    }
     setSubmitting(true);
     const {
       data: { user },
@@ -239,8 +254,6 @@ export function RefEventCalendar({
     const json = (await res.json()) as {
       error?: string;
       eventTitle?: string;
-      pendingVerification?: boolean;
-      status?: string;
     };
 
     setSubmitting(false);
@@ -248,14 +261,7 @@ export function RefEventCalendar({
       setMsg(json.error || "Could not send your application.");
       return;
     }
-    if (json.pendingVerification) {
-      setMsg(
-        json.status ||
-          "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically."
-      );
-    } else {
-      setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
-    }
+    setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
     await load();
   }
 
@@ -442,7 +448,7 @@ export function RefEventCalendar({
               {formatEventPay(selected)} per official
             </p>
             <p className="mt-3 text-sm">Officials needed: {selected.officials_needed}</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotREFS event organizer</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotRefs event organizer</p>
             {(() => {
               const notes = notesForRefDisplay(selected.notes);
               return notes ? <p className="mt-2 text-sm text-[var(--slate)]">{notes}</p> : null;
@@ -465,7 +471,11 @@ export function RefEventCalendar({
               ) : (
                 <button
                   type="button"
-                  disabled={submitting || eventWorkStatus(selected.id) !== "open"}
+                  disabled={
+                    submitting ||
+                    eventWorkStatus(selected.id) !== "open" ||
+                    !canApplyToEvents
+                  }
                   onClick={() => void requestSignup(selected)}
                   className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
                     eventWorkStatus(selected.id) === "invited" ||
@@ -478,9 +488,13 @@ export function RefEventCalendar({
                     ? "Invited — check My Work"
                     : eventWorkStatus(selected.id) === "confirmed"
                       ? "✓ Confirmed"
-                      : submitting
-                        ? "Submitting…"
-                        : "Apply"}
+                      : !canApplyToEvents
+                        ? applicationPending
+                          ? "Awaiting GotRefs approval"
+                          : "Verification required"
+                        : submitting
+                          ? "Submitting…"
+                          : "Apply"}
                 </button>
               )}
             </div>

@@ -102,7 +102,7 @@ export function AssignorRosterPanel({
     <section className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
       <h2 className="font-display text-xl font-bold text-[var(--navy)]">Assignor roster</h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Assignors track refs they already work with — same profile details as a GotREFS ref (sport, rate,
+        Assignors track refs they already work with — same profile details as a GotRefs ref (sport, rate,
         certification, availability).
       </p>
 
@@ -143,7 +143,7 @@ export function AssignorRosterPanel({
               className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--grey-light)]/30 p-4"
             >
               <p className="mb-4 text-xs text-[var(--muted)]">
-                Enter the same information you would as a referee on GotREFS.
+                Enter the same information you would as a referee on GotRefs.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-sm sm:col-span-2">

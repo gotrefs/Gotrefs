@@ -6,7 +6,7 @@ const STANDALONE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const STANDALONE_PHONE_RE = /^(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}$/;
 
 export const ORGANIZER_CONTACT_IN_NOTES_MESSAGE =
-  "Don't include your email or phone number in notes for refs. Contact stays private — GotREFS handles communication after a booking is confirmed.";
+  "Don't include your email or phone number in notes for refs. Contact stays private — GotRefs handles communication after a booking is confirmed.";
 
 export function textContainsOrganizerContact(text: string): boolean {
   const value = text.trim();

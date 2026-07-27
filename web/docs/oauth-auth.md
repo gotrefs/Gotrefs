@@ -1,6 +1,6 @@
 # OAuth Authentication Setup
 
-GotREFS uses Next.js App Router with Supabase Auth. Google, Facebook, and Apple OAuth codes are exchanged by Supabase, which verifies provider tokens and issues secure HTTP-only session cookies.
+GotRefs uses Next.js App Router with Supabase Auth. Google, Facebook, and Apple OAuth codes are exchanged by Supabase, which verifies provider tokens and issues secure HTTP-only session cookies.
 
 ## Routes
 

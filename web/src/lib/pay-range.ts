@@ -27,6 +27,18 @@ export function payRangesOverlap(a: PayRangeInput, b: PayRangeInput): boolean {
   return boundsA.min <= maxB && boundsB.min <= maxA;
 }
 
+/**
+ * Matching / invite rule: organizer pay only needs to meet the ref’s minimum.
+ * Pay above the ref’s listed maximum is allowed — those refs still show up.
+ */
+export function eventPayMeetsRefMinimum(ref: PayRangeInput, event: PayRangeInput): boolean {
+  const refBounds = payBounds(ref);
+  const eventBounds = payBounds(event);
+  if (refBounds.min == null || eventBounds.min == null) return true;
+  const eventMax = eventBounds.max ?? eventBounds.min;
+  return eventMax >= refBounds.min;
+}
+
 export function formatHourlyRateRange(min: number, max?: number | null) {
   const floor = Number(min);
   if (!Number.isFinite(floor)) return "Rate TBD";

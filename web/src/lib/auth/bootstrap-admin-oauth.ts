@@ -11,7 +11,7 @@ export async function ensureAdminOAuthMember(admin: SupabaseClient, user: User) 
     String(meta.full_name ?? "").trim() ||
     `${String(meta.first_name ?? "").trim()} ${String(meta.last_name ?? "").trim()}`.trim() ||
     user.email?.split("@")[0] ||
-    "GotREFS Admin";
+    "GotRefs Admin";
 
   await admin.auth.admin.updateUserById(user.id, {
     app_metadata: { ...(user.app_metadata ?? {}), gotrefs_admin: true },

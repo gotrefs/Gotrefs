@@ -1,4 +1,5 @@
 import type { PublicRefIdCard } from "@/lib/public-ref-id-card";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   cityLabel,
   sportsList,
@@ -14,13 +15,13 @@ function png(name: keyof typeof iconData) {
 /** In-memory Apple Wallet pass files (no external model path required). */
 export function buildApplePassBuffers(card: PublicRefIdCard) {
   const sports = sportsList(card).join(", ") || "Official";
-  const accepted = splitAcceptedOrgs(card).join(", ") || "GotREFS";
+  const accepted = splitAcceptedOrgs(card).join(", ") || BRAND_NAME;
   const city = cityLabel(card);
   const verifyUrl = verifyPageUrl(card.gotrefsId);
   const passTypeIdentifier =
     process.env.APPLE_PASS_TYPE_IDENTIFIER?.trim() || "pass.org.gotrefs.official";
   const teamIdentifier = process.env.APPLE_TEAM_ID?.trim() || "TEAMID";
-  const organizationName = process.env.APPLE_PASS_ORG_NAME?.trim() || "GotREFS";
+  const organizationName = process.env.APPLE_PASS_ORG_NAME?.trim() || "GotRefs";
 
   const passJson = {
     formatVersion: 1,
@@ -28,8 +29,8 @@ export function buildApplePassBuffers(card: PublicRefIdCard) {
     serialNumber: card.gotrefsId,
     teamIdentifier,
     organizationName,
-    description: "GotREFS Official ID Card",
-    logoText: "GotREFS",
+    description: "GotRefs Official ID Card",
+    logoText: "GotRefs",
     foregroundColor: "rgb(255, 255, 255)",
     backgroundColor: "rgb(38, 33, 62)",
     labelColor: "rgb(201, 162, 39)",
@@ -62,7 +63,7 @@ export function buildApplePassBuffers(card: PublicRefIdCard) {
         {
           key: "type",
           label: "TYPE",
-          value: card.certificationLevel || "GotREFS Accreditation",
+          value: card.certificationLevel || `${BRAND_NAME} Accreditation`,
         },
       ],
     },

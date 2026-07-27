@@ -34,7 +34,7 @@ function signJwtRs256(payload: Record<string, unknown>, privateKeyPem: string) {
 }
 
 /**
- * Google Wallet save link for a GotREFS official ID (Generic pass).
+ * Google Wallet save link for a GotRefs official ID (Generic pass).
  * Requires GOOGLE_WALLET_ISSUER_ID + service-account email/private key.
  */
 export async function GET(_request: Request, context: RouteContext) {
@@ -63,7 +63,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const objectId = `${issuerId}.${card.gotrefsId.replace(/[^\w\-]+/g, "_")}`;
     const verifyUrl = verifyPageUrl(card.gotrefsId);
     const sports = sportsList(card).join(", ") || "Official";
-    const accepted = splitAcceptedOrgs(card).join(", ") || "GotREFS";
+    const accepted = splitAcceptedOrgs(card).join(", ") || "GotRefs";
     const city = cityLabel(card);
 
     const claims = {
@@ -79,7 +79,7 @@ export async function GET(_request: Request, context: RouteContext) {
             cardTitle: {
               defaultValue: {
                 language: "en-US",
-                value: "GotREFS Verified Official",
+                value: "GotRefs Verified Official",
               },
             },
             header: {

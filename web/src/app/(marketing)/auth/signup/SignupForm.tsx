@@ -303,7 +303,7 @@ export function SignupForm() {
               <div>
                 <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a referee</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Fill in the fields below and watch your GotREFS Referee card update above.
+                  Fill in the fields below and watch your GotRefs Referee card update above.
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
@@ -793,7 +793,7 @@ export function SignupForm() {
               <RefereeIdCard
                 fullName={fullName}
                 gotrefsId={email ? gotrefsId : undefined}
-                cardTitle="GotREFS Referee"
+                cardTitle="GotRefs Referee"
                 primarySport={primarySport}
                 additionalSports={additionalSports}
                 certificationLevel={certificationLevel}

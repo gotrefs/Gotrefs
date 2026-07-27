@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { boostedOfferPay, computeOfferBoost } from "@/lib/boosts-server";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { notifyInBackground, notifyOfferInvite } from "@/lib/email/notifications";
-import { payRangesOverlap } from "@/lib/pay-range";
+import { eventPayMeetsRefMinimum } from "@/lib/pay-range";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const priceMatches = payRangesOverlap(
+  const priceMatches = eventPayMeetsRefMinimum(
     {
       type: profile?.rate_type === "range" ? "range" : "exact",
       exact: profile?.rate_per_game,
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This referee's hourly rate is outside your event pay range. Adjust your event pay or choose another official.",
+          "This referee's minimum hourly rate is above your event pay. Adjust your event pay or choose another official.",
       },
       { status: 400 }
     );

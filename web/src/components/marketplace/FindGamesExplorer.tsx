@@ -41,6 +41,10 @@ function formatWhenSummary(dateFrom: string, dateTo: string): string {
 
 export function FindGamesExplorer({
   view,
+  canApplyToEvents = true,
+  applicationPending = false,
+  applicationRejected = false,
+  onRequireProfile,
   onApplied,
   pendingInviteCount = 0,
   onOpenTrips,
@@ -221,6 +225,18 @@ export function FindGamesExplorer({
 
   async function applyToEvent(event: OpenEventRecord) {
     setMsg(null);
+    if (!canApplyToEvents) {
+      onRequireProfile?.();
+      setMsg({
+        text: applicationPending
+          ? "Your verification is still under review. You can browse games, but you can’t request to work until GotRefs approves you."
+          : applicationRejected
+            ? "Your verification wasn’t approved. Resolve that before requesting games."
+            : "GotRefs must approve your verification before you can request to work games.",
+        tone: "err",
+      });
+      return;
+    }
     if (event.already_requested || requestedIds.has(event.id)) {
       setMsg({ text: "You already requested to work this game.", tone: "ok" });
       return;
@@ -236,8 +252,6 @@ export function FindGamesExplorer({
       const json = (await res.json()) as {
         error?: string;
         eventTitle?: string;
-        pendingVerification?: boolean;
-        status?: string;
         applicationId?: string | null;
       };
       if (!res.ok) {
@@ -269,19 +283,10 @@ export function FindGamesExplorer({
           ? { ...prev, already_requested: true, application_id: applicationId }
           : prev
       );
-      if (json.pendingVerification) {
-        setMsg({
-          text:
-            json.status ||
-            "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically.",
-          tone: "ok",
-        });
-      } else {
-        setMsg({
-          text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotREFS ID.`,
-          tone: "ok",
-        });
-      }
+      setMsg({
+        text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotRefs ID.`,
+        tone: "ok",
+      });
       onApplied?.();
     } catch {
       setRequestedIds((prev) => {
@@ -557,6 +562,12 @@ export function FindGamesExplorer({
                 onSelect={setSelectedMapId}
                 requestedIds={requestedIds}
                 requestingId={submittingId}
+                canApply={canApplyToEvents}
+                applyBlockedLabel={
+                  applicationPending
+                    ? "Awaiting GotRefs approval"
+                    : "Verification required"
+                }
                 onRequest={(event) => void applyToEvent(event)}
               />
             )}
@@ -571,6 +582,14 @@ export function FindGamesExplorer({
         )}
         requesting={Boolean(detailsEvent && submittingId === detailsEvent.id)}
         unrequesting={Boolean(detailsEvent && unrequestingId === detailsEvent.id)}
+        canApply={canApplyToEvents}
+        applyBlockedLabel={
+          applicationPending
+            ? "Awaiting GotRefs approval"
+            : applicationRejected
+              ? "Verification required"
+              : "Verification required"
+        }
         onClose={() => setDetailsEvent(null)}
         onApply={(event) => void applyToEvent(event)}
         onUnrequest={(event) => void unrequestEvent(event)}

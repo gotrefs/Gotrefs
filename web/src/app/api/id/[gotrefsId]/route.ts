@@ -8,7 +8,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { gotrefsId: rawId } = await context.params;
   const gotrefsId = normalizeGotrefsId(rawId || "");
   if (!gotrefsId || gotrefsId.length < 4) {
-    return NextResponse.json({ error: "Invalid GotREFS ID." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid GotRefs ID." }, { status: 400 });
   }
 
   try {

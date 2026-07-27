@@ -8,7 +8,7 @@ type RouteContext = { params: Promise<{ refereeId: string }> };
 export const dynamic = "force-dynamic";
 
 /**
- * Generate an Apple Wallet .pkpass for a GotREFS official ID.
+ * Generate an Apple Wallet .pkpass for a GotRefs official ID.
  *
  * Required env:
  * - APPLE_PASS_CERT_PEM
@@ -47,8 +47,8 @@ export async function GET(_request: Request, context: RouteContext) {
       },
       {
         serialNumber: card.gotrefsId,
-        description: "GotREFS Official ID Card",
-        organizationName: process.env.APPLE_PASS_ORG_NAME?.trim() || "GotREFS",
+        description: "GotRefs Official ID Card",
+        organizationName: process.env.APPLE_PASS_ORG_NAME?.trim() || "GotRefs",
       }
     );
 
@@ -57,7 +57,7 @@ export async function GET(_request: Request, context: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.apple.pkpass",
-        "Content-Disposition": `attachment; filename="GotREFS-${card.gotrefsId}.pkpass"`,
+        "Content-Disposition": `attachment; filename="GotRefs-${card.gotrefsId}.pkpass"`,
         "Cache-Control": "no-store",
       },
     });

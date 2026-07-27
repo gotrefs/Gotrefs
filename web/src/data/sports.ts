@@ -1,5 +1,6 @@
 /** Sports available for refs/organizers — names only, A–Z. */
 export const PRIMARY_SPORTS = [
+  "7v7 Football",
   "American Football",
   "Archery",
   "Australian Rules Football",
@@ -15,6 +16,7 @@ export const PRIMARY_SPORTS = [
   "Fencing",
   "Field Hockey",
   "Figure Skating",
+  "Flag Football",
   "Gaelic Football / Hurling",
   "Golf",
   "Gymnastics",
@@ -34,6 +36,7 @@ export const PRIMARY_SPORTS = [
   "Squash",
   "Swimming",
   "Table Tennis",
+  "Tackle Football",
   "Taekwondo",
   "Tennis",
   "Volleyball",

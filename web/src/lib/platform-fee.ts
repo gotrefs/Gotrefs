@@ -1,4 +1,4 @@
-/** GotREFS marketplace service fee charged to organizers on accepted ref pay. */
+/** GotRefs marketplace service fee charged to organizers on accepted ref pay. */
 export const PLATFORM_FEE_RATE = 0.2;
 
 export const PLATFORM_FEE_PERCENT_LABEL = "20%";

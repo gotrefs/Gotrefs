@@ -141,6 +141,7 @@ export default function RefereeDashboardClient() {
   const [sport, setSport] = useState("Basketball");
   const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [cert, setCert] = useState("Youth / Recreational");
+  const [additionalCerts, setAdditionalCerts] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [verificationMethod, setVerificationMethod] = useState<"checkr" | "external">("checkr");
@@ -258,6 +259,7 @@ export default function RefereeDashboardClient() {
                   primarySport: draft.fields.primarySport || "Basketball",
                   additionalSports: draft.fields.secondarySport ? [draft.fields.secondarySport] : [],
                   certificationLevel: draft.fields.certificationLevel || "Youth / Recreational",
+                  additionalCertificationLevels: draft.fields.additionalCertificationLevels ?? [],
                 }
               : undefined
           );
@@ -422,13 +424,13 @@ export default function RefereeDashboardClient() {
     const profileResult = await supabase
       .from("ref_profiles")
       .select(
-        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, additional_certification_levels, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
       )
       .eq("member_id", user.id)
       .maybeSingle();
     let rp = profileResult.data;
     const rpErr = profileResult.error;
-    if (rpErr?.message.includes("rate_type")) {
+    if (rpErr?.message.includes("rate_type") || rpErr?.message.includes("additional_certification_levels")) {
       const legacy = await supabase
         .from("ref_profiles")
         .select(
@@ -447,6 +449,11 @@ export default function RefereeDashboardClient() {
       setAdditionalSports(Array.isArray(rp.additional_sports) ? rp.additional_sports : []);
       setIsAssignor(Boolean(rp.is_assignor));
       setCert(rp.certification_level || "Youth / Recreational");
+      setAdditionalCerts(
+        Array.isArray((rp as { additional_certification_levels?: string[] }).additional_certification_levels)
+          ? (rp as { additional_certification_levels: string[] }).additional_certification_levels
+          : []
+      );
       setBio(rp.bio || "");
       setVerificationMethod(
         rp.verification_method === "external" ? "external" : "checkr"
@@ -565,14 +572,14 @@ export default function RefereeDashboardClient() {
       return;
     }
 
-    // Always re-prompt when GotREFS asked for fixes — don't hide after dismiss until they resubmit.
+    // Always re-prompt when GotRefs asked for fixes — don't hide after dismiss until they resubmit.
     if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
       setVerificationNotice({
         type: "fix_required",
         title: resubmitNoticeTitle(verificationFixRequiredSteps),
         message:
           verificationAdminNotes ||
-          "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
+          "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
         items: REF_VERIFICATION_STEPS.filter((step) =>
           verificationFixRequiredSteps.includes(step.key)
         ).map((step) => `${step.number}. ${step.shortLabel}`),
@@ -590,7 +597,7 @@ export default function RefereeDashboardClient() {
         title: "You've been approved",
         message:
           verificationAdminNotes ||
-          "Your GotREFS verification is approved. You can now request to work games and receive invites from organizers.",
+          "Your GotRefs verification is approved. You can now request to work games and receive invites from organizers.",
       });
       return;
     }
@@ -600,7 +607,7 @@ export default function RefereeDashboardClient() {
         type: "rejected",
         message:
           verificationAdminNotes ||
-          "Your verification was not approved. Please contact GotREFS support if you have questions.",
+          "Your verification was not approved. Please contact GotRefs support if you have questions.",
       });
     }
   }, [
@@ -700,7 +707,7 @@ export default function RefereeDashboardClient() {
         mode: "resubmit",
         initialStep: verificationFixRequiredSteps[0],
         steps: verificationFixRequiredSteps,
-        adminMessage: verificationAdminNotes || "GotREFS requested updates to your application.",
+        adminMessage: verificationAdminNotes || "GotRefs requested updates to your application.",
       });
       return;
     }
@@ -793,7 +800,7 @@ export default function RefereeDashboardClient() {
         setMsg("Profile photo saved. If it disappears after refresh, try uploading again.");
         return;
       }
-      setMsg("Profile photo added to your GotREFS ID card.");
+      setMsg("Profile photo added to your GotRefs ID card.");
       window.setTimeout(() => {
         void publishIdCardPhoto();
       }, 600);
@@ -808,7 +815,7 @@ export default function RefereeDashboardClient() {
       mode: "resubmit",
       initialStep: verificationFixRequiredSteps[0],
       steps: verificationFixRequiredSteps,
-      adminMessage: verificationAdminNotes || "GotREFS requested updates to your application.",
+      adminMessage: verificationAdminNotes || "GotRefs requested updates to your application.",
     });
   }
 
@@ -1219,7 +1226,7 @@ export default function RefereeDashboardClient() {
             </h2>
             {verificationNotice.type === "fix_required" && (
               <p className="mt-2 text-sm font-semibold text-amber-900">
-                From GotREFS review:
+                From GotRefs review:
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
@@ -1269,6 +1276,8 @@ export default function RefereeDashboardClient() {
               primarySport={sport}
               additionalSports={additionalSports}
               certificationLevel={cert}
+              additionalCertificationLevels={additionalCerts}
+              certifiedBy={cardMeta.certifiedBy ?? ""}
               baseCity={cardMeta.baseCity ?? ""}
               travelRadius={cardMeta.travelRadius ?? ""}
               workRegions={cardMeta.workRegions ?? []}
@@ -1289,7 +1298,7 @@ export default function RefereeDashboardClient() {
                     title: resubmitNoticeTitle(verificationFixRequiredSteps),
                     message:
                       verificationAdminNotes ||
-                      "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
+                      "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
                     items: REF_VERIFICATION_STEPS.filter((step) =>
                       verificationFixRequiredSteps.includes(step.key)
                     ).map((step) => `${step.number}. ${step.shortLabel}`),
@@ -1343,9 +1352,9 @@ export default function RefereeDashboardClient() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
             {verificationNeedsFix
-              ? "GotREFS flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games on the map while you wait."
+              ? "GotRefs flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games on the map while you wait."
               : verificationRejected
-                ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotREFS."
+                ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotRefs."
                 : "Browse open games on the map below. Once approved, you will be able to request to work. Approvals take 1-2 business days."}
           </p>
           {verificationNeedsFix && !profileWizard && (
@@ -1396,6 +1405,7 @@ export default function RefereeDashboardClient() {
               primarySport={sport}
               additionalSports={additionalSports}
               certificationLevel={cert}
+              additionalCertificationLevels={additionalCerts}
               certifiedBy={cardMeta.certifiedBy || cert || undefined}
               rate={rateLabel()}
               avatarUrl={avatarUrl ?? undefined}

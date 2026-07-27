@@ -276,7 +276,7 @@ export function RefMyWorkPanel({
               return (
                 <article key={app.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    {queued ? "Queued — awaiting GotREFS verification" : "Application pending"}
+                    {queued ? "Queued — awaiting GotRefs verification" : "Application pending"}
                   </p>
                   <p className="mt-1 text-lg font-semibold text-neutral-900">{ev?.title ?? "Game"}</p>
                   <p className="mt-1 text-sm text-neutral-500">

@@ -28,7 +28,7 @@ export function emailLayout(opts: {
 <html>
   <body style="margin:0;padding:0;background:#F8FAFB;font-family:Arial,Helvetica,sans-serif;color:#0D1B2A;">
     <div style="max-width:560px;margin:24px auto;background:#ffffff;border:1px solid #E2E8EF;border-radius:16px;padding:28px;">
-      <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#F04E23;">${BRAND_NAME}</p>
+      <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.08em;color:#F04E23;">${BRAND_NAME}</p>
       <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">${escapeHtml(opts.title)}</h1>
       <div style="font-size:15px;line-height:1.6;color:#3A5068;">${opts.bodyHtml}</div>
       ${cta}

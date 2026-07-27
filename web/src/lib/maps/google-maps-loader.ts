@@ -22,7 +22,7 @@ declare global {
 
 function mapsAuthErrorMessage() {
   return (
-    "Google Maps rejected this API key. Confirm billing is linked to the GotREFS project, " +
+    "Google Maps rejected this API key. Confirm billing is linked to the GotRefs project, " +
     "APIs are enabled, and HTTP referrers include this exact site."
   );
 }

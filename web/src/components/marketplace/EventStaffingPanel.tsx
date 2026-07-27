@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
-import { payRangesOverlap } from "@/lib/pay-range";
+import { eventPayMeetsRefMinimum } from "@/lib/pay-range";
 
 type StaffingEvent = {
   id: string;
@@ -103,7 +103,7 @@ export function EventStaffingPanel({
           ref.primarySport.trim().toLowerCase() === event.sport.trim().toLowerCase();
         const zipMatch = !ref.homeZip || ref.homeZip === event.zip_code;
         const available = ref.availability.some((slot) => slotCoversEvent(slot, event));
-        const payMatch = payRangesOverlap(refPayInput(ref), eventPayInput(event));
+        const payMatch = eventPayMeetsRefMinimum(refPayInput(ref), eventPayInput(event));
         return sportMatch && zipMatch && available && payMatch;
       })
       .slice(0, 12);

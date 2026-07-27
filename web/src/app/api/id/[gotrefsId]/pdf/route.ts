@@ -12,7 +12,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { gotrefsId: rawId } = await context.params;
   const gotrefsId = normalizeGotrefsId(rawId || "");
   if (!gotrefsId || gotrefsId.length < 4) {
-    return new NextResponse("Invalid GotREFS ID.", { status: 400 });
+    return new NextResponse("Invalid GotRefs ID.", { status: 400 });
   }
 
   try {
@@ -22,7 +22,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const pdf = await buildPublicRefIdCardPdf(card);
-    const filename = `GotREFS-ID-${card.gotrefsId.replace(/[^\w\-]+/g, "-")}.pdf`;
+    const filename = `GotRefs-ID-${card.gotrefsId.replace(/[^\w\-]+/g, "-")}.pdf`;
     const bytes = pdf instanceof ArrayBuffer ? new Uint8Array(pdf) : pdf;
 
     return new NextResponse(bytes, {

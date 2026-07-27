@@ -271,7 +271,7 @@ export function OrganizerEventComposer({
             <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3">
               <label className="block">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-800">
-                  Base pay per official
+                  Hourly pay
                 </span>
                 <div className="mt-1 flex items-baseline gap-1">
                   <span className="text-base font-semibold text-neutral-900">$</span>

@@ -5,6 +5,7 @@ export function sportEmoji(sport: string): string {
   if (key.includes("basketball")) return "🏀";
   if (key.includes("flag football")) return "🚩";
   if (key.includes("7v7")) return "🏈";
+  if (key.includes("tackle football")) return "🏈";
   if (key.includes("football")) return "🏈";
   if (key.includes("soccer")) return "⚽";
   if (key.includes("baseball")) return "⚾";

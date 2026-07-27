@@ -506,7 +506,7 @@ export function OrganizerListingWizard({
     }
     if (screen === "prices") {
       if (!draft.ratePerOfficial.trim() || !(Number(draft.ratePerOfficial) > 0)) {
-        setError("Set a base pay per official.");
+        setError("Set an hourly pay for the referee.");
         return;
       }
       const saved = await onSaveProfile({
@@ -694,7 +694,7 @@ export function OrganizerListingWizard({
             <div className="grid items-start gap-10 lg:grid-cols-2">
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                  Set up your GotREFS listing
+                  Set up your GotRefs listing
                 </h1>
                 <p className="mt-3 text-lg text-neutral-600">
                   It&apos;s easy to create a great listing—let&apos;s start with your address.
@@ -781,7 +781,7 @@ export function OrganizerListingWizard({
                 Your exact address stays private
               </h1>
               <p className="mt-2 max-w-2xl text-neutral-600">
-                We only share your address after refs book through GotREFS. Until then, they&apos;ll see an
+                We only share your address after refs book through GotRefs. Until then, they&apos;ll see an
                 approximate location within about <strong>7 miles</strong> on the map — so they can&apos;t go
                 around the platform to find you at a specific park or gym.
               </p>
@@ -953,7 +953,7 @@ export function OrganizerListingWizard({
                 maxLength={600}
               />
               <p className="mt-2 text-sm text-neutral-500">
-                Do not include your email or phone — GotREFS keeps contact private until a booking is confirmed.
+                Do not include your email or phone — GotRefs keeps contact private until a booking is confirmed.
               </p>
               <p className="mt-2 text-right text-xs text-neutral-500">{draft.refInstructions.length}/600</p>
             </div>
@@ -984,8 +984,8 @@ export function OrganizerListingWizard({
                   Finish up and publish
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
-                  Finally, you&apos;ll set your pay per official and confirm a few final details to publish your
-                  listing.
+                  Finally, you&apos;ll set your hourly pay for the referee and confirm a few final details to publish
+                  your listing.
                 </p>
               </div>
               <SportListingPreview sport={draft.sport || "Basketball"} />
@@ -998,11 +998,11 @@ export function OrganizerListingWizard({
                 Now, set your prices
               </h1>
               <p className="mt-2 text-neutral-500">
-                Set a base pay per official. These suggestions are based on similar games in your area.
+                Set the hourly pay for the referee. These suggestions are based on similar games in your area.
               </p>
               <div className="mt-8 space-y-3">
                 <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                  <span className="text-xs text-neutral-500">Base pay per official</span>
+                  <span className="text-xs text-neutral-500">Hourly pay</span>
                   <div className="mt-1 flex items-baseline gap-1">
                     <span className="text-3xl font-semibold text-neutral-900">$</span>
                     <input
@@ -1041,7 +1041,7 @@ export function OrganizerListingWizard({
           {screen === "contact" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                How can refs and GotREFS reach you?
+                How can refs and GotRefs reach you?
               </h1>
               <p className="mt-2 text-neutral-500">
                 We use this to confirm your booking and keep you updated about your event.
@@ -1124,7 +1124,7 @@ export function OrganizerListingWizard({
 
               <p className="mt-10 font-semibold text-neutral-900">Verify your organization</p>
               <p className="mt-1 text-sm text-neutral-500">
-                Upload your organization logo for your GotREFS ID card. Brand colors are optional.
+                Upload your organization logo for your GotRefs ID card. Brand colors are optional.
               </p>
               {logoPath ? (
                 <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
@@ -1132,7 +1132,7 @@ export function OrganizerListingWizard({
                   <div>
                     <p className="font-semibold text-emerald-900">Organization verified</p>
                     <p className="text-sm text-emerald-800">
-                      Your logo is on file and will show on your GotREFS ID card. You&apos;re ready to publish.
+                      Your logo is on file and will show on your GotRefs ID card. You&apos;re ready to publish.
                     </p>
                   </div>
                 </div>
@@ -1158,7 +1158,7 @@ export function OrganizerListingWizard({
                   />
                   {logoPath ? (
                     <p className="mt-2 text-sm font-medium text-emerald-700">
-                      Logo uploaded — this photo appears on your GotREFS ID card
+                      Logo uploaded — this photo appears on your GotRefs ID card
                     </p>
                   ) : (
                     <p className="mt-2 text-sm text-neutral-500">JPG, PNG, WEBP, or SVG</p>

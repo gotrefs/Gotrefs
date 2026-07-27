@@ -6,7 +6,7 @@ type ApartItem = {
   description: string;
 };
 
-/** What sets GotREFS apart — full-screen section. */
+/** What sets GotRefs apart — full-screen section. */
 export function ApartSection({ title, items }: { title: string; items: ApartItem[] }) {
   const displayTitle = normalizeBrandInText(title);
 

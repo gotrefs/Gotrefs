@@ -54,7 +54,7 @@ function tabIndexForChip(chip: string): number {
 function questionForChip(chip: string): string {
   if (chip === "Is it free for referees?") return "Is there a cost to join?";
   if (chip === "How do organizers find officials?") {
-    return "How does GotREFS help me find officials?";
+    return "How does GotRefs help me find officials?";
   }
   return chip;
 }
@@ -215,7 +215,7 @@ export function MarketingFaqSection() {
         ) : (
           <div className="mt-4 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--grey-light)]/40 lg:min-h-0 lg:flex-1">
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] bg-white px-4 py-2">
-              <p className="text-sm font-semibold text-[#1b2132]">GotREFS FAQ helper</p>
+              <p className="text-sm font-semibold text-[#1b2132]">GotRefs FAQ helper</p>
               <button
                 type="button"
                 className="text-xs font-medium text-[var(--blue)] underline"
@@ -259,7 +259,7 @@ export function MarketingFaqSection() {
           }}
         >
           <label className="sr-only" htmlFor="faq-ask">
-            Ask a question about GotREFS
+            Ask a question about GotRefs
           </label>
           <div className="flex gap-2 rounded-xl border border-[var(--border)] bg-white p-2 shadow-sm">
             <input
@@ -267,7 +267,7 @@ export function MarketingFaqSection() {
               type="text"
               value={askInput}
               onChange={(e) => setAskInput(e.target.value)}
-              placeholder="Don't see your question? Ask anything about GotREFS…"
+              placeholder="Don't see your question? Ask anything about GotRefs…"
               className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)]"
             />
             <button
@@ -279,7 +279,7 @@ export function MarketingFaqSection() {
             </button>
           </div>
           <p className="mt-1.5 text-center text-[10px] text-[var(--muted)] md:text-xs">
-            Answers use our FAQ first, then the GotREFS AI helper when an API key is configured.
+            Answers use our FAQ first, then the GotRefs AI helper when an API key is configured.
           </p>
         </form>
       </div>

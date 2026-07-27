@@ -29,6 +29,8 @@ export function MarketplaceMapView({
   center,
   requestedIds,
   requestingId,
+  canApply = true,
+  applyBlockedLabel = "Verification required",
   onSelect,
   onRequest,
   className,
@@ -38,6 +40,8 @@ export function MarketplaceMapView({
   center?: { lat: number; lng: number } | null;
   requestedIds?: Set<string>;
   requestingId?: string | null;
+  canApply?: boolean;
+  applyBlockedLabel?: string;
   onSelect?: (id: string | null) => void;
   onRequest?: (event: OpenEventRecord) => void;
   className?: string;
@@ -74,6 +78,8 @@ export function MarketplaceMapView({
         event={selectedPin}
         alreadyRequested={alreadyRequested}
         requesting={Boolean(selectedPin && requestingId === selectedPin.id)}
+        canApply={canApply}
+        applyBlockedLabel={applyBlockedLabel}
         onClose={() => onSelect?.(null)}
         onApply={(event) => onRequest?.(event)}
       />

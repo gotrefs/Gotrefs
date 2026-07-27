@@ -48,12 +48,16 @@ export function GamePinPreviewDrawer({
   event,
   alreadyRequested,
   requesting,
+  canApply = true,
+  applyBlockedLabel = "Verification required",
   onClose,
   onApply,
 }: {
   event: OpenEventRecord | null;
   alreadyRequested?: boolean;
   requesting?: boolean;
+  canApply?: boolean;
+  applyBlockedLabel?: string;
   onClose: () => void;
   onApply: (event: OpenEventRecord) => void;
 }) {
@@ -71,9 +75,11 @@ export function GamePinPreviewDrawer({
   const requested = Boolean(alreadyRequested);
   const ctaLabel = requested
     ? "Requested to work"
-    : requesting
-      ? "Submitting…"
-      : "Apply";
+    : !canApply
+      ? applyBlockedLabel
+      : requesting
+        ? "Submitting…"
+        : "Apply";
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 flex items-end justify-center sm:items-end sm:justify-end sm:p-4">
@@ -152,7 +158,7 @@ export function GamePinPreviewDrawer({
 
           <button
             type="button"
-            disabled={requested || requesting}
+            disabled={requested || requesting || !canApply}
             onClick={() => onApply(event)}
             className={`mt-1 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
               requested

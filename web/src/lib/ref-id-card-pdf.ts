@@ -90,7 +90,7 @@ function badge(
 }
 
 /**
- * Data-driven GotREFS ID card PDF (jsPDF drawing only — no DOM/Tailwind capture).
+ * Data-driven GotRefs ID card PDF (jsPDF drawing only — no DOM/Tailwind capture).
  */
 export async function downloadRefIdCardPdf(
   data: RefIdCardPdfData,
@@ -247,7 +247,7 @@ export async function downloadRefIdCardPdf(
   doc.setTextColor(165, 243, 252);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text((data.cardTitle || `${BRAND_NAME} verified official`).toUpperCase(), textX, 118);
+  doc.text(data.cardTitle || `${BRAND_NAME} verified official`, textX, 118);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
@@ -409,7 +409,7 @@ export async function downloadRefIdCardPdf(
 
   if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: "GotREFS ID Card" });
+      await navigator.share({ files: [file], title: "GotRefs ID Card" });
       return;
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;

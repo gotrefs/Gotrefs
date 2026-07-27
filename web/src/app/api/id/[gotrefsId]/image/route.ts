@@ -10,7 +10,7 @@ export async function GET(request: Request, context: RouteContext) {
   const { gotrefsId: rawId } = await context.params;
   const gotrefsId = normalizeGotrefsId(rawId || "");
   if (!gotrefsId || gotrefsId.length < 4) {
-    return new NextResponse("Invalid GotREFS ID.", { status: 400 });
+    return new NextResponse("Invalid GotRefs ID.", { status: 400 });
   }
   const url = new URL(request.url);
   return NextResponse.redirect(new URL(`/verify/${encodeURIComponent(gotrefsId)}`, url.origin), 302);

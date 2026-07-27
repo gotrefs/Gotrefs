@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
+import { CertificationFields, normalizeCertificationLevels } from "@/components/CertificationFields";
 import { SportsFields } from "@/components/SportsFields";
 import { RefereeIdCard } from "@/components/RefereeIdCard";
 import { formatHourlyRateRange } from "@/lib/pay-range";
@@ -33,6 +34,8 @@ type RefVerificationResubmitFlowProps = {
   primarySport: string;
   additionalSports: string[];
   certificationLevel: string;
+  additionalCertificationLevels?: string[];
+  certifiedBy?: string;
   baseCity: string;
   travelRadius: string;
   workRegions: string[];
@@ -67,6 +70,8 @@ export function RefVerificationResubmitFlow({
   primarySport: initialPrimarySport,
   additionalSports: initialAdditionalSports,
   certificationLevel: initialCertificationLevel,
+  additionalCertificationLevels: initialAdditionalCertificationLevels = [],
+  certifiedBy: initialCertifiedBy = "",
   baseCity: initialBaseCity,
   travelRadius: initialTravelRadius,
   workRegions: initialWorkRegions,
@@ -96,6 +101,10 @@ export function RefVerificationResubmitFlow({
   const [primarySport, setPrimarySport] = useState(initialPrimarySport);
   const [additionalSports, setAdditionalSports] = useState(initialAdditionalSports);
   const [certificationLevel, setCertificationLevel] = useState(initialCertificationLevel);
+  const [additionalCertificationLevels, setAdditionalCertificationLevels] = useState(
+    initialAdditionalCertificationLevels
+  );
+  const [certifiedBy, setCertifiedBy] = useState(initialCertifiedBy);
   const [hourlyRateMin, setHourlyRateMin] = useState(initialHourlyRateMin);
   const [hourlyRateMax, setHourlyRateMax] = useState(initialHourlyRateMax);
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
@@ -219,12 +228,17 @@ export function RefVerificationResubmitFlow({
       const resolvedSport = primarySport.trim();
       const minRate = Number(hourlyRateMin);
       const maxRate = Number(hourlyRateMax);
-      await supabase
+      const resolvedCerts = normalizeCertificationLevels(
+        certificationLevel,
+        additionalCertificationLevels
+      );
+      const { error: profileUpdateError } = await supabase
         .from("ref_profiles")
         .update({
           primary_sport: resolvedSport,
           additional_sports: additionalSports.filter((sport) => sport !== resolvedSport),
-          certification_level: certificationLevel.trim(),
+          certification_level: resolvedCerts.certificationLevel,
+          additional_certification_levels: resolvedCerts.additionalCertificationLevels,
           rate_type: "range",
           rate_min: minRate,
           rate_max: maxRate,
@@ -233,10 +247,34 @@ export function RefVerificationResubmitFlow({
           updated_at: new Date().toISOString(),
         })
         .eq("member_id", memberId);
+      if (
+        profileUpdateError &&
+        /additional_certification_levels/i.test(profileUpdateError.message)
+      ) {
+        const { error: legacyError } = await supabase
+          .from("ref_profiles")
+          .update({
+            primary_sport: resolvedSport,
+            additional_sports: additionalSports.filter((sport) => sport !== resolvedSport),
+            certification_level: resolvedCerts.certificationLevel,
+            rate_type: "range",
+            rate_min: minRate,
+            rate_max: maxRate,
+            rate_per_game: minRate,
+            rate_unit: "hour",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("member_id", memberId);
+        if (legacyError) throw legacyError;
+      } else if (profileUpdateError) {
+        throw profileUpdateError;
+      }
       await supabase.auth.updateUser({
         data: {
           primary_sport: resolvedSport,
-          certification_level: certificationLevel.trim(),
+          certification_level: resolvedCerts.certificationLevel,
+          additional_certification_levels: resolvedCerts.additionalCertificationLevels,
+          certified_by: certifiedBy.trim() || null,
         },
       });
     }
@@ -318,7 +356,7 @@ export function RefVerificationResubmitFlow({
         <p className="mt-2 text-sm leading-6 text-[var(--slate)]">
           {isEditMode
             ? "Your ref ID card reflects the updates you made."
-            : "Your fixes were sent back to GotREFS for review. We'll notify you when your verification is updated."}
+            : "Your fixes were sent back to GotRefs for review. We'll notify you when your verification is updated."}
         </p>
         <button
           type="button"
@@ -352,7 +390,7 @@ export function RefVerificationResubmitFlow({
       </h2>
       {!isEditMode && adminMessage && (
         <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <span className="font-bold">From GotREFS: </span>
+          <span className="font-bold">From GotRefs: </span>
           {adminMessage}
         </p>
       )}
@@ -362,7 +400,7 @@ export function RefVerificationResubmitFlow({
         </p>
       ) : (
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Complete only the items GotREFS requested:{" "}
+          Complete only the items GotRefs requested:{" "}
           {orderedSteps
             .map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.shortLabel)
             .filter(Boolean)
@@ -395,8 +433,8 @@ export function RefVerificationResubmitFlow({
             </label>
             <p className="text-sm font-semibold text-[var(--muted)]">
               {existingAvatarUrl && !photoFile
-                ? "Your signup photo is already on your GotREFS ID card. Replace it only if you want a new one."
-                : "Upload a clear face photo — it updates your GotREFS ID card immediately."}
+                ? "Your signup photo is already on your GotRefs ID card. Replace it only if you want a new one."
+                : "Upload a clear face photo — it updates your GotRefs ID card immediately."}
             </p>
             <label
               className={`relative block cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
@@ -435,7 +473,7 @@ export function RefVerificationResubmitFlow({
             </label>
             <div className="mx-auto w-full max-w-[360px] pt-2">
               <p className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                Your GotREFS ID card
+                Your GotRefs ID card
               </p>
               <RefereeIdCard
                 fullName={fullName}
@@ -453,6 +491,8 @@ export function RefVerificationResubmitFlow({
                 primarySport={primarySport || undefined}
                 additionalSports={additionalSports}
                 certificationLevel={certificationLevel || undefined}
+                additionalCertificationLevels={additionalCertificationLevels}
+                certifiedBy={certifiedBy || undefined}
                 baseCity={baseCity || undefined}
                 emptyPlaceholders
                 onUploadPhoto={(file) => setPhotoFile(file)}
@@ -469,15 +509,15 @@ export function RefVerificationResubmitFlow({
               onPrimaryChange={setPrimarySport}
               onAdditionalChange={setAdditionalSports}
             />
-            <label className="block text-sm font-bold text-[var(--navy)]">
-              Certification level
-              <input
-                value={certificationLevel}
-                onChange={(event) => setCertificationLevel(event.target.value)}
-                placeholder="Youth, varsity, NFHS, USSF, etc."
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-              />
-            </label>
+            <CertificationFields
+              variant="form"
+              certificationLevel={certificationLevel}
+              additionalCertificationLevels={additionalCertificationLevels}
+              onCertificationLevel={setCertificationLevel}
+              onAdditionalChange={setAdditionalCertificationLevels}
+              certifiedBy={certifiedBy}
+              onCertifiedBy={setCertifiedBy}
+            />
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
               <p className="mt-1 text-xs text-[var(--muted)]">

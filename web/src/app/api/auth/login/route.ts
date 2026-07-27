@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         const authUser = await findUserByEmail(admin, email);
         if (!authUser) {
           return NextResponse.json(
-            { error: "No GotREFS account exists for that email. Click Sign up to create one." },
+            { error: "No GotRefs account exists for that email. Click Sign up to create one." },
             { status: 404 }
           );
         }

@@ -109,7 +109,7 @@ export async function POST(request: Request) {
           currency: "usd",
           unit_amount: platformFeeCents,
           product_data: {
-            name: "GotREFS platform fee",
+            name: "GotRefs platform fee",
             description: `${PLATFORM_FEE_PERCENT_LABEL} marketplace service fee`,
           },
         },

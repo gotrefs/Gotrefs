@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
-import {
-  QUEUED_PENDING_VERIFICATION_MESSAGE,
-  isQueuedSignupHold,
-} from "@/lib/activate-queued-signups";
+import { isQueuedSignupHold } from "@/lib/activate-queued-signups";
 import { notifyInBackground, notifyOrganizerNewApplication } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
-import { refOfferEligible } from "@/lib/ref-eligibility";
+import { refCanApplyToGames } from "@/lib/ref-eligibility";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -14,8 +11,8 @@ type ApplyBody = {
   eventId?: string;
 };
 
-const PENDING_STATUS_MESSAGE =
-  "Your status is pending — once GotREFS approves your verification, the organizer will be notified automatically for this game.";
+export const APPLY_REQUIRES_APPROVAL_MESSAGE =
+  "GotRefs must approve your verification before you can request to work games.";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -60,16 +57,12 @@ export async function POST(request: Request) {
     admin.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
   ]);
 
-  const eligible = refOfferEligible({
+  const eligible = refCanApplyToGames({
     screeningStatus: screening?.status,
     verificationMethod: profile?.verification_method,
     externalProofPath: profile?.external_verification_proof_path,
     verificationSubmissionStatus: submission?.status,
   });
-
-  // Eligible refs go straight to the organizer. Everyone else can still apply —
-  // the request is queued until GotREFS admin approval, then organizers are emailed.
-  const queueUntilApproved = !eligible;
 
   const { data: event, error: eventError } = await admin
     .from("scheduled_events")
@@ -108,7 +101,7 @@ export async function POST(request: Request) {
       applicationId: existing.id,
       alreadyRequested: true,
       pendingVerification: held,
-      status: held ? PENDING_STATUS_MESSAGE : undefined,
+      status: held ? APPLY_REQUIRES_APPROVAL_MESSAGE : undefined,
     });
   }
 
@@ -126,71 +119,44 @@ export async function POST(request: Request) {
     );
   }
 
-  // withdrawn (or no row) → upsert a fresh pending/queued request below.
-
-  async function upsertRequest(status: "queued" | "pending", message: string) {
-    return admin
-      .from("event_signup_requests")
-      .upsert(
-        {
-          event_id: eventId,
-          ref_member_id: refMemberId,
-          status,
-          message,
-        },
-        { onConflict: "event_id,ref_member_id" }
-      )
-      .select("id")
-      .single();
+  // withdrawn (or no row) → only fully approved refs may create a new request.
+  if (!eligible) {
+    return NextResponse.json({ error: APPLY_REQUIRES_APPROVAL_MESSAGE }, { status: 403 });
   }
 
-  let upserted: { id: string } | null = null;
-  let usedQueuedStatus = false;
+  const { data: upserted, error: upsertError } = await admin
+    .from("event_signup_requests")
+    .upsert(
+      {
+        event_id: eventId,
+        ref_member_id: refMemberId,
+        status: "pending",
+        message: "Ref applied from the open games marketplace",
+      },
+      { onConflict: "event_id,ref_member_id" }
+    )
+    .select("id")
+    .single();
 
-  if (queueUntilApproved) {
-    const queuedTry = await upsertRequest(
-      "queued",
-      "Ref requested while verification pending — held until GotREFS approval"
-    );
-    if (queuedTry.error && /queued|check|constraint/i.test(queuedTry.error.message)) {
-      // DB migration not applied yet — hold as pending with a marker organizers filter out.
-      const fallback = await upsertRequest("pending", QUEUED_PENDING_VERIFICATION_MESSAGE);
-      if (fallback.error) {
-        return NextResponse.json({ error: fallback.error.message }, { status: 400 });
-      }
-      upserted = fallback.data;
-    } else if (queuedTry.error) {
-      return NextResponse.json({ error: queuedTry.error.message }, { status: 400 });
-    } else {
-      upserted = queuedTry.data;
-      usedQueuedStatus = true;
-    }
-  } else {
-    const live = await upsertRequest("pending", "Ref applied from the open games marketplace");
-    if (live.error) {
-      return NextResponse.json({ error: live.error.message }, { status: 400 });
-    }
-    upserted = live.data;
+  if (upsertError) {
+    return NextResponse.json({ error: upsertError.message }, { status: 400 });
   }
 
-  if (!queueUntilApproved) {
-    notifyInBackground(() =>
-      notifyOrganizerNewApplication({
-        admin,
-        eventId,
-        refMemberId,
-        applicationId: upserted?.id,
-        siteUrl: emailSiteUrl(request.url),
-      })
-    );
-  }
+  notifyInBackground(() =>
+    notifyOrganizerNewApplication({
+      admin,
+      eventId,
+      refMemberId,
+      applicationId: upserted?.id,
+      siteUrl: emailSiteUrl(request.url),
+    })
+  );
 
   return NextResponse.json({
     ok: true,
     eventTitle,
     applicationId: upserted?.id ?? null,
-    pendingVerification: queueUntilApproved,
-    queuedStatus: usedQueuedStatus ? "queued" : queueUntilApproved ? "pending_hold" : "pending",
-    status: queueUntilApproved ? PENDING_STATUS_MESSAGE : undefined,
+    pendingVerification: false,
+    queuedStatus: "pending",
   });
 }

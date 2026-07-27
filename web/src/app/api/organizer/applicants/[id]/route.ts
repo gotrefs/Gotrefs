@@ -101,7 +101,7 @@ export async function PATCH(
     (row.status === "queued" || isQueuedSignupHold(row))
   ) {
     return NextResponse.json(
-      { error: "This request is still awaiting GotREFS verification." },
+      { error: "This request is still awaiting GotRefs verification." },
       { status: 400 }
     );
   }

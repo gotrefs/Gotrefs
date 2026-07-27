@@ -11,6 +11,7 @@ type RefSignupProfile = {
   primarySport: string;
   additionalSports?: string[];
   certificationLevel: string;
+  additionalCertificationLevels?: string[];
 };
 
 async function uploadVerificationFile(userId: string, file: File, prefix: string) {
@@ -77,6 +78,7 @@ export async function uploadRefSignupDocuments(
     profilePatch.primary_sport = profile.primarySport;
     profilePatch.additional_sports = profile.additionalSports ?? [];
     profilePatch.certification_level = profile.certificationLevel;
+    profilePatch.additional_certification_levels = profile.additionalCertificationLevels ?? [];
   }
 
   if (Object.keys(profilePatch).length > 1) {
