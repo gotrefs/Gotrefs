@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function ListingPhotoCarousel({
   images,
@@ -20,33 +20,35 @@ export function ListingPhotoCarousel({
   secondaryBadge?: string | null;
   aspectClass?: string;
 }) {
-  const slides = images.length > 0 ? images : [];
-  const [index, setIndex] = useState(0);
-  const hasMultiple = slides.length > 1;
+  // One photo per listing — ignore extras if callers still pass arrays.
+  const photo = images.find((url) => Boolean(url?.trim()))?.trim() || null;
+  const [failed, setFailed] = useState(false);
 
-  function show(next: number) {
-    if (!slides.length) return;
-    setIndex((next + slides.length) % slides.length);
-  }
+  useEffect(() => {
+    setFailed(false);
+  }, [photo]);
+
+  const showPhoto = Boolean(photo) && !failed;
 
   return (
-    <div
-      className={`group/photos relative ${aspectClass} overflow-hidden bg-gradient-to-br ${gradientClass}`}
-      onMouseLeave={() => setIndex(0)}
-    >
-      {slides.length > 0 ? (
+    <div className={`relative ${aspectClass} overflow-hidden bg-gradient-to-br ${gradientClass}`}>
+      {showPhoto ? (
         <Image
-          src={slides[index]}
-          alt={alt}
+          src={photo!}
+          alt=""
           fill
-          className="object-cover transition duration-500 group-hover/photos:scale-[1.02]"
+          className="object-cover"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          onError={() => setFailed(true)}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-6xl drop-shadow-md">{emoji}</div>
+        <div className="absolute inset-0 flex items-center justify-center text-6xl drop-shadow-md" aria-hidden>
+          {emoji}
+        </div>
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-black/10" />
+      <span className="sr-only">{alt}</span>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/10" />
 
       {badge && (
         <div className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-neutral-800 shadow-sm">
@@ -63,41 +65,6 @@ export function ListingPhotoCarousel({
         >
           {secondaryBadge}
         </div>
-      )}
-
-      {hasMultiple && (
-        <>
-          <button
-            type="button"
-            aria-label="Previous photo"
-            onClick={(e) => {
-              e.stopPropagation();
-              show(index - 1);
-            }}
-            className="absolute left-2 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-sm font-bold text-neutral-800 shadow group-hover/photos:flex"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            aria-label="Next photo"
-            onClick={(e) => {
-              e.stopPropagation();
-              show(index + 1);
-            }}
-            className="absolute right-2 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-sm font-bold text-neutral-800 shadow group-hover/photos:flex"
-          >
-            ›
-          </button>
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1">
-            {slides.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/60"}`}
-              />
-            ))}
-          </div>
-        </>
       )}
     </div>
   );

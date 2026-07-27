@@ -165,11 +165,6 @@ export default function RefereeDashboardClient() {
     title: string;
     message: string;
   } | null>(null);
-  const [assignorRecommendOpen, setAssignorRecommendOpen] = useState(false);
-  const [assignorName, setAssignorName] = useState("");
-  const [assignorEmail, setAssignorEmail] = useState("");
-  const [assignorPhone, setAssignorPhone] = useState("");
-  const [savingAssignorRec, setSavingAssignorRec] = useState(false);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [isAssignor, setIsAssignor] = useState(false);
   const [assignorSaving, setAssignorSaving] = useState(false);
@@ -427,37 +422,21 @@ export default function RefereeDashboardClient() {
     const profileResult = await supabase
       .from("ref_profiles")
       .select(
-        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path, recommended_assignor_name, recommended_assignor_email, recommended_assignor_phone"
+        "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
       )
       .eq("member_id", user.id)
       .maybeSingle();
-    let rp = profileResult.data as
-      | (NonNullable<typeof profileResult.data> & {
-          recommended_assignor_name?: string | null;
-          recommended_assignor_email?: string | null;
-          recommended_assignor_phone?: string | null;
-        })
-      | null;
+    let rp = profileResult.data;
     const rpErr = profileResult.error;
-    if (rpErr?.message.includes("recommended_assignor") || rpErr?.message.includes("rate_type")) {
-      const fallback = await supabase
+    if (rpErr?.message.includes("rate_type")) {
+      const legacy = await supabase
         .from("ref_profiles")
         .select(
-          "rate_per_game, rate_type, rate_min, rate_max, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
+          "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
         )
         .eq("member_id", user.id)
         .maybeSingle();
-      rp = fallback.data as typeof rp;
-      if (fallback.error?.message.includes("rate_type")) {
-        const legacy = await supabase
-          .from("ref_profiles")
-          .select(
-            "rate_per_game, primary_sport, additional_sports, is_assignor, certification_level, bio, verification_method, external_verifier_name, external_verification_proof_path, government_id_path, certification_document_path, verification_doc_path"
-          )
-          .eq("member_id", user.id)
-          .maybeSingle();
-        rp = legacy.data as typeof rp;
-      }
+      rp = legacy.data as typeof rp;
     }
     if (rp) {
       setRate(rp.rate_per_game != null ? String(rp.rate_per_game) : "");
@@ -469,9 +448,6 @@ export default function RefereeDashboardClient() {
       setIsAssignor(Boolean(rp.is_assignor));
       setCert(rp.certification_level || "Youth / Recreational");
       setBio(rp.bio || "");
-      setAssignorName(rp.recommended_assignor_name?.trim() || "");
-      setAssignorEmail(rp.recommended_assignor_email?.trim() || "");
-      setAssignorPhone(rp.recommended_assignor_phone?.trim() || "");
       setVerificationMethod(
         rp.verification_method === "external" ? "external" : "checkr"
       );
@@ -736,46 +712,6 @@ export default function RefereeDashboardClient() {
       window.requestAnimationFrame(() => {
         gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
-    }
-  }
-
-  async function saveAssignorRecommendation() {
-    if (!memberId) return;
-    const name = assignorName.trim();
-    const email = assignorEmail.trim();
-    const phone = assignorPhone.trim();
-    if (!name) {
-      setMsg("Enter the assignor's name.");
-      return;
-    }
-    if (!email && !phone) {
-      setMsg("Enter the assignor's email or phone number.");
-      return;
-    }
-    setSavingAssignorRec(true);
-    setMsg(null);
-    try {
-      const { error } = await supabase
-        .from("ref_profiles")
-        .update({
-          recommended_assignor_name: name,
-          recommended_assignor_email: email || null,
-          recommended_assignor_phone: phone || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("member_id", memberId);
-      if (error) {
-        setMsg(
-          error.message.includes("recommended_assignor")
-            ? "Run the latest database migration to enable assignor recommendations."
-            : error.message
-        );
-        return;
-      }
-      setAssignorRecommendOpen(false);
-      setMsg("Assignor recommendation saved. Thanks!");
-    } finally {
-      setSavingAssignorRec(false);
     }
   }
 
@@ -1315,72 +1251,6 @@ export default function RefereeDashboardClient() {
         </div>
       )}
 
-      {assignorRecommendOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl"
-          >
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500">
-              Assignor referral
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
-              Recommended by an assignor?
-            </h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              If an assignor introduced you to GotREFS, add their name and email or phone so we can credit them.
-            </p>
-            <label className="mt-4 block text-sm font-bold text-[var(--navy)]">
-              Assignor name
-              <input
-                value={assignorName}
-                onChange={(e) => setAssignorName(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-                placeholder="Full name"
-              />
-            </label>
-            <label className="mt-3 block text-sm font-bold text-[var(--navy)]">
-              Email <span className="font-medium text-neutral-500">(or phone below)</span>
-              <input
-                type="email"
-                value={assignorEmail}
-                onChange={(e) => setAssignorEmail(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-                placeholder="assignor@example.com"
-              />
-            </label>
-            <label className="mt-3 block text-sm font-bold text-[var(--navy)]">
-              Phone
-              <input
-                type="tel"
-                value={assignorPhone}
-                onChange={(e) => setAssignorPhone(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
-                placeholder="(555) 555-5555"
-              />
-            </label>
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAssignorRecommendOpen(false)}
-                className="flex-1 rounded-full border border-neutral-300 px-4 py-3 text-sm font-semibold text-neutral-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={savingAssignorRec}
-                onClick={() => void saveAssignorRecommendation()}
-                className="flex-1 rounded-full bg-[var(--navy)] px-4 py-3 text-sm font-black text-white disabled:opacity-60"
-              >
-                {savingAssignorRec ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {profileWizard && memberId && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/55 p-4">
           <div className="mx-auto flex min-h-full max-w-2xl items-start py-6">
@@ -1549,22 +1419,6 @@ export default function RefereeDashboardClient() {
               onUploadPhoto={(file) => void uploadProfilePhoto(file)}
             />
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setAssignorRecommendOpen(true)}
-              className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
-            >
-              {assignorName ? "Edit assignor recommendation" : "Recommended by assignor?"}
-            </button>
-          </div>
-          {assignorName ? (
-            <p className="mt-2 text-xs text-neutral-500">
-              Recommended by {assignorName}
-              {assignorEmail ? ` · ${assignorEmail}` : ""}
-              {assignorPhone ? ` · ${assignorPhone}` : ""}
-            </p>
-          ) : null}
         </div>
       ) : null}
 

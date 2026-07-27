@@ -4,7 +4,6 @@ import { ListingPhotoCarousel } from "@/components/marketplace/ListingPhotoCarou
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import {
   marketplaceCardShadow,
-  refListingPhotos,
   sportListingPhotos,
   sportListingVisual,
 } from "@/lib/marketplace/airbnb-styles";
@@ -185,7 +184,6 @@ export function AirbnbAcceptProfile({
 }
 
 export function acceptPhotosForSport(sport: string, preferredUrl?: string | null) {
-  const fallback = sportListingPhotos(sport);
-  if (preferredUrl?.trim()) return [preferredUrl.trim(), ...fallback];
-  return refListingPhotos(sport);
+  if (preferredUrl?.trim()) return [preferredUrl.trim()];
+  return sportListingPhotos(sport);
 }

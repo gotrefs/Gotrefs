@@ -44,7 +44,7 @@ export function RefListingCard({
       <div className="relative">
         <ListingPhotoCarousel
           images={photos}
-          alt={`Verified ${primarySport} official ${gotrefsId}`}
+          alt={`${primarySport} official`}
           gradientClass={visual.gradient}
           emoji={visual.emoji}
           badge="Verified"

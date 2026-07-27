@@ -106,9 +106,7 @@ const SPORT_PHOTO_SETS: Record<string, string[]> = {
     u("photo-1554068865-24cecd4e34b8"),
   ],
   pickleball: [
-    u("photo-1595435934249-5df7ca71e7e9"),
-    u("photo-1622279457486-62dcc4a431d6"),
-    u("photo-1612872087720-bb876e2e67d1"),
+    u("photo-1626224582227-157a266fe810"),
   ],
   badminton: [
     u("photo-1626224582227-157a266fe810"),
@@ -272,35 +270,28 @@ const SPORT_PHOTO_SETS: Record<string, string[]> = {
   ],
 };
 
-const DEFAULT_SPORT_PHOTOS = [
-  u("photo-1461896836934-ff607608d972"),
-  u("photo-1577223625816-7546f13df25d"),
-  u("photo-1517466787929-bc90951d0974"),
-];
+const DEFAULT_SPORT_PHOTOS = [u("photo-1461896836934-ff607608d972")];
 
-const REF_OFFICIAL_PHOTOS = [
-  u("photo-1624526267942-ab0ff8a3e972"),
-  u("photo-1571019613454-1cb2f99b2d8b"),
-  u("photo-1551958219-acbc608c6377"),
-];
-
+/** One stable action/venue photo for the sport (no carousel). */
 export function sportListingPhotos(sport: string): string[] {
   const key = sport.toLowerCase().trim();
   if (!key) return DEFAULT_SPORT_PHOTOS;
 
   const exact = SPORT_PHOTO_SETS[key];
-  if (exact) return exact;
+  if (exact?.[0]) return [exact[0]];
 
   // Longest alias first so "field hockey" beats "hockey", etc.
   const aliases = Object.entries(SPORT_PHOTO_SETS).sort((a, b) => b[0].length - a[0].length);
   for (const [name, photos] of aliases) {
-    if (key.includes(name) || name.includes(key)) return photos;
+    if (key.includes(name) || name.includes(key)) {
+      return photos[0] ? [photos[0]] : DEFAULT_SPORT_PHOTOS;
+    }
   }
   return DEFAULT_SPORT_PHOTOS;
 }
 
 export function refListingPhotos(sport: string): string[] {
-  return [...REF_OFFICIAL_PHOTOS, ...sportListingPhotos(sport).slice(0, 1)];
+  return sportListingPhotos(sport);
 }
 
 /** Airbnb-style elevated shadow for search pill and cards */

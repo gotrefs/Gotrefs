@@ -59,7 +59,7 @@ export function GameListingCard({
         <div className="relative">
           <ListingPhotoCarousel
             images={visual.photos}
-            alt={`${event.sport} game at ${event.title}`}
+            alt={`${event.sport} game`}
             gradientClass={visual.gradient}
             emoji={visual.emoji}
             badge={event.sport}
