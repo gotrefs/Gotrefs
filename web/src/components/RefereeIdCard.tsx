@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode, type Ref } from "react";
 import QRCode from "qrcode";
 import { BRAND_NAME } from "@/lib/brand";
-import { publicRefIdCardUrl } from "@/lib/public-card-url";
+import { publicRefIdCardPdfUrl } from "@/lib/public-card-url";
 
 export type EditableRefCardField =
   | "profile"
@@ -202,7 +202,7 @@ export function RefereeIdCard({
       setPublicIdUrl(null);
       return;
     }
-    setPublicIdUrl(publicRefIdCardUrl(id));
+    setPublicIdUrl(publicRefIdCardPdfUrl(id));
   }, [id]);
 
   const qrPayload = publicIdUrl || id || "GotREFS Official ID";
@@ -482,11 +482,11 @@ export function RefereeIdCard({
                 className="mt-1 text-center text-[7px] font-bold uppercase tracking-wide"
                 style={{ color: C.navyMid }}
               >
-                Scan for photo ID
+                Scan for PDF ID
               </p>
               {qrUsesProductionWhileLocal ? (
                 <p className="mt-1 text-center text-[7px] leading-tight text-amber-800">
-                  Opens gotrefs.org (not localhost)
+                  Opens gotrefs.org PDF (not localhost)
                 </p>
               ) : null}
             </div>

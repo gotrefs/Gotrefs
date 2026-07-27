@@ -18,7 +18,17 @@ export function resolvePublicCardOrigin(): string {
   return "https://gotrefs.org";
 }
 
+/** HTML card page (fallback). */
 export function publicRefIdCardUrl(gotrefsId: string): string {
   const id = gotrefsId.trim();
   return `${resolvePublicCardOrigin()}/id/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Direct PDF URL for organizer QR scans.
+ * Opens instantly in the phone's PDF viewer — no dashboard, no extra taps.
+ */
+export function publicRefIdCardPdfUrl(gotrefsId: string): string {
+  const id = gotrefsId.trim();
+  return `${resolvePublicCardOrigin()}/api/id/${encodeURIComponent(id)}/pdf`;
 }
