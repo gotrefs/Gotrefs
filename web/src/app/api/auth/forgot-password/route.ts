@@ -18,6 +18,16 @@ function recoveryCallbackUrl(siteUrl: string, tokenHash: string) {
   return `${base}/auth/callback?${params.toString()}`;
 }
 
+function isCooldownError(message: string) {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("rate limit") ||
+    msg.includes("for security purposes") ||
+    msg.includes("only request this after") ||
+    msg.includes("only request this once")
+  );
+}
+
 async function sendRecoveryEmail(to: string, resetUrl: string) {
   const apiKey = serverEnv.resendApiKey();
   const from =
@@ -51,6 +61,18 @@ async function sendRecoveryEmail(to: string, resetUrl: string) {
   return true;
 }
 
+async function clearRecoveryCooldown(
+  admin: ReturnType<typeof createServiceClient>,
+  email: string
+) {
+  const { error } = await admin.rpc("clear_auth_recovery_cooldown", {
+    target_email: email,
+  });
+  if (error) {
+    console.warn("[forgot-password] clear_auth_recovery_cooldown:", error.message);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     serverEnv.supabaseUrl();
@@ -80,53 +102,80 @@ export async function POST(request: NextRequest) {
       "If an account exists for that email, we sent a link to set or reset your password. Open the newest email and use “Set your password”.",
   };
 
-  // Prefer token_hash links (work from mail apps). Requires service role + Resend.
-  try {
-    const admin = createServiceClient();
-    const { data, error } = await admin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: {
-        redirectTo: `${siteUrl.replace(/\/$/, "")}/auth/update-password`,
-      },
-    });
+  const resendConfigured = Boolean(serverEnv.resendApiKey());
 
-    if (!error) {
-      const tokenHash = data.properties?.hashed_token;
-      if (tokenHash) {
-        const resetUrl = recoveryCallbackUrl(siteUrl, tokenHash);
-        const sent = await sendRecoveryEmail(email, resetUrl);
-        if (sent) {
+  // Prefer token_hash links via admin generateLink + Resend (no 60s Auth cooldown).
+  // Never call resetPasswordForEmail after a successful generateLink — that updates
+  // recovery_sent_at and immediately triggers Supabase's "after N seconds" error.
+  if (resendConfigured) {
+    try {
+      const admin = createServiceClient();
+      const { data, error } = await admin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: `${siteUrl.replace(/\/$/, "")}/auth/update-password`,
+        },
+      });
+
+      if (!error) {
+        const tokenHash = data.properties?.hashed_token;
+        if (tokenHash) {
+          const resetUrl = recoveryCallbackUrl(siteUrl, tokenHash);
+          const sent = await sendRecoveryEmail(email, resetUrl);
+          if (sent) {
+            return NextResponse.json(genericOk);
+          }
+          console.warn(
+            "[forgot-password] generateLink succeeded but Resend failed; not falling through to /recover."
+          );
+          return NextResponse.json(
+            { error: "Could not send the password reset email. Please try again." },
+            { status: 502 }
+          );
+        }
+      } else {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("user not found") || msg.includes("unable to find")) {
           return NextResponse.json(genericOk);
         }
-        console.warn(
-          "[forgot-password] Generated token_hash link but Resend is not configured/failed; falling back to Supabase email."
-        );
+        console.error("[forgot-password] generateLink:", error.message);
       }
-    } else {
-      // Unknown email — still return generic success (no account enumeration).
-      const msg = error.message.toLowerCase();
-      if (msg.includes("user not found") || msg.includes("unable to find")) {
-        return NextResponse.json(genericOk);
-      }
-      console.error("[forgot-password] generateLink:", error.message);
+    } catch (err) {
+      console.error("[forgot-password] generateLink unavailable:", err);
     }
-  } catch (err) {
-    console.error("[forgot-password] generateLink unavailable:", err);
   }
 
-  // Fallback: Supabase Auth email (requires Reset password template to use token_hash — see EMAIL_AUTH_TEMPLATES.md)
+  // Fallback: Supabase Auth email (requires Reset password template — see EMAIL_AUTH_TEMPLATES.md)
   const redirectTo = `${siteUrl.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`;
   const sessionResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, sessionResponse);
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+  try {
+    const admin = createServiceClient();
+    await clearRecoveryCooldown(admin, email);
+  } catch (err) {
+    console.warn("[forgot-password] could not clear recovery cooldown:", err);
+  }
+
+  let { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error && isCooldownError(error.message)) {
+    try {
+      const admin = createServiceClient();
+      await clearRecoveryCooldown(admin, email);
+      ({ error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo }));
+    } catch (err) {
+      console.warn("[forgot-password] cooldown retry failed:", err);
+    }
+  }
 
   if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("rate limit")) {
+    if (isCooldownError(error.message)) {
+      // Migration not applied yet, or Auth still blocking — never show the 59s copy.
       return NextResponse.json(
-        { error: "Too many emails sent. Wait a few minutes and try again." },
-        { status: 429 }
+        { error: "Could not send the password reset email. Please try again." },
+        { status: 502 }
       );
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
