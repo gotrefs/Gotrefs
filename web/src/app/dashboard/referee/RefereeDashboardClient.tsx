@@ -225,6 +225,13 @@ export default function RefereeDashboardClient() {
       verificationSkipped: meta.verification_skipped === true,
     });
 
+    if (typeof meta.gotrefs_id === "string" && meta.gotrefs_id.trim()) {
+      void supabase
+        .from("ref_profiles")
+        .update({ gotrefs_id: meta.gotrefs_id.trim() })
+        .eq("member_id", user.id);
+    }
+
     const { data: sc } = await supabase
       .from("screening_checks")
       .select("status, summary")
