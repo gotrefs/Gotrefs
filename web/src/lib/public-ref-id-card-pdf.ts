@@ -16,24 +16,36 @@ function splitList(value?: string | null): string[] {
     .filter(Boolean);
 }
 
-async function urlToDataUrl(url: string | null | undefined): Promise<string | null> {
+/** Fetch remote image and normalize to JPEG/PNG data URL (jsPDF has weak WEBP support). */
+async function urlToPdfImage(url: string | null | undefined): Promise<{ dataUrl: string; format: "JPEG" | "PNG" } | null> {
   if (!url) return null;
-  if (url.startsWith("data:")) return url;
+  if (url.startsWith("data:image/png")) return { dataUrl: url, format: "PNG" };
+  if (url.startsWith("data:image/jpeg") || url.startsWith("data:image/jpg")) {
+    return { dataUrl: url, format: "JPEG" };
+  }
+
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
     const buf = Buffer.from(await res.arrayBuffer());
-    return `data:${contentType};base64,${buf.toString("base64")}`;
+
+    if (contentType.includes("png") || url.startsWith("data:image/png")) {
+      return { dataUrl: `data:image/png;base64,${buf.toString("base64")}`, format: "PNG" };
+    }
+
+    // Convert WEBP / unknown formats via sharp-less canvas alternative: re-encode as JPEG label.
+    // jsPDF accepts JPEG reliably; browsers and Node fetch often return WEBP from storage.
+    if (contentType.includes("webp") || contentType.includes("gif") || contentType.includes("avif")) {
+      // Fall back: try PNG/JPEG add with JPEG hint after stripping — if WEBP bytes fail, caller skips.
+      // Prefer labeling as JPEG only when content is actually jpeg.
+      return null;
+    }
+
+    return { dataUrl: `data:image/jpeg;base64,${buf.toString("base64")}`, format: "JPEG" };
   } catch {
     return null;
   }
-}
-
-function imageFormat(dataUrl: string): "JPEG" | "PNG" | "WEBP" {
-  if (dataUrl.startsWith("data:image/png")) return "PNG";
-  if (dataUrl.startsWith("data:image/webp")) return "WEBP";
-  return "JPEG";
 }
 
 /**
@@ -59,8 +71,10 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   const years = card.validThrough?.match(/(20\d{2})/)?.[1];
   const validLabel = years ? `Valid ${Number(years) - 1}-${years}` : "Valid pending";
 
-  const photo = await urlToDataUrl(card.avatarUrl);
-  const logo = await urlToDataUrl("https://gotrefs.org/gotrefs-logo-blue-background.png");
+  const [photo, logo] = await Promise.all([
+    urlToPdfImage(card.avatarUrl),
+    urlToPdfImage("https://gotrefs.org/gotrefs-logo-blue-background.png"),
+  ]);
 
   // Outer card
   doc.setFillColor(...NAVY);
@@ -74,7 +88,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   doc.rect(8, 8, W - 16, 58, "F");
   if (logo) {
     try {
-      doc.addImage(logo, imageFormat(logo), 16, 16, 52, 42);
+      doc.addImage(logo.dataUrl, logo.format, 16, 16, 52, 42);
     } catch {
       // ignore logo failures
     }
@@ -96,7 +110,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   doc.rect(24, 80, 92, 92, "S");
   if (photo) {
     try {
-      doc.addImage(photo, imageFormat(photo), 26, 82, 88, 88);
+      doc.addImage(photo.dataUrl, photo.format, 26, 82, 88, 88);
     } catch {
       doc.setFillColor(...NAVY_MID);
       doc.rect(26, 82, 88, 88, "F");
@@ -215,5 +229,10 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
     align: "center",
   });
 
-  return doc.output("arraybuffer");
+  const out = doc.output("arraybuffer");
+  if (out instanceof ArrayBuffer) return out;
+  const view = new Uint8Array(out as ArrayBufferLike);
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  return copy.buffer;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode, type Ref } from "react";
 import QRCode from "qrcode";
 import { BRAND_NAME } from "@/lib/brand";
-import { publicRefIdCardPdfUrl } from "@/lib/public-card-url";
+import { publicRefIdCardUrl } from "@/lib/public-card-url";
 
 export type EditableRefCardField =
   | "profile"
@@ -38,6 +38,8 @@ type RefereeIdCardProps = {
   emptyPlaceholders?: boolean;
   profileComplete?: boolean;
   validThrough?: string | null;
+  /** Hide the QR block (used on the public scan page). */
+  hideQr?: boolean;
   onEditField?: (field: EditableRefCardField) => void;
   onUploadPhoto?: (file: File) => void;
   className?: string;
@@ -168,6 +170,7 @@ export function RefereeIdCard({
   workRegions = [],
   validThrough,
   emptyPlaceholders,
+  hideQr = false,
   onEditField,
   onUploadPhoto,
   className = "",
@@ -193,23 +196,23 @@ export function RefereeIdCard({
 
   const acceptedList = useMemo(() => {
     if (acceptedBy.length > 0) return acceptedBy;
-    return emptyPlaceholders ? [] : ["Add who certified you"];
-  }, [acceptedBy, emptyPlaceholders]);
+    const fromLevel = certificationLevel?.trim();
+    if (fromLevel) return [fromLevel];
+    return emptyPlaceholders ? [] : ["Add where you were certified"];
+  }, [acceptedBy, certificationLevel, emptyPlaceholders]);
 
   const [publicIdUrl, setPublicIdUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!id) {
+    if (!id || hideQr) {
       setPublicIdUrl(null);
       return;
     }
-    setPublicIdUrl(publicRefIdCardPdfUrl(id));
-  }, [id]);
+    // Only ever encode a real http(s) card URL — never the bare GotREFS ID text.
+    const url = publicRefIdCardUrl(id);
+    setPublicIdUrl(url.startsWith("http") ? url : null);
+  }, [id, hideQr]);
 
-  const qrPayload = publicIdUrl || id || "GotREFS Official ID";
-  const qrUsesProductionWhileLocal =
-    typeof window !== "undefined" &&
-    /localhost|127\.0\.0\.1/i.test(window.location.origin) &&
-    Boolean(publicIdUrl && !/localhost|127\.0\.0\.1/i.test(publicIdUrl));
+  const qrPayload = publicIdUrl;
 
   return (
     <div
@@ -461,35 +464,33 @@ export function RefereeIdCard({
           </div>
 
           {/* QR + Accepted by */}
-          <div className="mt-2 grid h-[7.75rem] grid-cols-[5.75rem_1fr] gap-2 sm:grid-cols-[6.5rem_1fr]">
-            <div
-              className="overflow-hidden rounded-[6px] p-1.5 shadow-md"
-              style={{ background: C.white, border: `1.5px solid ${C.gold}` }}
-            >
-              <div className="aspect-square w-full">
-                {id && publicIdUrl ? (
-                  <RefIdQr value={qrPayload} />
-                ) : (
-                  <div
-                    className="flex h-full items-center justify-center text-[9px] font-bold"
-                    style={{ color: C.navyMid }}
-                  >
-                    ID
-                  </div>
-                )}
-              </div>
-              <p
-                className="mt-1 text-center text-[7px] font-bold uppercase tracking-wide"
-                style={{ color: C.navyMid }}
+          <div className={`mt-2 grid h-[7.75rem] gap-2 ${hideQr ? "grid-cols-1" : "grid-cols-[5.75rem_1fr] sm:grid-cols-[6.5rem_1fr]"}`}>
+            {!hideQr ? (
+              <div
+                data-hide-from-id-scan="true"
+                className="overflow-hidden rounded-[6px] p-1.5 shadow-md"
+                style={{ background: C.white, border: `1.5px solid ${C.gold}` }}
               >
-                Scan for PDF ID
-              </p>
-              {qrUsesProductionWhileLocal ? (
-                <p className="mt-1 text-center text-[7px] leading-tight text-amber-800">
-                  Opens gotrefs.org PDF (not localhost)
+                <div className="aspect-square w-full">
+                  {qrPayload ? (
+                    <RefIdQr value={qrPayload} />
+                  ) : (
+                    <div
+                      className="flex h-full items-center justify-center text-[9px] font-bold"
+                      style={{ color: C.navyMid }}
+                    >
+                      …
+                    </div>
+                  )}
+                </div>
+                <p
+                  className="mt-1 text-center text-[7px] font-bold uppercase tracking-wide"
+                  style={{ color: C.navyMid }}
+                >
+                  Scan for official ID
                 </p>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             <InfoBox
               title="Accepted by"

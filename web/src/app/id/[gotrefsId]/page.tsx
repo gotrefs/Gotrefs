@@ -1,16 +1,12 @@
 import { redirect } from "next/navigation";
+import { normalizeGotrefsId } from "@/lib/public-ref-id-card";
 
 type PageProps = { params: Promise<{ gotrefsId: string }> };
 
-/**
- * Legacy /id/{GotREFS-ID} links redirect straight to the inline PDF
- * so organizers always land in a phone PDF viewer.
- */
-export default async function PublicRefIdPage({ params }: PageProps) {
+/** Legacy /id/{id} links redirect to the verify page used by QR scans. */
+export default async function LegacyPublicRefIdPage({ params }: PageProps) {
   const { gotrefsId } = await params;
-  const id = decodeURIComponent(gotrefsId || "").trim();
-  if (!id) {
-    redirect("/");
-  }
-  redirect(`/api/id/${encodeURIComponent(id)}/pdf`);
+  const id = normalizeGotrefsId(gotrefsId || "");
+  if (!id) redirect("/");
+  redirect(`/verify/${encodeURIComponent(id)}`);
 }

@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 
 type RefSignupUploads = {
-  govIdFront: File;
-  govIdBack: File;
-  certificationDocument: File;
+  govIdFront?: File | null;
+  govIdBack?: File | null;
+  certificationDocument?: File | null;
   profilePhoto?: File | null;
 };
 
@@ -15,14 +15,36 @@ type RefSignupProfile = {
 
 async function uploadVerificationFile(userId: string, file: File, prefix: string) {
   const supabase = createClient();
-  const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
-  const path = `${userId}/${prefix}_${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from("verification_documents").upload(path, file, { upsert: true });
+  const ext = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "jpg";
+  const safeExt = ext && ["jpg", "jpeg", "png", "webp", "pdf"].includes(ext) ? ext : "jpg";
+  const path = `${userId}/${prefix}_${Date.now()}.${safeExt}`;
+  const contentType =
+    file.type ||
+    (safeExt === "pdf" ? "application/pdf" : `image/${safeExt === "jpg" ? "jpeg" : safeExt}`);
+  const { error } = await supabase.storage
+    .from("verification_documents")
+    .upload(path, file, { upsert: true, contentType });
   if (error) throw error;
   return path;
 }
 
-/** Upload referee ID and certification files after signup while the session is active. */
+/** Persist face photo to storage + members so the official ID card shows it immediately. */
+export async function uploadRefProfilePhoto(userId: string, file: File): Promise<string> {
+  const path = await uploadVerificationFile(userId, file, "profile_photo");
+  const supabase = createClient();
+  const { error: memberError } = await supabase
+    .from("members")
+    .update({ profile_picture_url: path })
+    .eq("id", userId);
+  if (memberError) throw memberError;
+
+  await supabase.auth.updateUser({
+    data: { profile_picture_url: path },
+  });
+  return path;
+}
+
+/** Upload referee ID / certification / profile files after signup while the session is active. */
 export async function uploadRefSignupDocuments(
   userId: string,
   files: RefSignupUploads,
@@ -30,33 +52,37 @@ export async function uploadRefSignupDocuments(
 ) {
   const [governmentIdFrontPath, governmentIdBackPath, certificationDocumentPath, profilePhotoPath] =
     await Promise.all([
-      uploadVerificationFile(userId, files.govIdFront, "gov_id_front"),
-      uploadVerificationFile(userId, files.govIdBack, "gov_id_back"),
-      uploadVerificationFile(userId, files.certificationDocument, "certification"),
+      files.govIdFront
+        ? uploadVerificationFile(userId, files.govIdFront, "gov_id_front")
+        : Promise.resolve(null),
+      files.govIdBack
+        ? uploadVerificationFile(userId, files.govIdBack, "gov_id_back")
+        : Promise.resolve(null),
+      files.certificationDocument
+        ? uploadVerificationFile(userId, files.certificationDocument, "certification")
+        : Promise.resolve(null),
       files.profilePhoto
         ? uploadVerificationFile(userId, files.profilePhoto, "profile_photo")
         : Promise.resolve(null),
     ]);
 
   const supabase = createClient();
-  const { error } = await supabase
-    .from("ref_profiles")
-    .update({
-      government_id_path: governmentIdFrontPath,
-      verification_doc_path: governmentIdBackPath,
-      certification_document_path: certificationDocumentPath,
-      ...(profile
-        ? {
-            primary_sport: profile.primarySport,
-            additional_sports: profile.additionalSports ?? [],
-            certification_level: profile.certificationLevel,
-          }
-        : {}),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("member_id", userId);
+  const profilePatch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (governmentIdFrontPath) profilePatch.government_id_path = governmentIdFrontPath;
+  if (governmentIdBackPath) profilePatch.verification_doc_path = governmentIdBackPath;
+  if (certificationDocumentPath) profilePatch.certification_document_path = certificationDocumentPath;
+  if (profile) {
+    profilePatch.primary_sport = profile.primarySport;
+    profilePatch.additional_sports = profile.additionalSports ?? [];
+    profilePatch.certification_level = profile.certificationLevel;
+  }
 
-  if (error) throw error;
+  if (Object.keys(profilePatch).length > 1) {
+    const { error } = await supabase.from("ref_profiles").update(profilePatch).eq("member_id", userId);
+    if (error) throw error;
+  }
 
   if (profilePhotoPath) {
     const { error: memberError } = await supabase
@@ -72,6 +98,13 @@ export async function uploadRefSignupDocuments(
       data: { profile_picture_url: profilePhotoPath },
     });
   }
+
+  return {
+    governmentIdFrontPath,
+    governmentIdBackPath,
+    certificationDocumentPath,
+    profilePhotoPath,
+  };
 }
 
 /** Queue verification for admin review after signup uploads complete. */

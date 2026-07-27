@@ -1,4 +1,4 @@
-import { formatCardValidThrough } from "@/lib/ref-id-card-pdf";
+import { formatCardValidThrough } from "@/lib/ref-id-card-validity";
 import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -16,16 +16,72 @@ export type PublicRefIdCard = {
   profileComplete: boolean;
 };
 
+type ProfileRow = {
+  member_id: string;
+  gotrefs_id?: string | null;
+  primary_sport: string | null;
+  additional_sports: unknown;
+  certification_level: string | null;
+};
+
+const PROFILE_SELECT_WITH_ID =
+  "member_id, gotrefs_id, primary_sport, additional_sports, certification_level";
+const PROFILE_SELECT_BASE = "member_id, primary_sport, additional_sports, certification_level";
+
 export function normalizeGotrefsId(raw: string) {
   return decodeURIComponent(raw).trim().toUpperCase();
 }
 
-function splitList(value?: string | null): string[] {
-  if (!value?.trim()) return [];
-  return value
-    .split(/[\n,;|]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+function metaGotrefsId(meta: Record<string, unknown> | null | undefined): string {
+  const value = meta?.gotrefs_id;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return error?.code === "42703" || /does not exist/i.test(error?.message ?? "");
+}
+
+async function findAuthUserByGotrefsId(
+  admin: ReturnType<typeof createServiceClient>,
+  gotrefsId: string
+) {
+  let page = 1;
+  while (page <= 5) {
+    const { data: listed, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw error;
+    const users = listed?.users ?? [];
+    const match = users.find((user) => {
+      const metaId = metaGotrefsId(user.user_metadata as Record<string, unknown>);
+      return metaId && metaId.toUpperCase() === gotrefsId;
+    });
+    if (match) return match;
+    if (users.length < 200) break;
+    page += 1;
+  }
+  return null;
+}
+
+async function loadProfileByMemberId(
+  admin: ReturnType<typeof createServiceClient>,
+  memberId: string
+): Promise<ProfileRow | null> {
+  const withId = await admin
+    .from("ref_profiles")
+    .select(PROFILE_SELECT_WITH_ID)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  if (!isMissingColumnError(withId.error)) {
+    return (withId.data as ProfileRow | null) ?? null;
+  }
+
+  const base = await admin
+    .from("ref_profiles")
+    .select(PROFILE_SELECT_BASE)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  return (base.data as ProfileRow | null) ?? null;
 }
 
 /** Load public ID card fields by GotREFS ID (no legal name/email/phone). */
@@ -35,63 +91,90 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
 
   const admin = createServiceClient();
 
-  let { data: profile } = await admin
+  let profile: ProfileRow | null = null;
+
+  const exact = await admin
     .from("ref_profiles")
-    .select("member_id, gotrefs_id, primary_sport, additional_sports, certification_level")
+    .select(PROFILE_SELECT_WITH_ID)
     .eq("gotrefs_id", gotrefsId)
     .maybeSingle();
 
-  if (!profile) {
-    const { data: rows } = await admin
-      .from("ref_profiles")
-      .select("member_id, gotrefs_id, primary_sport, additional_sports, certification_level")
-      .ilike("gotrefs_id", gotrefsId)
-      .limit(1);
-    profile = rows?.[0] ?? null;
+  if (!isMissingColumnError(exact.error)) {
+    profile = (exact.data as ProfileRow | null) ?? null;
+    if (!profile) {
+      const { data: rows } = await admin
+        .from("ref_profiles")
+        .select(PROFILE_SELECT_WITH_ID)
+        .ilike("gotrefs_id", gotrefsId)
+        .limit(1);
+      profile = (rows?.[0] as ProfileRow | undefined) ?? null;
+    }
   }
 
-  // Fallback: metadata may have gotrefs_id before ref_profiles was synced.
+  // Fallback: auth metadata may have gotrefs_id before ref_profiles was synced / migrated.
   if (!profile?.member_id) {
-    const { data: listed } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const match = listed.users.find((user) => {
-      const metaId = user.user_metadata?.gotrefs_id;
-      return typeof metaId === "string" && metaId.trim().toUpperCase() === gotrefsId;
-    });
+    const match = await findAuthUserByGotrefsId(admin, gotrefsId);
     if (match) {
-      const { data: rp } = await admin
-        .from("ref_profiles")
-        .select("member_id, gotrefs_id, primary_sport, additional_sports, certification_level")
-        .eq("member_id", match.id)
-        .maybeSingle();
+      const rp = await loadProfileByMemberId(admin, match.id);
+      const meta = (match.user_metadata ?? {}) as Record<string, unknown>;
       profile = rp ?? {
         member_id: match.id,
         gotrefs_id: gotrefsId,
-        primary_sport: typeof match.user_metadata?.primary_sport === "string" ? match.user_metadata.primary_sport : null,
-        additional_sports: Array.isArray(match.user_metadata?.additional_sports)
-          ? match.user_metadata.additional_sports
-          : [],
+        primary_sport: typeof meta.primary_sport === "string" ? meta.primary_sport : null,
+        additional_sports: Array.isArray(meta.additional_sports) ? meta.additional_sports : [],
         certification_level:
-          typeof match.user_metadata?.certification_level === "string"
-            ? match.user_metadata.certification_level
-            : null,
+          typeof meta.certification_level === "string" ? meta.certification_level : null,
       };
-      // Best-effort sync for next scan.
+
+      // Best-effort sync for next scan (no-op if column missing).
       void admin
         .from("ref_profiles")
         .upsert(
           {
             member_id: match.id,
             gotrefs_id: gotrefsId,
+            primary_sport: profile.primary_sport,
+            additional_sports: profile.additional_sports,
+            certification_level: profile.certification_level,
+            updated_at: new Date().toISOString(),
           },
           { onConflict: "member_id" }
-        );
+        )
+        .then(({ error }) => {
+          if (error && !isMissingColumnError(error)) {
+            console.warn("[public-ref-id-card] gotrefs_id sync failed", error.message);
+          }
+        });
     }
   }
 
   if (!profile?.member_id) return null;
 
-  const [{ data: member }, { data: submission }, authResult] = await Promise.all([
-    admin.from("members").select("profile_picture_url, role").eq("id", profile.member_id).maybeSingle(),
+  if (!profile.gotrefs_id || String(profile.gotrefs_id).toUpperCase() !== gotrefsId) {
+    void admin
+      .from("ref_profiles")
+      .update({ gotrefs_id: gotrefsId })
+      .eq("member_id", profile.member_id)
+      .then(({ error }) => {
+        if (error && !isMissingColumnError(error)) {
+          console.warn("[public-ref-id-card] gotrefs_id update failed", error.message);
+        }
+      });
+  }
+
+  const memberWithPhoto = await admin
+    .from("members")
+    .select("profile_picture_url, role")
+    .eq("id", profile.member_id)
+    .maybeSingle();
+
+  let member = memberWithPhoto.data as { profile_picture_url?: string | null; role?: string } | null;
+  if (isMissingColumnError(memberWithPhoto.error)) {
+    const roleOnly = await admin.from("members").select("role").eq("id", profile.member_id).maybeSingle();
+    member = roleOnly.data;
+  }
+
+  const [{ data: submission }, authResult] = await Promise.all([
     admin
       .from("ref_verification_submissions")
       .select("status, reviewed_at")
@@ -102,8 +185,8 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
 
   if (member?.role && member.role !== "ref") return null;
 
-  const meta = authResult.data.user?.user_metadata ?? {};
-  const metaGotrefs = typeof meta.gotrefs_id === "string" ? meta.gotrefs_id.trim() : "";
+  const meta = (authResult.data.user?.user_metadata ?? {}) as Record<string, unknown>;
+  const metaGotrefs = metaGotrefsId(meta);
   const displayId = (profile.gotrefs_id || metaGotrefs || gotrefsId).trim();
 
   const photoSource =
@@ -123,10 +206,11 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
     ? meta.work_regions.filter((s: unknown): s is string => typeof s === "string")
     : [];
 
-  const certifiedBy =
-    typeof meta.certified_by === "string"
-      ? meta.certified_by
-      : splitList(typeof meta.certified_by === "string" ? meta.certified_by : null).join(", ");
+  const certifiedByRaw =
+    (typeof meta.certified_by === "string" && meta.certified_by.trim()) ||
+    (typeof meta.certification_level === "string" && meta.certification_level.trim()) ||
+    (typeof profile.certification_level === "string" && profile.certification_level.trim()) ||
+    null;
 
   const approved = submission?.status === "approved";
 
@@ -138,7 +222,7 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
     certificationLevel:
       profile.certification_level ||
       (typeof meta.certification_level === "string" ? meta.certification_level : null),
-    certifiedBy: typeof meta.certified_by === "string" ? meta.certified_by : certifiedBy || null,
+    certifiedBy: certifiedByRaw,
     baseCity: typeof meta.base_city === "string" ? meta.base_city : null,
     workRegions,
     avatarUrl,

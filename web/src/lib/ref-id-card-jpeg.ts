@@ -1,6 +1,7 @@
 "use client";
 
 import { domToJpeg } from "modern-screenshot";
+import { createClient } from "@/lib/supabase/client";
 
 function triggerBlobDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -68,7 +69,6 @@ async function withInlinedImages<T>(root: HTMLElement, run: () => Promise<T>): P
     })
   );
 
-  // Let the browser paint the inlined images.
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
   try {
@@ -82,9 +82,48 @@ function findIdCardElement(preferred?: HTMLElement | null): HTMLElement {
   if (preferred && preferred.isConnected) return preferred;
   const found = document.querySelector<HTMLElement>("[data-ref-id-card]");
   if (!found) {
-    throw new Error("ID card is not on the page yet. Close this dialog and try Download again.");
+    throw new Error("ID card is not on the page yet.");
   }
   return found;
+}
+
+export async function captureRefIdCardJpegDataUrl(cardElement?: HTMLElement | null): Promise<string> {
+  const el = findIdCardElement(cardElement);
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
+
+  return withInlinedImages(el, async () =>
+    domToJpeg(el, {
+      quality: 0.95,
+      scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
+      backgroundColor: "#020617",
+      filter: (node) => {
+        if (node instanceof HTMLInputElement) return false;
+        if (node instanceof HTMLElement && node.dataset.hideFromIdScan === "true") return false;
+        return true;
+      },
+    })
+  );
+}
+
+/**
+ * Screenshot the live on-screen RefereeIdCard and store it so QR scans
+ * open a photo of the card (no login, no dashboard).
+ */
+export async function publishOfficialIdCardImage(
+  memberId: string,
+  cardElement?: HTMLElement | null
+): Promise<string> {
+  const dataUrl = await captureRefIdCardJpegDataUrl(cardElement);
+  const blob = dataUrlToBlob(dataUrl);
+  const path = `${memberId}/official_id_card.jpg`;
+  const supabase = createClient();
+  const { error } = await supabase.storage.from("verification_documents").upload(path, blob, {
+    upsert: true,
+    contentType: "image/jpeg",
+    cacheControl: "60",
+  });
+  if (error) throw error;
+  return path;
 }
 
 /**
@@ -95,20 +134,6 @@ export async function downloadRefIdCardJpeg(
   filename: string,
   cardElement?: HTMLElement | null
 ): Promise<void> {
-  const el = findIdCardElement(cardElement);
-
-  // Ensure the real card is laid out at its on-screen size.
-  el.scrollIntoView({ block: "nearest", inline: "nearest" });
-
-  const dataUrl = await withInlinedImages(el, async () =>
-    domToJpeg(el, {
-      quality: 0.95,
-      scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
-      backgroundColor: "#020617",
-      // Skip invisible file inputs so they don't affect the shot.
-      filter: (node) => !(node instanceof HTMLInputElement),
-    })
-  );
-
+  const dataUrl = await captureRefIdCardJpegDataUrl(cardElement);
   triggerBlobDownload(dataUrlToBlob(dataUrl), filename);
 }

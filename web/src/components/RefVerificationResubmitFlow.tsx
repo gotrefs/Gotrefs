@@ -25,6 +25,8 @@ type RefVerificationResubmitFlowProps = {
   initialStep?: RefVerificationStepKey;
   existingGovId?: boolean;
   existingCert?: boolean;
+  /** Existing face photo already on the official ID card (signed URL or blob). */
+  existingAvatarUrl?: string | null;
   initialHourlyRateMin?: string;
   initialHourlyRateMax?: string;
   displayName: string;
@@ -58,6 +60,7 @@ export function RefVerificationResubmitFlow({
   initialStep,
   existingGovId = false,
   existingCert = false,
+  existingAvatarUrl = null,
   initialHourlyRateMin = String(HOURLY_RATE_FLOOR),
   initialHourlyRateMax = "75",
   displayName: initialDisplayName,
@@ -87,6 +90,7 @@ export function RefVerificationResubmitFlow({
   const [fullName, setFullName] = useState(initialDisplayName);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const cardPhotoUrl = photoPreviewUrl || existingAvatarUrl || null;
   const onPhotoUpdatedRef = useRef(onProfilePhotoUpdated);
   onPhotoUpdatedRef.current = onProfilePhotoUpdated;
   const [primarySport, setPrimarySport] = useState(initialPrimarySport);
@@ -132,8 +136,10 @@ export function RefVerificationResubmitFlow({
     if (currentStep === "profile") {
       if (!fullName.trim()) return "Enter your name.";
       if (fullName.trim().length > 100) return "Name is too long.";
-      // Admin-requested profile resubmit always needs a new face photo.
-      if (mode === "resubmit" && !photoFile) return "Upload a clear photo of your face to continue.";
+      // Admin-requested profile resubmit needs a new face photo only if none is on file yet.
+      if (mode === "resubmit" && !photoFile && !existingAvatarUrl) {
+        return "Upload a clear photo of your face to continue.";
+      }
     }
     if (currentStep === "sports") {
       const sport = primarySport.trim();
@@ -388,28 +394,34 @@ export function RefVerificationResubmitFlow({
               />
             </label>
             <p className="text-sm font-semibold text-[var(--muted)]">
-              Upload a clear face photo — it updates your GotREFS ID card immediately.
+              {existingAvatarUrl && !photoFile
+                ? "Your signup photo is already on your GotREFS ID card. Replace it only if you want a new one."
+                : "Upload a clear face photo — it updates your GotREFS ID card immediately."}
             </p>
             <label
               className={`relative block cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
-                photoFile
+                photoFile || existingAvatarUrl
                   ? "border-green-400 bg-green-50"
                   : "border-[var(--blue)]/40 bg-slate-50 hover:border-[var(--blue)]"
               }`}
             >
-              {photoFile ? (
+              {photoFile || existingAvatarUrl ? (
                 <>
                   <span className="relative mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-green-500 text-2xl font-black text-white">
-                    {photoPreviewUrl ? (
+                    {cardPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={photoPreviewUrl} alt="" className="h-full w-full object-cover" />
+                      <img src={cardPhotoUrl} alt="" className="h-full w-full object-cover" />
                     ) : null}
                     <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-2xl font-black text-white">
                       ✓
                     </span>
                   </span>
-                  <span className="mt-3 block text-sm font-bold text-green-800">Profile photo uploaded</span>
-                  <span className="mt-1 block text-xs text-green-700/80">{photoFile.name} · tap to replace</span>
+                  <span className="mt-3 block text-sm font-bold text-green-800">
+                    {photoFile ? "Profile photo uploaded" : "Profile photo already on your ID card"}
+                  </span>
+                  <span className="mt-1 block text-xs text-green-700/80">
+                    {photoFile ? `${photoFile.name} · tap to replace` : "Tap to replace anytime"}
+                  </span>
                 </>
               ) : (
                 <span className="text-sm font-bold text-[var(--navy)]">Upload profile photo</span>
@@ -428,7 +440,7 @@ export function RefVerificationResubmitFlow({
               <RefereeIdCard
                 fullName={fullName}
                 gotrefsId={gotrefsId}
-                avatarUrl={photoPreviewUrl ?? undefined}
+                avatarUrl={cardPhotoUrl ?? undefined}
                 avatarLabel={
                   fullName
                     .trim()

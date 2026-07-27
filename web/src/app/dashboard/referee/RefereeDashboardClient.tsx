@@ -12,7 +12,16 @@ import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeId
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import { findStoredProfilePhotoPath, resolveProfilePhotoUrl } from "@/lib/profile-photo";
-import { formatCardValidThrough } from "@/lib/ref-id-card-pdf";
+import {
+  clearRefSignupDraft,
+  loadRefSignupDraft,
+} from "@/lib/auth/signup-draft";
+import {
+  submitRefVerificationForReview,
+  uploadRefSignupDocuments,
+} from "@/lib/auth/upload-ref-signup-docs";
+import { formatCardValidThrough } from "@/lib/ref-id-card-validity";
+import { publishOfficialIdCardImage } from "@/lib/ref-id-card-jpeg";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
@@ -170,6 +179,29 @@ export default function RefereeDashboardClient() {
   const [myRatingCount, setMyRatingCount] = useState(0);
   const [myReviews, setMyReviews] = useState<PublicReview[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const idCardRef = useRef<HTMLDivElement | null>(null);
+  const publishCardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const publishIdCardPhoto = useCallback(async () => {
+    if (!memberId || !cardMeta.gotrefsId) return;
+    try {
+      await publishOfficialIdCardImage(memberId, idCardRef.current);
+    } catch {
+      // Non-fatal — QR falls back to the live HTML card until publish succeeds.
+    }
+  }, [memberId, cardMeta.gotrefsId]);
+
+  useEffect(() => {
+    if (!memberId || !cardMeta.gotrefsId || loading) return;
+    if (publishCardTimer.current) clearTimeout(publishCardTimer.current);
+    // Wait for photo / fonts to paint, then snapshot the exact on-screen card.
+    publishCardTimer.current = setTimeout(() => {
+      void publishIdCardPhoto();
+    }, 900);
+    return () => {
+      if (publishCardTimer.current) clearTimeout(publishCardTimer.current);
+    };
+  }, [memberId, cardMeta.gotrefsId, avatarUrl, sport, cert, cardMeta.certifiedBy, cardMeta.baseCity, loading, publishIdCardPhoto]);
 
   const load = useCallback(async () => {
     const {
@@ -206,6 +238,61 @@ export default function RefereeDashboardClient() {
     }
 
     setAvatarUrl(await resolveProfilePhotoUrl(supabase, photoSource));
+
+    // After email confirmation / failed signup upload, attach saved photo to the ID card.
+    try {
+      const pending =
+        typeof window !== "undefined" && localStorage.getItem("gotrefs_pending_ref_docs") === "1";
+      if (pending) {
+        const draft = await loadRefSignupDraft();
+        const draftFiles = draft?.files;
+        const hasDraftFiles = Boolean(
+          draftFiles?.photo || draftFiles?.govIdFront || draftFiles?.govIdBack || draftFiles?.certDoc
+        );
+        if (hasDraftFiles && draftFiles) {
+          await uploadRefSignupDocuments(
+            user.id,
+            {
+              profilePhoto: draftFiles.photo,
+              govIdFront: draftFiles.govIdFront,
+              govIdBack: draftFiles.govIdBack,
+              certificationDocument: draftFiles.certDoc,
+            },
+            draft?.fields
+              ? {
+                  primarySport: draft.fields.primarySport || "Basketball",
+                  additionalSports: draft.fields.secondarySport ? [draft.fields.secondarySport] : [],
+                  certificationLevel: draft.fields.certificationLevel || "Youth / Recreational",
+                }
+              : undefined
+          );
+          if (draftFiles.photo) {
+            const { data: memberAfter } = await supabase
+              .from("members")
+              .select("profile_picture_url")
+              .eq("id", user.id)
+              .maybeSingle();
+            const recoveredPath =
+              memberAfter?.profile_picture_url ||
+              (await findStoredProfilePhotoPath(supabase, user.id));
+            const signed = await resolveProfilePhotoUrl(supabase, recoveredPath);
+            if (signed) setAvatarUrl(signed);
+          }
+          if (draftFiles.photo && draftFiles.govIdFront && draftFiles.govIdBack && draftFiles.certDoc) {
+            try {
+              await submitRefVerificationForReview();
+            } catch {
+              // Non-fatal — user can submit from dashboard later.
+            }
+          }
+        }
+        await clearRefSignupDraft();
+        localStorage.removeItem("gotrefs_pending_ref_docs");
+      }
+    } catch {
+      // Non-fatal — user can re-upload from the ID card if needed.
+    }
+
     setCardMeta({
       gotrefsId: typeof meta.gotrefs_id === "string" ? meta.gotrefs_id : undefined,
       certifiedBy: typeof meta.certified_by === "string" ? meta.certified_by : undefined,
@@ -771,6 +858,9 @@ export default function RefereeDashboardClient() {
         return;
       }
       setMsg("Profile photo added to your GotREFS ID card.");
+      window.setTimeout(() => {
+        void publishIdCardPhoto();
+      }, 600);
     } catch {
       setMsg("Could not upload your photo. Try again.");
     }
@@ -1302,6 +1392,7 @@ export default function RefereeDashboardClient() {
               adminMessage={profileWizard.adminMessage}
               existingGovId={Boolean(govIdPath)}
               existingCert={Boolean(certDocPath)}
+              existingAvatarUrl={avatarUrl}
               initialHourlyRateMin={rateMin || "10"}
               initialHourlyRateMax={rateMax || rateMin || "75"}
               displayName={displayName}
@@ -1429,12 +1520,13 @@ export default function RefereeDashboardClient() {
           </div>
           <div>
             <RefereeIdCard
+              cardRef={idCardRef}
               fullName={displayName}
               gotrefsId={cardMeta.gotrefsId}
               primarySport={sport}
               additionalSports={additionalSports}
               certificationLevel={cert}
-              certifiedBy={cardMeta.certifiedBy}
+              certifiedBy={cardMeta.certifiedBy || cert || undefined}
               rate={rateLabel()}
               avatarUrl={avatarUrl ?? undefined}
               avatarLabel={avatarLabel}

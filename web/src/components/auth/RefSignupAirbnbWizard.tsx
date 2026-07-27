@@ -81,6 +81,7 @@ export type RefSignupAirbnbWizardProps = {
   customPrimarySport: string;
   secondarySport: string;
   certificationLevel: string;
+  certifiedBy: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
   govIdFrontFile: File | null;
@@ -101,6 +102,7 @@ export type RefSignupAirbnbWizardProps = {
   onCustomPrimarySport: (value: string) => void;
   onSecondarySport: (value: string) => void;
   onCertificationLevel: (value: string) => void;
+  onCertifiedBy: (value: string) => void;
   onHourlyRateMin: (value: string) => void;
   onHourlyRateMax: (value: string) => void;
   onGovIdFrontFile: (file: File | null) => void;
@@ -183,6 +185,7 @@ export function RefSignupAirbnbWizard({
   customPrimarySport,
   secondarySport,
   certificationLevel,
+  certifiedBy,
   hourlyRateMin,
   hourlyRateMax,
   govIdFrontFile,
@@ -203,6 +206,7 @@ export function RefSignupAirbnbWizard({
   onCustomPrimarySport,
   onSecondarySport,
   onCertificationLevel,
+  onCertifiedBy,
   onHourlyRateMin,
   onHourlyRateMax,
   onGovIdFrontFile,
@@ -548,6 +552,7 @@ export function RefSignupAirbnbWizard({
                     }
                     additionalSports={secondarySport ? [secondarySport] : []}
                     certificationLevel={certificationLevel || undefined}
+                    certifiedBy={certifiedBy || certificationLevel || undefined}
                     baseCity={baseCity || undefined}
                     emptyPlaceholders
                     onUploadPhoto={(file) => {
@@ -671,16 +676,27 @@ export function RefSignupAirbnbWizard({
           {screen === "certificationLevel" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                What&apos;s your certification level?
+                Where were you certified?
               </h1>
-              <p className="mt-2 text-neutral-500">Youth, varsity, NFHS, USSF — whatever best describes you.</p>
+              <p className="mt-2 text-neutral-500">
+                This shows on your GotREFS ID card under &quot;Accepted by&quot; for organizers.
+              </p>
               <label className="mt-8 block rounded-2xl border border-neutral-300 px-5 py-4">
+                <span className="text-xs text-neutral-500">Certified by / association</span>
+                <input
+                  className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
+                  value={certifiedBy}
+                  onChange={(event) => onCertifiedBy(event.target.value)}
+                  placeholder="NFHS, state association, local association, USSF, etc."
+                />
+              </label>
+              <label className="mt-4 block rounded-2xl border border-neutral-300 px-5 py-4">
                 <span className="text-xs text-neutral-500">Certification level</span>
                 <input
                   className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
                   value={certificationLevel}
                   onChange={(event) => onCertificationLevel(event.target.value)}
-                  placeholder="Youth, varsity, NFHS, USSF, etc."
+                  placeholder="Youth, varsity, Grade 7, etc."
                 />
               </label>
             </div>

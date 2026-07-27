@@ -12,6 +12,7 @@ import { signupDashboardLabel, type SignupDashboardPath } from "@/lib/auth/email
 import {
   clearRefSignupDraft,
   loadRefSignupDraft,
+  saveRefSignupDraft,
   type RefSignupDraftFields,
 } from "@/lib/auth/signup-draft";
 import { formatHourlyRateRange } from "@/lib/pay-range";
@@ -85,6 +86,7 @@ export function AuthFlow() {
   const [customPrimarySport, setCustomPrimarySport] = useState("");
   const [secondarySport, setSecondarySport] = useState("");
   const [certificationLevel, setCertificationLevel] = useState("");
+  const [certifiedBy, setCertifiedBy] = useState("");
   const [hourlyRateMin, setHourlyRateMin] = useState(String(SIGNUP_HOURLY_RATE_FLOOR));
   const [hourlyRateMax, setHourlyRateMax] = useState("75");
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
@@ -524,6 +526,7 @@ export function AuthFlow() {
         primarySport: resolvedPrimarySport,
         additionalSports: resolvedAdditionalSports,
         certificationLevel: certificationLevel.trim() || undefined,
+        certifiedBy: role === "ref" ? certifiedBy.trim() || certificationLevel.trim() || undefined : undefined,
         rateMin: role === "ref" ? Number(hourlyRateMin) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateMax: role === "ref" ? Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateType: role === "ref" ? "range" : undefined,
@@ -564,14 +567,40 @@ export function AuthFlow() {
         if (json.pendingRedirect) {
           setPendingRedirect(json.pendingRedirect);
         }
-        if (role === "ref" && photoFile && govIdFrontFile && govIdBackFile && certDocFile) {
+        if (role === "ref" && (photoFile || govIdFrontFile || govIdBackFile || certDocFile)) {
           try {
+            await saveRefSignupDraft(
+              {
+                screen: "account",
+                fullName,
+                email,
+                primarySport,
+                customPrimarySport,
+                secondarySport,
+                certificationLevel,
+                hourlyRateMin,
+                hourlyRateMax,
+                baseCity,
+                travelRadius,
+                workRegions,
+                termsAccepted,
+                recommendedAssignorName,
+                recommendedAssignorEmail,
+                recommendedAssignorPhone,
+              },
+              {
+                photo: photoFile,
+                govIdFront: govIdFrontFile,
+                govIdBack: govIdBackFile,
+                certDoc: certDocFile,
+              }
+            );
             localStorage.setItem("gotrefs_pending_ref_docs", "1");
           } catch {
             // Non-fatal if storage is unavailable.
           }
           setNotice(
-            "After you confirm your email, upload your verification documents from your referee dashboard."
+            "Confirm your email to finish. Your profile photo and documents are saved on this device and will attach to your ID card automatically after you sign in."
           );
         }
         setStep("verify-email");
@@ -579,7 +608,8 @@ export function AuthFlow() {
       }
 
       const userId = json.userId;
-      if (role === "ref" && photoFile && govIdFrontFile && govIdBackFile && certDocFile) {
+      let docsUploaded = false;
+      if (role === "ref" && (photoFile || govIdFrontFile || govIdBackFile || certDocFile)) {
         try {
           let memberId = userId;
           if (!memberId) {
@@ -590,6 +620,7 @@ export function AuthFlow() {
             memberId = user?.id ?? null;
           }
           if (memberId) {
+            // Always persist the signup face photo so the official ID card shows it immediately.
             await uploadRefSignupDocuments(
               memberId,
               {
@@ -604,7 +635,10 @@ export function AuthFlow() {
                 certificationLevel: certificationLevel.trim() || "Youth / Recreational",
               }
             );
-            await submitRefVerificationForReview();
+            docsUploaded = true;
+            if (photoFile && govIdFrontFile && govIdBackFile && certDocFile) {
+              await submitRefVerificationForReview();
+            }
           }
         } catch (submitError) {
           const detail =
@@ -612,12 +646,50 @@ export function AuthFlow() {
           setNotice(
             `Account created, but verification was not queued for review (${detail}). Ask your admin to run supabase/RUN_ADMIN_VERIFICATION_SETUP.sql in Supabase, then open your referee dashboard to resubmit.`
           );
+          try {
+            await saveRefSignupDraft(
+              {
+                screen: "account",
+                fullName,
+                email,
+                primarySport,
+                customPrimarySport,
+                secondarySport,
+                certificationLevel,
+                hourlyRateMin,
+                hourlyRateMax,
+                baseCity,
+                travelRadius,
+                workRegions,
+                termsAccepted,
+                recommendedAssignorName,
+                recommendedAssignorEmail,
+                recommendedAssignorPhone,
+              },
+              {
+                photo: photoFile,
+                govIdFront: govIdFrontFile,
+                govIdBack: govIdBackFile,
+                certDoc: certDocFile,
+              }
+            );
+            localStorage.setItem("gotrefs_pending_ref_docs", "1");
+          } catch {
+            // Non-fatal.
+          }
         }
       }
 
       const next = searchParams.get("next");
       const destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
-      await clearRefSignupDraft();
+      if (docsUploaded || role !== "ref") {
+        await clearRefSignupDraft();
+        try {
+          localStorage.removeItem("gotrefs_pending_ref_docs");
+        } catch {
+          // ignore
+        }
+      }
       window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
@@ -648,6 +720,7 @@ export function AuthFlow() {
         customPrimarySport={customPrimarySport}
         secondarySport={secondarySport}
         certificationLevel={certificationLevel}
+        certifiedBy={certifiedBy}
         hourlyRateMin={hourlyRateMin}
         hourlyRateMax={hourlyRateMax}
         govIdFrontFile={govIdFrontFile}
@@ -668,6 +741,7 @@ export function AuthFlow() {
         onCustomPrimarySport={setCustomPrimarySport}
         onSecondarySport={setSecondarySport}
         onCertificationLevel={setCertificationLevel}
+        onCertifiedBy={setCertifiedBy}
         onHourlyRateMin={setHourlyRateMin}
         onHourlyRateMax={setHourlyRateMax}
         onGovIdFrontFile={setGovIdFrontFile}
