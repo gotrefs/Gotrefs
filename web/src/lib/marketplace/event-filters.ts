@@ -90,22 +90,32 @@ export type OpenEventFilters = {
   refProfile?: RefProfileForMatch | null;
 };
 
+/** True while refs can still see / request the game (until ends_at). */
+export function isEventOpenForRequests(
+  event: { starts_at: string; ends_at?: string | null },
+  nowMs = Date.now()
+): boolean {
+  const end = new Date(event.ends_at || event.starts_at).getTime();
+  if (Number.isNaN(end)) return true;
+  return end >= nowMs;
+}
+
 export function filterOpenEvents(events: OpenEventRecord[], filters: OpenEventFilters): OpenEventRecord[] {
   const sport = filters.sport?.trim();
   const zip = filters.zip?.trim();
   const startsAfter = filters.startsAfter ? new Date(filters.startsAfter) : null;
   const startsBefore = filters.startsBefore ? new Date(filters.startsBefore) : null;
   const refProfile = filters.refProfile;
-  const matchRefSports = refHasSportsConfigured(refProfile);
 
   return events.filter((event) => {
     const start = new Date(event.starts_at);
+    // Drop finished games so they leave Find Games / map / request flows.
+    if (!isEventOpenForRequests(event)) return false;
     if (startsAfter && !Number.isNaN(startsAfter.getTime()) && start < startsAfter) return false;
     if (startsBefore && !Number.isNaN(startsBefore.getTime()) && start > startsBefore) return false;
+    // Sport is optional: empty means any sport. Only AND-filter when the user picked one.
     if (sport && event.sport.trim().toLowerCase() !== sport.toLowerCase()) return false;
     if (zip && event.zip_code.trim() !== zip) return false;
-    // Only apply profile sport matching when the ref has sports configured.
-    if (matchRefSports && refProfile && !refOfficiatesSport(refProfile, event.sport)) return false;
     if (filters.payMatchesRef && refProfile) {
       if (!payRangesOverlap(refPayInput(refProfile), eventPayInput(event))) return false;
     }

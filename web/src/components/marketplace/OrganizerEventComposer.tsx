@@ -3,6 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { ALL_SPORTS } from "@/data/sports";
 import { marketplaceCardShadow } from "@/lib/marketplace/airbnb-styles";
+import {
+  ORGANIZER_CONTACT_IN_NOTES_MESSAGE,
+  textContainsOrganizerContact,
+} from "@/lib/marketplace/notes-for-ref";
 
 export type ComposerEventValues = {
   title: string;
@@ -307,9 +311,19 @@ export function OrganizerEventComposer({
                     rows={3}
                     className={`${inputClass} min-h-[4.5rem] resize-y`}
                     value={values.notes}
-                    onChange={(e) => patch({ notes: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (textContainsOrganizerContact(value)) {
+                        window.alert(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
+                        return;
+                      }
+                      patch({ notes: value });
+                    }}
                     placeholder="Parking, check-in, uniform…"
                   />
+                  <p className="mt-1.5 text-xs text-neutral-500">
+                    Do not include your email or phone number here.
+                  </p>
                 </FieldShell>
               </div>
             ) : null}

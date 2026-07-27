@@ -27,6 +27,9 @@ type CompleteOAuthBody = {
   crewInvite?: string;
   termsAccepted?: boolean;
   acceptedTermsSlug?: string;
+  recommendedAssignorName?: string;
+  recommendedAssignorEmail?: string;
+  recommendedAssignorPhone?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -88,6 +91,9 @@ export async function POST(request: NextRequest) {
     typeof body.travelRadius === "number" && Number.isFinite(body.travelRadius) ? body.travelRadius : null;
   const governingBodies = (body.governingBodies ?? "").trim();
   const crewInvite = (body.crewInvite ?? "").trim();
+  const recommendedAssignorName = (body.recommendedAssignorName ?? "").trim() || null;
+  const recommendedAssignorEmail = (body.recommendedAssignorEmail ?? "").trim() || null;
+  const recommendedAssignorPhone = (body.recommendedAssignorPhone ?? "").trim() || null;
   const now = new Date().toISOString();
   const displayName = `${firstName} ${lastName}`.trim();
 
@@ -139,23 +145,31 @@ export async function POST(request: NextRequest) {
       );
 
     if (role === "ref") {
-      await admin.from("ref_profiles").upsert(
-        {
-          member_id: user.id,
-          is_assignor: isAssignor,
-          primary_sport: primarySport || "Basketball",
-          additional_sports: additionalSports,
-          certification_level: certificationLevel || "Youth / Recreational",
-          gotrefs_id: gotrefsId || null,
-          rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
-          rate_min: rateMin,
-          rate_max: rateMax,
-          rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
-          rate_unit: rateUnit ?? "hour",
-          updated_at: now,
-        },
-        { onConflict: "member_id" }
-      );
+      const profilePayload = {
+        member_id: user.id,
+        is_assignor: isAssignor,
+        primary_sport: primarySport || "Basketball",
+        additional_sports: additionalSports,
+        certification_level: certificationLevel || "Youth / Recreational",
+        gotrefs_id: gotrefsId || null,
+        rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
+        rate_min: rateMin,
+        rate_max: rateMax,
+        rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
+        rate_unit: rateUnit ?? "hour",
+        recommended_assignor_name: recommendedAssignorName,
+        recommended_assignor_email: recommendedAssignorEmail,
+        recommended_assignor_phone: recommendedAssignorPhone,
+        updated_at: now,
+      };
+      const { error: profileError } = await admin.from("ref_profiles").upsert(profilePayload, {
+        onConflict: "member_id",
+      });
+      if (profileError?.message.includes("recommended_assignor")) {
+        const { recommended_assignor_name: _n, recommended_assignor_email: _e, recommended_assignor_phone: _p, ...fallback } =
+          profilePayload;
+        await admin.from("ref_profiles").upsert(fallback, { onConflict: "member_id" });
+      }
       await admin.from("screening_checks").upsert({ ref_member_id: user.id }, { onConflict: "ref_member_id" });
     } else {
       await admin.from("organizer_profiles").upsert({ member_id: user.id }, { onConflict: "member_id" });

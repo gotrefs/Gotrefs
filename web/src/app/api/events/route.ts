@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { sanitizeBoostIds } from "@/lib/boosts";
+import {
+  ORGANIZER_CONTACT_IN_NOTES_MESSAGE,
+  sanitizeNotesForStorage,
+  textContainsOrganizerContact,
+} from "@/lib/marketplace/notes-for-ref";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -125,6 +130,11 @@ export async function POST(request: Request) {
   const venueLng =
     venueLngRaw == null || venueLngRaw === ("" as unknown as number) ? null : Number(venueLngRaw);
 
+  const rawNotes = body.notes?.trim() || "";
+  if (textContainsOrganizerContact(rawNotes)) {
+    return NextResponse.json({ error: ORGANIZER_CONTACT_IN_NOTES_MESSAGE }, { status: 400 });
+  }
+
   const row = {
     organizer_member_id: user.id,
     title: (body.title ?? "").trim() || "Event",
@@ -143,7 +153,7 @@ export async function POST(request: Request) {
     pay_type: payType,
     pay_min: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : null,
     pay_max: payType === "range" && Number.isFinite(payMaxNum as number) ? payMaxNum : null,
-    notes: body.notes?.trim() || null,
+    notes: sanitizeNotesForStorage(rawNotes),
     boosts: sanitizeBoostIds(body.boosts),
     status: "published" as const,
   };

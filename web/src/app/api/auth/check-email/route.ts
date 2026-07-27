@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findUserByEmail } from "@/lib/auth/admin-users";
+import { isReusableOnboardingTestEmail } from "@/lib/auth/onboarding-test-account";
 import { validateEmail } from "@/lib/auth/validation";
 import { serverEnv } from "@/lib/env/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -30,6 +31,15 @@ export async function POST(request: Request) {
   const email = (body.email ?? "").trim().toLowerCase();
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
+
+  // Always treat the reusable onboarding tester as "new" so signup/onboarding stays available.
+  if (isReusableOnboardingTestEmail(email)) {
+    return NextResponse.json({
+      exists: false,
+      providers: [],
+      reusableOnboardingTester: true,
+    });
+  }
 
   const user = await findUserByEmail(admin, email);
   const appProviders = Array.isArray(user?.app_metadata?.providers)

@@ -5,6 +5,7 @@ import {
   type OpenEventRecord,
   type RefProfileForMatch,
 } from "@/lib/marketplace/event-filters";
+import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 import { publicMapCoordsFromVenue } from "@/lib/maps/event-map-coords";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -61,13 +62,17 @@ export async function GET(request: NextRequest) {
   let events: Record<string, unknown>[] | null = null;
   let eventsErr: { message?: string } | null = null;
   for (const columns of selectCandidates) {
+    // Always hide finished games from the map / request list, even when a date filter is set.
     let eventsQuery = admin
       .from("scheduled_events")
       .select(columns)
       .eq("status", "published")
-      .gte("starts_at", startsAfter || now)
+      .gte("ends_at", now)
       .order("starts_at", { ascending: true })
       .limit(200);
+    if (startsAfter) {
+      eventsQuery = eventsQuery.gte("starts_at", startsAfter);
+    }
     if (startsBefore) {
       eventsQuery = eventsQuery.lte("starts_at", startsBefore);
     }
@@ -173,6 +178,7 @@ export async function GET(request: NextRequest) {
       const { venue_lat: _lat, venue_lng: _lng, ...publicEvent } = event;
       return {
         ...publicEvent,
+        notes: notesForRefDisplay(typeof event.notes === "string" ? event.notes : null),
         map_lat: mapCoords?.lat ?? null,
         map_lng: mapCoords?.lng ?? null,
         booked_count: bookingCounts.get(event.id) ?? 0,

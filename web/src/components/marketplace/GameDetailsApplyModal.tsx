@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
+import { isEventOpenForRequests, type OpenEventRecord } from "@/lib/marketplace/event-filters";
+import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 import { EVENT_PRIVACY_RADIUS_MILES } from "@/lib/maps/geo";
 import { formatPayRangeLabel } from "@/lib/pay-range";
 
@@ -68,12 +69,16 @@ export function GameDetailsApplyModal({
   if (!event) return null;
 
   const requested = Boolean(alreadyRequested);
+  const ended = !isEventOpenForRequests(event);
   const slotsLeft = Math.max(0, event.officials_needed - (event.booked_count ?? 0));
-  const applyLabel = requested
-    ? "Requested to work"
-    : requesting
-      ? "Submitting…"
-      : "Apply";
+  const applyLabel = ended
+    ? "Game ended"
+    : requested
+      ? "Requested to work"
+      : requesting
+        ? "Submitting…"
+        : "Apply";
+  const notes = notesForRefDisplay(event.notes);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 sm:items-center">
@@ -148,19 +153,19 @@ export function GameDetailsApplyModal({
                 {slotsLeft} official slot{slotsLeft === 1 ? "" : "s"} available
               </dd>
             </div>
-            {event.notes ? (
+            {notes ? (
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                   Notes
                 </dt>
-                <dd className="mt-0.5 text-neutral-700">{event.notes}</dd>
+                <dd className="mt-0.5 text-neutral-700">{notes}</dd>
               </div>
             ) : null}
           </dl>
 
           <button
             type="button"
-            disabled={requested || requesting || slotsLeft === 0}
+            disabled={ended || requested || requesting || slotsLeft === 0}
             onClick={() => onApply(event)}
             className={`mt-1 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
               requested
@@ -168,7 +173,7 @@ export function GameDetailsApplyModal({
                 : "bg-[#d81d24] hover:bg-[#c01820] disabled:opacity-60"
             }`}
           >
-            {slotsLeft === 0 && !requested ? "No openings left" : applyLabel}
+            {ended ? "Game ended" : slotsLeft === 0 && !requested ? "No openings left" : applyLabel}
           </button>
         </div>
       </div>

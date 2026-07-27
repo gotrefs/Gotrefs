@@ -15,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ error }, { status: 500 });
     }
 
-    return NextResponse.json({ entries });
+    return NextResponse.json({ entries, total: entries.length });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load verification queue.";
     return NextResponse.json({ error: message }, { status: 503 });

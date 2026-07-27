@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboardRole } from "./RoleContext";
 
@@ -10,6 +10,8 @@ type NotificationItem = {
   kind: "system" | "message";
   title: string;
   body: string;
+  fromLabel?: string;
+  createdAt?: string | null;
   targetUrl: string;
   tone?: "red" | "amber" | "green" | "blue";
 };
@@ -89,11 +91,95 @@ function NotificationDropdown({
   );
 }
 
+function MessagesPanel({
+  open,
+  items,
+  returnLabel,
+  returnHref,
+  onClose,
+}: {
+  open: boolean;
+  items: NotificationItem[];
+  returnLabel: string;
+  returnHref: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-white">
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-6">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Inbox</p>
+          <h2 className="font-display text-xl font-black text-[var(--navy)]">Messages</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            router.push(returnHref);
+          }}
+          className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+        >
+          {returnLabel}
+        </button>
+      </header>
+      <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <p className="mb-4 text-sm text-[var(--muted)]">
+          Messages from GotREFS admins, event organizers, and assignors appear here.
+        </p>
+        <div className="space-y-3">
+          {items.map((item) => (
+            <article
+              key={item.id}
+              className={`rounded-2xl border p-4 ${itemToneClasses(item.tone)}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black">{item.title}</p>
+                  {item.fromLabel ? (
+                    <p className="mt-1 text-xs font-semibold opacity-80">From {item.fromLabel}</p>
+                  ) : null}
+                </div>
+                {item.createdAt ? (
+                  <p className="text-xs opacity-70">{new Date(item.createdAt).toLocaleString()}</p>
+                ) : null}
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 opacity-90">{item.body}</p>
+              {item.targetUrl.includes("panel=") ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push(item.targetUrl);
+                  }}
+                  className="mt-3 text-xs font-black underline underline-offset-2"
+                >
+                  Open related page
+                </button>
+              ) : null}
+            </article>
+          ))}
+          {items.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-8 text-center text-sm text-[var(--muted)]">
+              No messages yet. When GotREFS or an organizer contacts you, it will show up here.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardNotificationCenter() {
   const supabase = useMemo(() => createClient(), []);
   const { currentRole } = useDashboardRole();
+  const searchParams = useSearchParams();
   const [systemItems, setSystemItems] = useState<NotificationItem[]>([]);
   const [messageItems, setMessageItems] = useState<NotificationItem[]>([]);
+  const [messagesOpen, setMessagesOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -165,10 +251,16 @@ export function DashboardNotificationCenter() {
 
     const { data: inquiries } = await supabase
       .from("ref_inquiries")
-      .select("id, subject, message, members ( display_name )")
+      .select("id, subject, message, created_at, members ( display_name )")
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(6);
+      .limit(40);
+
+    const { data: verification } = await supabase
+      .from("ref_verification_submissions")
+      .select("status, admin_notes, updated_at, reviewed_at, fix_required_steps")
+      .eq("ref_member_id", user.id)
+      .maybeSingle();
 
     setSystemItems(
       offers?.map((offer) => {
@@ -184,24 +276,57 @@ export function DashboardNotificationCenter() {
       }) ?? []
     );
 
-    setMessageItems(
-      inquiries?.map((inquiry) => {
-        const member = Array.isArray(inquiry.members) ? inquiry.members[0] : inquiry.members;
-        return {
-          id: `inquiry-${inquiry.id}`,
-          kind: "message" as const,
-          title: inquiry.subject,
-          body: `From ${member?.display_name ?? "Event organizer"}: ${inquiry.message}`,
-          targetUrl: "/dashboard/referee?panel=messages",
-          tone: "blue" as const,
-        };
-      }) ?? []
-    );
+    const messages: NotificationItem[] = [];
+
+    if (verification?.admin_notes?.trim()) {
+      const status = verification.status ?? "draft";
+      const tone =
+        status === "approved" ? "green" : status === "rejected" ? "red" : status === "submitted" ? "blue" : "amber";
+      messages.push({
+        id: `admin-verification-${verification.reviewed_at ?? verification.updated_at ?? "note"}`,
+        kind: "message",
+        title:
+          status === "approved"
+            ? "Verification approved"
+            : status === "rejected"
+              ? "Verification not approved"
+              : Array.isArray(verification.fix_required_steps) && verification.fix_required_steps.length > 0
+                ? "GotREFS requested updates"
+                : "Message from GotREFS",
+        body: verification.admin_notes.trim(),
+        fromLabel: "GotREFS admin",
+        createdAt: verification.reviewed_at ?? verification.updated_at ?? null,
+        targetUrl: "/dashboard/referee",
+        tone,
+      });
+    }
+
+    for (const inquiry of inquiries ?? []) {
+      const member = Array.isArray(inquiry.members) ? inquiry.members[0] : inquiry.members;
+      messages.push({
+        id: `inquiry-${inquiry.id}`,
+        kind: "message",
+        title: inquiry.subject || "Organizer message",
+        body: inquiry.message,
+        fromLabel: member?.display_name ?? "Event organizer",
+        createdAt: inquiry.created_at,
+        targetUrl: "/dashboard/referee",
+        tone: "blue",
+      });
+    }
+
+    setMessageItems(messages);
   }, [currentRole, supabase]);
 
   useEffect(() => {
     queueMicrotask(() => void load());
   }, [load]);
+
+  useEffect(() => {
+    if (searchParams.get("panel") === "messages") {
+      setMessagesOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const channel = supabase
@@ -218,6 +343,9 @@ export function DashboardNotificationCenter() {
         setToast("New message received.");
         void load();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "ref_verification_submissions" }, () => {
+        void load();
+      })
       .subscribe();
 
     return () => {
@@ -231,10 +359,32 @@ export function DashboardNotificationCenter() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const returnHref = currentRole === "organizer" ? "/dashboard/organizer" : "/dashboard/referee";
+  const returnLabel = currentRole === "organizer" ? "Return to Events" : "Return to Games";
+
   return (
     <>
       <NotificationDropdown icon="🔔" label="Notifications" items={systemItems} />
-      <NotificationDropdown icon="✉" label="Messages" items={messageItems} />
+      <button
+        type="button"
+        onClick={() => setMessagesOpen(true)}
+        className="relative rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm font-black text-[var(--navy)] transition-all duration-200 hover:bg-slate-50"
+        aria-label="Messages"
+      >
+        <span aria-hidden="true">✉</span>
+        {messageItems.length > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--red)] px-1 text-[10px] font-black text-white">
+            {messageItems.length}
+          </span>
+        )}
+      </button>
+      <MessagesPanel
+        open={messagesOpen}
+        items={messageItems}
+        returnLabel={returnLabel}
+        returnHref={returnHref}
+        onClose={() => setMessagesOpen(false)}
+      />
       {toast && (
         <div className="fixed right-4 top-20 z-[60] rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-bold text-[var(--navy)] shadow-2xl">
           {toast}

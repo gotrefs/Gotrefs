@@ -6,6 +6,10 @@ import {
   signupDashboardPath,
 } from "@/lib/auth/email-confirmation";
 import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
+import {
+  isReusableOnboardingTestEmail,
+  resetReusableOnboardingTestAccount,
+} from "@/lib/auth/onboarding-test-account";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
@@ -39,6 +43,9 @@ type RegisterBody = {
   verificationSkipped?: boolean;
   termsAccepted?: boolean;
   acceptedTermsSlug?: string;
+  recommendedAssignorName?: string;
+  recommendedAssignorEmail?: string;
+  recommendedAssignorPhone?: string;
 };
 
 type ProfileSetupInput = {
@@ -52,6 +59,9 @@ type ProfileSetupInput = {
   rateType: "exact" | "range" | null;
   rateUnit: "hour" | "game" | null;
   gotrefsId: string;
+  recommendedAssignorName: string | null;
+  recommendedAssignorEmail: string | null;
+  recommendedAssignorPhone: string | null;
 };
 
 async function setupSignupProfiles(
@@ -70,6 +80,9 @@ async function setupSignupProfiles(
     rateType,
     rateUnit,
     gotrefsId,
+    recommendedAssignorName,
+    recommendedAssignorEmail,
+    recommendedAssignorPhone,
   } = input;
 
   if (isAssignor) {
@@ -103,12 +116,34 @@ async function setupSignupProfiles(
         rate_max: rateMax,
         rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
         rate_unit: rateUnit ?? "hour",
+        recommended_assignor_name: recommendedAssignorName,
+        recommended_assignor_email: recommendedAssignorEmail,
+        recommended_assignor_phone: recommendedAssignorPhone,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "member_id" }
     );
     if (error) {
       // Profile row is created by trigger; non-fatal if upsert fails.
+      // Retry without assignor columns if migration has not been applied yet.
+      if (error.message.includes("recommended_assignor")) {
+        await admin.from("ref_profiles").upsert(
+          {
+            member_id: userId,
+            primary_sport: primarySport || "Basketball",
+            additional_sports: additionalSports,
+            certification_level: certificationLevel || "Youth / Recreational",
+            gotrefs_id: gotrefsId || null,
+            rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
+            rate_min: rateMin,
+            rate_max: rateMax,
+            rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
+            rate_unit: rateUnit ?? "hour",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "member_id" }
+        );
+      }
     }
   }
 
@@ -173,19 +208,35 @@ export async function POST(request: NextRequest) {
   const governingBodies = (body.governingBodies ?? "").trim();
   const crewInvite = (body.crewInvite ?? "").trim();
   const verificationSkipped = body.verificationSkipped === true;
+  const recommendedAssignorName = (body.recommendedAssignorName ?? "").trim() || null;
+  const recommendedAssignorEmail = (body.recommendedAssignorEmail ?? "").trim() || null;
+  const recommendedAssignorPhone = (body.recommendedAssignorPhone ?? "").trim() || null;
   const requiredTermsSlug = role === "organizer" ? "event-organizer-terms" : "referee-official-terms";
   const termsAccepted = body.termsAccepted === true && body.acceptedTermsSlug === requiredTermsSlug;
-  const skipConfirmation = serverEnv.skipEmailConfirmation();
+  const reusableOnboardingTester = isReusableOnboardingTestEmail(email);
+  const skipConfirmation = serverEnv.skipEmailConfirmation() || reusableOnboardingTester;
   const pendingRedirect = signupDashboardPath(role, isAssignor);
 
   const emailErr = validateEmail(email);
   if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
 
-  const fnErr = validateName(firstName, "First name");
-  if (fnErr) return NextResponse.json({ error: fnErr }, { status: 400 });
+  if (role !== "ref") {
+    const fnErr = validateName(firstName, "First name");
+    if (fnErr) return NextResponse.json({ error: fnErr }, { status: 400 });
 
-  const lnErr = validateName(lastName, "Last name");
-  if (lnErr) return NextResponse.json({ error: lnErr }, { status: 400 });
+    const lnErr = validateName(lastName, "Last name");
+    if (lnErr) return NextResponse.json({ error: lnErr }, { status: 400 });
+  } else {
+    if (!firstName && !lastName) {
+      return NextResponse.json({ error: "Enter your name to continue." }, { status: 400 });
+    }
+    if (firstName.length > 100) {
+      return NextResponse.json({ error: "First name is too long." }, { status: 400 });
+    }
+    if (lastName.length > 100) {
+      return NextResponse.json({ error: "Last name is too long." }, { status: 400 });
+    }
+  }
 
   const pwErr = validatePasswordStrength(password);
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
@@ -228,26 +279,39 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = createServiceClient();
-    const existingUser = await findUserByEmail(admin, email);
-    if (existingUser) {
-      const providers = Array.isArray(existingUser.app_metadata?.providers)
-        ? existingUser.app_metadata.providers.filter((provider): provider is string => typeof provider === "string")
-        : [];
-      const identityProviders =
-        existingUser.identities
-          ?.map((identity) => identity.provider)
-          .filter((provider): provider is string => typeof provider === "string") ?? [];
-      const allProviders = Array.from(new Set([...providers, ...identityProviders]));
-      return NextResponse.json(
-        {
-          error: allProviders.includes("google")
-            ? isOAuthProviderEnabled("google")
-              ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
-              : "That email already has a GotREFS account connected to Google. Log in and use Forgot password to set an email password."
-            : "That email already has a GotREFS account. Log in instead, or use a different email.",
-        },
-        { status: 409 }
-      );
+    if (reusableOnboardingTester) {
+      const reset = await resetReusableOnboardingTestAccount(admin, email);
+      if (reset.error) {
+        return NextResponse.json(
+          {
+            error:
+              "Could not reset the reusable onboarding test account. Check SUPABASE_SERVICE_ROLE_KEY and try again.",
+          },
+          { status: 503 }
+        );
+      }
+    } else {
+      const existingUser = await findUserByEmail(admin, email);
+      if (existingUser) {
+        const providers = Array.isArray(existingUser.app_metadata?.providers)
+          ? existingUser.app_metadata.providers.filter((provider): provider is string => typeof provider === "string")
+          : [];
+        const identityProviders =
+          existingUser.identities
+            ?.map((identity) => identity.provider)
+            .filter((provider): provider is string => typeof provider === "string") ?? [];
+        const allProviders = Array.from(new Set([...providers, ...identityProviders]));
+        return NextResponse.json(
+          {
+            error: allProviders.includes("google")
+              ? isOAuthProviderEnabled("google")
+                ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
+                : "That email already has a GotREFS account connected to Google. Log in and use Forgot password to set an email password."
+              : "That email already has a GotREFS account. Log in instead, or use a different email.",
+          },
+          { status: 409 }
+        );
+      }
     }
   } catch {
     // If service-role lookup is unavailable, continue and let Supabase handle signup.
@@ -280,6 +344,9 @@ export async function POST(request: NextRequest) {
     rateType,
     rateUnit,
     gotrefsId,
+    recommendedAssignorName: role === "ref" ? recommendedAssignorName : null,
+    recommendedAssignorEmail: role === "ref" ? recommendedAssignorEmail : null,
+    recommendedAssignorPhone: role === "ref" ? recommendedAssignorPhone : null,
   };
 
   if (!data.session && userId && !skipConfirmation) {

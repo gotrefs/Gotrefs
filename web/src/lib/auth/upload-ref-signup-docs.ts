@@ -4,6 +4,7 @@ type RefSignupUploads = {
   govIdFront: File;
   govIdBack: File;
   certificationDocument: File;
+  profilePhoto?: File | null;
 };
 
 type RefSignupProfile = {
@@ -27,11 +28,15 @@ export async function uploadRefSignupDocuments(
   files: RefSignupUploads,
   profile?: RefSignupProfile
 ) {
-  const [governmentIdFrontPath, governmentIdBackPath, certificationDocumentPath] = await Promise.all([
-    uploadVerificationFile(userId, files.govIdFront, "gov_id_front"),
-    uploadVerificationFile(userId, files.govIdBack, "gov_id_back"),
-    uploadVerificationFile(userId, files.certificationDocument, "certification"),
-  ]);
+  const [governmentIdFrontPath, governmentIdBackPath, certificationDocumentPath, profilePhotoPath] =
+    await Promise.all([
+      uploadVerificationFile(userId, files.govIdFront, "gov_id_front"),
+      uploadVerificationFile(userId, files.govIdBack, "gov_id_back"),
+      uploadVerificationFile(userId, files.certificationDocument, "certification"),
+      files.profilePhoto
+        ? uploadVerificationFile(userId, files.profilePhoto, "profile_photo")
+        : Promise.resolve(null),
+    ]);
 
   const supabase = createClient();
   const { error } = await supabase
@@ -52,6 +57,21 @@ export async function uploadRefSignupDocuments(
     .eq("member_id", userId);
 
   if (error) throw error;
+
+  if (profilePhotoPath) {
+    const { error: memberError } = await supabase
+      .from("members")
+      .update({
+        profile_picture_url: profilePhotoPath,
+      })
+      .eq("id", userId);
+    if (memberError) throw memberError;
+
+    // Keep auth metadata in sync so ID cards resolve even if members row lags.
+    await supabase.auth.updateUser({
+      data: { profile_picture_url: profilePhotoPath },
+    });
+  }
 }
 
 /** Queue verification for admin review after signup uploads complete. */

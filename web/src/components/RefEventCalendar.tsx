@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 import { formatEventLocation } from "@/data/sports";
+import { isEventOpenForRequests } from "@/lib/marketplace/event-filters";
+import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 
 export type CalendarEvent = {
   id: string;
@@ -125,7 +127,10 @@ export function RefEventCalendar({
       setMsg(evErr.message);
       setEvents([]);
     } else {
-      setEvents((ev as CalendarEvent[]) || []);
+      // Hide finished games from the open calendar / request surface.
+      setEvents(
+        ((ev as CalendarEvent[]) || []).filter((event) => isEventOpenForRequests(event))
+      );
     }
 
     const { data: req } = await supabase
@@ -406,7 +411,10 @@ export function RefEventCalendar({
             </p>
             <p className="mt-3 text-sm">Officials needed: {selected.officials_needed}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotREFS event organizer</p>
-            {selected.notes && <p className="mt-2 text-sm text-[var(--slate)]">{selected.notes}</p>}
+            {(() => {
+              const notes = notesForRefDisplay(selected.notes);
+              return notes ? <p className="mt-2 text-sm text-[var(--slate)]">{notes}</p> : null;
+            })()}
             {eventWorkStatus(selected.id) !== "open" && (
               <p className="mt-3 text-sm font-medium text-[var(--blue)]">
                 Status: {eventStatusLabel(eventWorkStatus(selected.id))}

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { BRAND_NAME } from "@/lib/brand";
 import { emailLayout, escapeHtml } from "@/lib/email/layout";
 import { emailSiteUrl, sendEmail } from "@/lib/email/resend";
+import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 
 async function emailForMemberId(
   admin: SupabaseClient,
@@ -74,31 +75,9 @@ async function eventSummary(
       : "TBD",
     place,
     address: address || place,
-    notes: sanitizeOrganizerNotesForRef(event.notes),
+    notes: notesForRefDisplay(event.notes),
     organizerName: org?.display_name?.trim() || "an organizer",
   };
-}
-
-/** Strip email/phone from organizer notes shown to confirmed refs. */
-function sanitizeOrganizerNotesForRef(notes: string | null | undefined): string {
-  if (!notes?.trim()) return "";
-  return notes
-    .split(/\s*·\s*/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      if (/^contact:/i.test(part)) return "";
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(part)) return "";
-      if (/^(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}$/.test(part.replace(/\s/g, ""))) return "";
-      return part
-        .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "")
-        .replace(/(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g, "")
-        .replace(/\s{2,}/g, " ")
-        .replace(/^[\s,;:·-]+|[\s,;:·-]+$/g, "")
-        .trim();
-    })
-    .filter(Boolean)
-    .join(" · ");
 }
 
 function dashboardUrl(siteUrl: string, path: "/dashboard/referee" | "/dashboard/organizer") {

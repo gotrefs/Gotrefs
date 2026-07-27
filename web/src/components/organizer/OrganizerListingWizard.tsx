@@ -1,10 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ListingPhotoCarousel } from "@/components/marketplace/ListingPhotoCarousel";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
 import { VenuePinMap } from "@/components/organizer/VenuePinMap";
 import { SportsFields } from "@/components/SportsFields";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
+import {
+  ORGANIZER_CONTACT_IN_NOTES_MESSAGE,
+  textContainsOrganizerContact,
+} from "@/lib/marketplace/notes-for-ref";
+
+function SportListingPreview({
+  sport,
+  badge,
+  roundedClass = "rounded-[2rem]",
+}: {
+  sport: string;
+  badge?: string;
+  roundedClass?: string;
+}) {
+  const visual = sportListingVisual(sport || "Basketball");
+  return (
+    <div className={`overflow-hidden ${roundedClass} bg-neutral-100 shadow-sm ring-1 ring-black/5`}>
+      <ListingPhotoCarousel
+        images={visual.photos}
+        alt={`${sport || "Sport"} listing preview`}
+        gradientClass={visual.gradient}
+        emoji={visual.emoji}
+        badge={badge ?? (sport || undefined)}
+      />
+    </div>
+  );
+}
 
 export type OrganizerWizardDraft = {
   venueType: string;
@@ -370,8 +398,6 @@ export function OrganizerListingWizard({
     ...initialDraft,
   });
 
-  const visual = sportListingVisual(draft.sport || "Basketball");
-
   const previewTitle = useMemo(() => {
     const place = draft.city ? `${draft.city}, ${draft.state || "CA"}` : "your city";
     const venue = VENUE_TYPES.find((v) => v.id === draft.venueType)?.label ?? "Venue";
@@ -464,6 +490,10 @@ export function OrganizerListingWizard({
     }
     if (screen === "sport" && !draft.sport.trim()) {
       setError("Choose a primary sport.");
+      return;
+    }
+    if (screen === "refInstructions" && textContainsOrganizerContact(draft.refInstructions)) {
+      setError(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
       return;
     }
     if (screen === "bio") {
@@ -597,11 +627,7 @@ export function OrganizerListingWizard({
                   refs you need.
                 </p>
               </div>
-              <div className="overflow-hidden rounded-[2rem] bg-[#dbe7f3]">
-                <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-7xl`}>
-                  {visual.emoji}
-                </div>
-              </div>
+              <SportListingPreview sport={draft.sport || "Basketball"} />
             </div>
           )}
 
@@ -699,9 +725,10 @@ export function OrganizerListingWizard({
               </div>
               <div className="rounded-[2rem] bg-[#cfe0f5] p-8">
                 <div className="mx-auto max-w-xs overflow-hidden rounded-3xl bg-white shadow-xl">
-                  <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-5xl`}>
-                    {visual.emoji}
-                  </div>
+                  <SportListingPreview
+                    sport={draft.sport || "Basketball"}
+                    roundedClass="rounded-none"
+                  />
                   <div className="p-4">
                     <p className="font-semibold text-neutral-900">{previewTitle}</p>
                     <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
@@ -845,9 +872,7 @@ export function OrganizerListingWizard({
                   so the right officials show up prepared.
                 </p>
               </div>
-              <div className={`overflow-hidden rounded-[2rem] bg-gradient-to-br ${visual.gradient}`}>
-                <div className="flex aspect-[4/3] items-center justify-center text-7xl">{visual.emoji}</div>
-              </div>
+              <SportListingPreview sport={draft.sport || "Basketball"} />
             </div>
           )}
 
@@ -916,10 +941,20 @@ export function OrganizerListingWizard({
               <textarea
                 className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"
                 value={draft.refInstructions}
-                onChange={(e) => patch({ refInstructions: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (textContainsOrganizerContact(value)) {
+                    window.alert(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
+                    return;
+                  }
+                  patch({ refInstructions: value });
+                }}
                 placeholder="e.g. Park in Lot B, check in at the front desk, black pants required…"
                 maxLength={600}
               />
+              <p className="mt-2 text-sm text-neutral-500">
+                Do not include your email or phone — GotREFS keeps contact private until a booking is confirmed.
+              </p>
               <p className="mt-2 text-right text-xs text-neutral-500">{draft.refInstructions.length}/600</p>
             </div>
           )}
@@ -953,9 +988,7 @@ export function OrganizerListingWizard({
                   listing.
                 </p>
               </div>
-              <div className={`overflow-hidden rounded-[2rem] bg-gradient-to-br ${visual.gradient}`}>
-                <div className="flex aspect-[4/3] items-center justify-center text-7xl">{visual.emoji}</div>
-              </div>
+              <SportListingPreview sport={draft.sport || "Basketball"} />
             </div>
           )}
 
@@ -1193,12 +1226,11 @@ export function OrganizerListingWizard({
               </p>
               <div className="mt-6 max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-neutral-200">
                 <div className="relative">
-                  <div className={`aspect-[4/3] bg-gradient-to-br ${visual.gradient} flex items-center justify-center text-6xl`}>
-                    {visual.emoji}
-                  </div>
-                  <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-neutral-800">
-                    ● Posted
-                  </span>
+                  <SportListingPreview
+                    sport={draft.sport || "Basketball"}
+                    badge="● Posted"
+                    roundedClass="rounded-none"
+                  />
                 </div>
                 <div className="p-4">
                   <p className="font-semibold text-neutral-900">{previewTitle}</p>

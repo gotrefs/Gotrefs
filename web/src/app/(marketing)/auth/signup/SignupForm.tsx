@@ -82,7 +82,7 @@ export function SignupForm() {
   const canContinue = useMemo(() => {
     if (!isRef) return true;
     if (step === 0) {
-      return firstName.trim().length >= 2 && lastName.trim().length >= 2 && Boolean(primarySport.trim());
+      return Boolean(firstName.trim() || lastName.trim()) && Boolean(primarySport.trim());
     }
     if (step === 1) return Boolean(baseCity.trim() && workRegions.length && travelRadius.trim());
     return true;
@@ -310,7 +310,6 @@ export function SignupForm() {
                     <span className="font-medium text-[var(--blue-text)]">First name</span>
                     <input
                       type="text"
-                      required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       className="rounded-xl border border-[var(--border)] px-3 py-3"
@@ -322,7 +321,6 @@ export function SignupForm() {
                     <span className="font-medium text-[var(--blue-text)]">Last name</span>
                     <input
                       type="text"
-                      required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       className="rounded-xl border border-[var(--border)] px-3 py-3"
@@ -331,6 +329,7 @@ export function SignupForm() {
                     />
                   </label>
                 </div>
+                <p className="mt-2 text-xs text-[var(--muted)]">Enter first name, last name, or both.</p>
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
                   {REF_AVATARS.map((avatar) => {
                     const active = selectedAvatar === avatar.id && !avatarPhotoUrl;

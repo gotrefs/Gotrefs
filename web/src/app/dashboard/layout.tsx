@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { resolveMemberRole } from "@/lib/member-role";
@@ -30,7 +31,11 @@ export default async function DashboardLayout({
             <nav className="flex items-center gap-3 text-sm">
               {user && !isAdmin && <DashboardRoleLabel role={initialRole} />}
               {user && isAdmin && <AdminDashboardLink />}
-              {user && !isAdmin && <DashboardNotificationCenter />}
+              {user && !isAdmin && (
+                <Suspense fallback={null}>
+                  <DashboardNotificationCenter />
+                </Suspense>
+              )}
               {user && <SignOutButton />}
             </nav>
           </div>

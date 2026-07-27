@@ -73,12 +73,20 @@ export async function POST(request: Request) {
 
   const { data: event, error: eventError } = await admin
     .from("scheduled_events")
-    .select("id, title, status, city, state, zip_code, starts_at")
+    .select("id, title, status, city, state, zip_code, starts_at, ends_at")
     .eq("id", body.eventId)
     .single();
 
   if (eventError || !event || event.status !== "published") {
-    return NextResponse.json({ error: "This event is not available for applications." }, { status: 404 });
+    return NextResponse.json({ error: "This event is no longer available for applications." }, { status: 404 });
+  }
+
+  const eventEnd = new Date(event.ends_at || event.starts_at);
+  if (!Number.isNaN(eventEnd.getTime()) && eventEnd.getTime() < Date.now()) {
+    return NextResponse.json(
+      { error: "This game has already ended, so requests are closed." },
+      { status: 400 }
+    );
   }
 
   const eventId = event.id;

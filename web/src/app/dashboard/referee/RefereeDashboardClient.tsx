@@ -11,9 +11,8 @@ import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueMo
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
-import { BRAND_NAME } from "@/lib/brand";
-import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
-import { downloadRefIdCardPdf, formatCardValidThrough } from "@/lib/ref-id-card-pdf";
+import { findStoredProfilePhotoPath, resolveProfilePhotoUrl } from "@/lib/profile-photo";
+import { formatCardValidThrough } from "@/lib/ref-id-card-pdf";
 import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
@@ -24,15 +23,6 @@ import {
   resubmitNoticeTitle,
   type RefVerificationStepKey,
 } from "@/lib/ref-verification-steps";
-
-type InquiryRow = {
-  id: string;
-  subject: string;
-  message: string;
-  created_at: string;
-  organizer_member_id: string;
-  members: { display_name: string } | { display_name: string }[] | null;
-};
 
 type Screening = {
   status: string;
@@ -118,8 +108,6 @@ export default function RefereeDashboardClient() {
   const router = useRouter();
   const gamesRef = useRef<HTMLDivElement | null>(null);
   const marketplaceRef = useRef<HTMLElement | null>(null);
-  const notificationsRef = useRef<HTMLElement | null>(null);
-  const messagesRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileWizard, setProfileWizard] = useState<ProfileWizardState | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -162,15 +150,12 @@ export default function RefereeDashboardClient() {
     title?: string;
     message: string;
     items?: string[];
-    /** When true, show approval-only popup (no download CTA). */
-    cardAlreadyDownloaded?: boolean;
   } | null>(null);
   const [applicationDecisionNotice, setApplicationDecisionNotice] = useState<{
     type: "accepted" | "declined";
     title: string;
     message: string;
   } | null>(null);
-  const [downloadingCard, setDownloadingCard] = useState(false);
   const [assignorRecommendOpen, setAssignorRecommendOpen] = useState(false);
   const [assignorName, setAssignorName] = useState("");
   const [assignorEmail, setAssignorEmail] = useState("");
@@ -181,7 +166,6 @@ export default function RefereeDashboardClient() {
   const [assignorSaving, setAssignorSaving] = useState(false);
   const [rosterEntries, setRosterEntries] = useState<AssignorRosterEntry[]>([]);
   const [rosterSaving, setRosterSaving] = useState(false);
-  const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
   const [myRatingAverage, setMyRatingAverage] = useState<number | null>(null);
   const [myRatingCount, setMyRatingCount] = useState(0);
   const [myReviews, setMyReviews] = useState<PublicReview[]>([]);
@@ -206,10 +190,21 @@ export default function RefereeDashboardClient() {
       .select("profile_picture_url")
       .eq("id", user.id)
       .maybeSingle();
-    const photoSource =
+    let photoSource =
       memberRow?.profile_picture_url ||
       (typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null) ||
       (typeof meta.avatar_url === "string" ? meta.avatar_url : null);
+
+    // Recover photos that uploaded to storage but never saved on members (e.g. bad updated_at write).
+    if (!photoSource) {
+      const recovered = await findStoredProfilePhotoPath(supabase, user.id);
+      if (recovered) {
+        photoSource = recovered;
+        void supabase.from("members").update({ profile_picture_url: recovered }).eq("id", user.id);
+        void supabase.auth.updateUser({ data: { profile_picture_url: recovered } });
+      }
+    }
+
     setAvatarUrl(await resolveProfilePhotoUrl(supabase, photoSource));
     setCardMeta({
       gotrefsId: typeof meta.gotrefs_id === "string" ? meta.gotrefs_id : undefined,
@@ -428,13 +423,6 @@ export default function RefereeDashboardClient() {
     setVerificationReviewedAt(submission?.reviewed_at || null);
     setVerificationFixRequiredSteps(normalizeFixRequiredSteps(submission?.fix_required_steps));
 
-    const { data: inq } = await supabase
-      .from("ref_inquiries")
-      .select("id, subject, message, created_at, organizer_member_id, members ( display_name )")
-      .eq("ref_member_id", user.id)
-      .order("created_at", { ascending: false });
-    setInquiries((inq as unknown as InquiryRow[]) || []);
-
     if (rp?.is_assignor) {
       try {
         const rosterRes = await fetch("/api/assignor/roster");
@@ -481,7 +469,6 @@ export default function RefereeDashboardClient() {
     setExternalCompany,
     setExternalProofPath,
     setGovIdPath,
-    setInquiries,
     setIsAssignor,
     setLoading,
     setOffers,
@@ -505,7 +492,15 @@ export default function RefereeDashboardClient() {
   ]);
 
   useEffect(() => {
-    if (loading || !memberId || profileWizard) return;
+    if (loading || !memberId) return;
+
+    // If admin decides while the resubmit wizard is open, close it so the popup can show.
+    if (profileWizard?.mode === "resubmit") {
+      if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) return;
+      setProfileWizard(null);
+    } else if (profileWizard) {
+      return;
+    }
 
     // Always re-prompt when GotREFS asked for fixes — don't hide after dismiss until they resubmit.
     if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
@@ -527,28 +522,13 @@ export default function RefereeDashboardClient() {
     if (window.localStorage.getItem(storageKey) === fingerprint) return;
 
     if (refVerificationApproved(verificationStatus)) {
-      const cardAlreadyDownloaded = Boolean(
-        window.localStorage.getItem(`gotrefs-ref-id-card-downloaded:${memberId}`)
-      );
-      if (cardAlreadyDownloaded) {
-        setVerificationNotice({
-          type: "approved",
-          cardAlreadyDownloaded: true,
-          title: "You've been approved",
-          message:
-            verificationAdminNotes ||
-            "Your GotREFS verification is approved. You can now request to work games and receive invites from organizers.",
-        });
-      } else {
-        setVerificationNotice({
-          type: "approved",
-          cardAlreadyDownloaded: false,
-          title: "Download your GotREFS ID card",
-          message:
-            verificationAdminNotes ||
-            "You're approved. Download your digital ID card to show organizers — it's valid for one year from today.",
-        });
-      }
+      setVerificationNotice({
+        type: "approved",
+        title: "You've been approved",
+        message:
+          verificationAdminNotes ||
+          "Your GotREFS verification is approved. You can now request to work games and receive invites from organizers.",
+      });
       return;
     }
 
@@ -643,59 +623,6 @@ export default function RefereeDashboardClient() {
     searchParams,
   ]);
 
-  function markIdCardDownloaded() {
-    if (!memberId) return;
-    window.localStorage.setItem(`gotrefs-ref-id-card-downloaded:${memberId}`, "1");
-  }
-
-  async function downloadIdCardPdf(): Promise<boolean> {
-    setDownloadingCard(true);
-    try {
-      const safeName = (displayName || "referee").replace(/[^\w\- ]+/g, "").trim() || "referee";
-      await downloadRefIdCardPdf(
-        {
-          fullName: displayName,
-          gotrefsId: cardMeta.gotrefsId,
-          primarySport: sport,
-          additionalSports,
-          certificationLevel: cert,
-          certifiedBy: cardMeta.certifiedBy,
-          rate: rateLabel(),
-          avatarUrl: avatarUrl ?? undefined,
-          avatarLabel,
-          baseCity: cardMeta.baseCity,
-          workRegions: cardMeta.workRegions,
-          travelRadius: cardMeta.travelRadius,
-          availabilitySummary,
-          govIdUploaded: Boolean(govIdPath),
-          certUploaded: Boolean(certDocPath),
-          backgroundStatus: screening?.status,
-          verificationStatus,
-          verificationSkipped: cardMeta.verificationSkipped,
-          profileComplete,
-          validThrough: refVerificationApproved(verificationStatus)
-            ? formatCardValidThrough(verificationReviewedAt)
-            : null,
-        },
-        `GotREFS-ID-${safeName.replace(/\s+/g, "-")}.pdf`
-      );
-      markIdCardDownloaded();
-      setMsg("ID card downloaded. Valid for one year from your approval date.");
-      return true;
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : "Unknown error";
-      setMsg(`Could not create the PDF (${detail}). Try again, or screenshot your on-screen ID card.`);
-      return false;
-    } finally {
-      setDownloadingCard(false);
-    }
-  }
-
-  async function downloadIdCardAndGoToGames() {
-    const ok = await downloadIdCardPdf();
-    if (ok) dismissVerificationNotice();
-  }
-
   function dismissVerificationNotice() {
     if (!memberId) {
       setVerificationNotice(null);
@@ -767,13 +694,13 @@ export default function RefereeDashboardClient() {
 
   async function handleProfileWizardComplete() {
     const wasResubmit = profileWizard?.mode === "resubmit";
+    await load();
     setProfileWizard(null);
     setMsg(
       wasResubmit
         ? "Application successfully submitted — we'll review your updates within 1-2 business days."
         : "Profile updated."
     );
-    await load();
     if (!verificationSubmitted && govIdPath && certDocPath && profileReady) {
       await submitVerificationPackage();
     }
@@ -823,18 +750,25 @@ export default function RefereeDashboardClient() {
       }
       const { error: updateErr } = await supabase
         .from("members")
-        .update({ profile_picture_url: path, updated_at: new Date().toISOString() })
+        .update({ profile_picture_url: path })
         .eq("id", memberId);
       if (updateErr) {
         setMsg(updateErr.message);
         return;
       }
+      await supabase.auth.updateUser({
+        data: { profile_picture_url: path },
+      });
       const signed = await resolveProfilePhotoUrl(supabase, path);
       if (signed) {
         setAvatarUrl((prev) => {
           if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
           return signed;
         });
+      } else {
+        // Keep the local preview if signed URL generation fails.
+        setMsg("Profile photo saved. If it disappears after refresh, try uploading again.");
+        return;
       }
       setMsg("Profile photo added to your GotREFS ID card.");
     } catch {
@@ -856,14 +790,90 @@ export default function RefereeDashboardClient() {
     queueMicrotask(() => void load());
   }, [load]);
 
+  const refreshVerificationStatus = useCallback(async () => {
+    if (!memberId) return;
+    const { data: vs, error: vsError } = await supabase
+      .from("ref_verification_submissions")
+      .select("status, admin_notes, updated_at, reviewed_at, fix_required_steps, resubmitted_at")
+      .eq("ref_member_id", memberId)
+      .maybeSingle();
+
+    let submission: {
+      status?: string | null;
+      admin_notes?: string | null;
+      updated_at?: string | null;
+      reviewed_at?: string | null;
+      fix_required_steps?: unknown;
+    } | null = vs;
+
+    if (vsError?.message.includes("fix_required_steps")) {
+      const fallback = await supabase
+        .from("ref_verification_submissions")
+        .select("status, admin_notes, updated_at, reviewed_at")
+        .eq("ref_member_id", memberId)
+        .maybeSingle();
+      submission = fallback.data;
+    } else if (vsError) {
+      return;
+    }
+
+    setVerificationStatus(submission?.status || "draft");
+    setVerificationAdminNotes(submission?.admin_notes?.trim() || null);
+    setVerificationNotesUpdatedAt(submission?.updated_at || null);
+    setVerificationReviewedAt(submission?.reviewed_at || null);
+    setVerificationFixRequiredSteps(normalizeFixRequiredSteps(submission?.fix_required_steps));
+  }, [memberId, supabase]);
+
+  // Live updates: when admin approves/rejects, the popup appears without a manual refresh.
+  useEffect(() => {
+    if (!memberId) return;
+
+    const channel = supabase
+      .channel(`ref-verification-${memberId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ref_verification_submissions",
+          filter: `ref_member_id=eq.${memberId}`,
+        },
+        () => {
+          void refreshVerificationStatus();
+        }
+      )
+      .subscribe();
+
+    const waitingForDecision =
+      refVerificationPendingReview(verificationStatus) ||
+      refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps);
+
+    const pollId = waitingForDecision
+      ? window.setInterval(() => {
+          void refreshVerificationStatus();
+        }, 8000)
+      : null;
+
+    return () => {
+      void supabase.removeChannel(channel);
+      if (pollId) window.clearInterval(pollId);
+    };
+  }, [
+    memberId,
+    supabase,
+    refreshVerificationStatus,
+    verificationStatus,
+    verificationFixRequiredSteps,
+  ]);
+
   useEffect(() => {
     const panel = searchParams.get("panel");
     if (!panel || loading) return;
-    window.requestAnimationFrame(() => {
-      if (panel === "offers") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (panel === "messages") messagesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (panel === "notifications") notificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    if (panel === "offers" || panel === "my-work") {
+      window.requestAnimationFrame(() => {
+        marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   }, [loading, searchParams]);
 
   async function toggleAssignor(enabled: boolean) {
@@ -1055,11 +1065,6 @@ export default function RefereeDashboardClient() {
   const canApplyToGames = canAcceptOffers;
   const backgroundReady = screening?.status === "clear" || verificationSubmitted;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
-  const hasVerificationMailboxMessage = Boolean(verificationAdminNotes);
-  const hasVerificationStatusNotice =
-    verificationApproved || verificationRejected || verificationNeedsFix;
-  const refNotificationCount =
-    pendingOffers.length + inquiries.length + (hasVerificationMailboxMessage || hasVerificationStatusNotice ? 1 : 0);
   const missingActions: {
     label: string;
     description: string;
@@ -1181,10 +1186,7 @@ export default function RefereeDashboardClient() {
             </p>
             <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
               {verificationNotice.type === "approved"
-                ? verificationNotice.title ||
-                  (verificationNotice.cardAlreadyDownloaded
-                    ? "You've been approved"
-                    : "Download your GotREFS ID card")
+                ? verificationNotice.title || "You've been approved"
                 : verificationNotice.type === "fix_required"
                   ? verificationNotice.title || "Please fix and resubmit your application"
                   : "Verification not approved"}
@@ -1195,15 +1197,6 @@ export default function RefereeDashboardClient() {
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
-            {verificationNotice.type === "approved" && !verificationNotice.cardAlreadyDownloaded && (
-              <p className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-900">
-                Valid for 1 year from your approval date
-                {verificationReviewedAt
-                  ? ` · through ${formatCardValidThrough(verificationReviewedAt)}`
-                  : ""}
-                . Save the PDF to your phone to show organizers at games.
-              </p>
-            )}
             {verificationNotice.type === "fix_required" && verificationNotice.items && verificationNotice.items.length > 0 && (
               <ul className="mt-3 space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-[var(--navy)]">
                 {verificationNotice.items.map((item) => (
@@ -1211,43 +1204,23 @@ export default function RefereeDashboardClient() {
                 ))}
               </ul>
             )}
-            {verificationNotice.type === "approved" && !verificationNotice.cardAlreadyDownloaded ? (
-              <div className="mt-5 space-y-2">
-                <button
-                  type="button"
-                  disabled={downloadingCard}
-                  onClick={() => void downloadIdCardAndGoToGames()}
-                  className="w-full rounded-full bg-green-600 px-4 py-3 text-sm font-black text-white disabled:opacity-60"
-                >
-                  {downloadingCard ? "Preparing PDF…" : "Download your ref ID card"}
-                </button>
-                <button
-                  type="button"
-                  onClick={dismissVerificationNotice}
-                  className="w-full rounded-full border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700"
-                >
-                  Skip for now — browse games
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={dismissVerificationNotice}
-                className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
-                  verificationNotice.type === "approved"
-                    ? "bg-green-600"
-                    : verificationNotice.type === "fix_required"
-                      ? "bg-amber-600"
-                      : "bg-[var(--red)]"
-                }`}
-              >
-                {verificationNotice.type === "approved"
-                  ? "Got it — browse games"
+            <button
+              type="button"
+              onClick={dismissVerificationNotice}
+              className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-black text-white ${
+                verificationNotice.type === "approved"
+                  ? "bg-green-600"
                   : verificationNotice.type === "fix_required"
-                    ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
-                    : "Got it"}
-              </button>
-            )}
+                    ? "bg-amber-600"
+                    : "bg-[var(--red)]"
+              }`}
+            >
+              {verificationNotice.type === "approved"
+                ? "Browse games"
+                : verificationNotice.type === "fix_required"
+                  ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
+                  : "Got it"}
+            </button>
           </div>
         </div>
       )}
@@ -1338,9 +1311,17 @@ export default function RefereeDashboardClient() {
               baseCity={cardMeta.baseCity ?? ""}
               travelRadius={cardMeta.travelRadius ?? ""}
               workRegions={cardMeta.workRegions ?? []}
+              gotrefsId={cardMeta.gotrefsId}
+              onProfilePhotoUpdated={(previewUrl) => {
+                setAvatarUrl((prev) => {
+                  if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                  return previewUrl;
+                });
+              }}
               onComplete={() => void handleProfileWizardComplete()}
               onClose={() => {
                 setProfileWizard(null);
+                void load();
                 if (verificationFixRequiredSteps.length > 0) {
                   setVerificationNotice({
                     type: "fix_required",
@@ -1477,16 +1458,6 @@ export default function RefereeDashboardClient() {
             />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {refVerificationApproved(verificationStatus) && (
-              <button
-                type="button"
-                disabled={downloadingCard}
-                onClick={() => void downloadIdCardPdf()}
-                className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-60"
-              >
-                {downloadingCard ? "Preparing PDF…" : "Download ID card PDF"}
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setAssignorRecommendOpen(true)}
@@ -1504,148 +1475,6 @@ export default function RefereeDashboardClient() {
           ) : null}
         </div>
       ) : null}
-
-      <section ref={notificationsRef} className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-xl font-black text-[var(--navy)]">Notification inbox</h2>
-              {refNotificationCount > 0 && (
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--red)] px-2 text-xs font-black text-white">
-                  {refNotificationCount}!
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Organizer invites, verification updates, and messages show up here.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {verificationApproved && (
-            <article className="rounded-2xl border border-green-200 bg-green-50 p-4 md:col-span-2">
-              <p className="text-xs font-black uppercase tracking-wide text-green-700">Verification approved</p>
-              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                {verificationAdminNotes ||
-                  "Your verification has been approved! You can now request to work games on GotREFS."}
-              </p>
-              {verificationReviewedAt && (
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
-                </p>
-              )}
-            </article>
-          )}
-          {verificationNeedsFix && (
-            <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 md:col-span-2">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-700">Fixes requested</p>
-              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                {verificationAdminNotes ||
-                  "GotREFS needs updates to your application before we can approve you."}
-              </p>
-              {verificationReviewedAt && (
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={openResubmitWizard}
-                className="mt-3 rounded-full bg-amber-600 px-4 py-2 text-xs font-black text-white"
-              >
-                Fix & resubmit
-              </button>
-            </article>
-          )}
-          {verificationRejected && !verificationNeedsFix && (
-            <article className="rounded-2xl border border-red-200 bg-red-50 p-4 md:col-span-2">
-              <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">Verification not approved</p>
-              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                {verificationAdminNotes ||
-                  "Your verification was not approved. Please contact GotREFS support if you have questions."}
-              </p>
-              {verificationReviewedAt && (
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  From GotREFS · {new Date(verificationReviewedAt).toLocaleString()}
-                </p>
-              )}
-            </article>
-          )}
-          {hasVerificationMailboxMessage &&
-            !verificationApproved &&
-            !verificationRejected &&
-            !verificationNeedsFix && (
-            <article className="rounded-2xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
-              <p className="text-xs font-black uppercase tracking-wide text-[var(--blue)]">Verification update</p>
-              <p className="mt-1 text-sm font-bold text-[var(--navy)]">{verificationAdminNotes}</p>
-              {verificationNotesUpdatedAt && (
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  From GotREFS · {new Date(verificationNotesUpdatedAt).toLocaleString()}
-                </p>
-              )}
-            </article>
-          )}
-          {pendingOffers.length > 0 && (
-            <article className="rounded-2xl border border-red-100 bg-red-50 p-4 md:col-span-2">
-              <p className="text-xs font-black uppercase tracking-wide text-[var(--red)]">Organizer invites</p>
-              <p className="mt-1 text-sm font-bold text-[var(--navy)]">
-                You have {pendingOffers.length} pending invite{pendingOffers.length === 1 ? "" : "s"}.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("tab", "my-work");
-                  window.location.assign(url.toString());
-                }}
-                className="mt-3 rounded-full bg-[var(--navy)] px-4 py-2 text-xs font-black text-white"
-              >
-                Review in My Work
-              </button>
-            </article>
-          )}
-          {inquiries.slice(0, 4).map((inq) => {
-            const org = Array.isArray(inq.members) ? inq.members[0] : inq.members;
-            return (
-              <article key={inq.id} className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-amber-700">Organizer message</p>
-                <p className="mt-1 text-sm font-bold text-[var(--navy)]">{inq.subject}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  From {org?.display_name ?? "Event organizer"} · {new Date(inq.created_at).toLocaleString()}
-                </p>
-              </article>
-            );
-          })}
-          {refNotificationCount === 0 && (
-            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)] md:col-span-2">
-              No messages yet. Organizer invites and verification updates will show up here.
-            </div>
-          )}
-        </div>
-      </section>
-
-      {inquiries.length > 0 && (
-        <section ref={messagesRef} className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
-          <h2 className="font-display text-xl font-bold text-[var(--blue)]">Organizer messages</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Event organizers reach you through {BRAND_NAME} — their messages appear here, not your personal email.
-          </p>
-          <ul className="mt-4 space-y-3 text-sm">
-            {inquiries.map((inq) => {
-              const org = Array.isArray(inq.members) ? inq.members[0] : inq.members;
-              return (
-                <li key={inq.id} className="rounded border border-[var(--border)] px-3 py-3">
-                  <p className="font-medium text-[var(--navy)]">{inq.subject}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    From {org?.display_name ?? "Event organizer"} · {new Date(inq.created_at).toLocaleString()}
-                  </p>
-                  <p className="mt-2 whitespace-pre-wrap text-[var(--slate)]">{inq.message}</p>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
 
       {!dismissOfferQueue && pendingOffers.length > 0 && (
         <PendingOfferQueueModal

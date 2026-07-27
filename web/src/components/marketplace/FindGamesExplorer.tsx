@@ -9,6 +9,7 @@ import { MarketplaceMapView } from "@/components/marketplace/MarketplaceMapView"
 import type { MapGamePin } from "@/components/marketplace/MarketplaceMapInner";
 import { PlacesWhereInput } from "@/components/marketplace/PlacesWhereInput";
 import {
+  isEventOpenForRequests,
   payMatchLabel,
   type OpenEventRecord,
   type RefProfileForMatch,
@@ -16,6 +17,27 @@ import {
 import { DEFAULT_SEARCH_RADIUS_MILES, distanceMiles } from "@/lib/maps/geo";
 import { isGoogleMapsConfigured } from "@/lib/maps/google-maps-loader";
 import { geocodeZipBatch } from "@/lib/marketplace/zip-geocode";
+
+function startOfLocalDayIso(dateValue: string): string | null {
+  if (!dateValue.trim()) return null;
+  const date = new Date(`${dateValue.trim()}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function endOfLocalDayIso(dateValue: string): string | null {
+  if (!dateValue.trim()) return null;
+  const date = new Date(`${dateValue.trim()}T23:59:59.999`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function formatWhenSummary(dateFrom: string, dateTo: string): string {
+  if (dateFrom && dateTo) return `${dateFrom} → ${dateTo}`;
+  if (dateFrom) return `From ${dateFrom}`;
+  if (dateTo) return `Until ${dateTo}`;
+  return "";
+}
 
 export function FindGamesExplorer({
   view,
@@ -38,6 +60,7 @@ export function FindGamesExplorer({
     null
   );
   const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [events, setEvents] = useState<OpenEventRecord[]>([]);
   const [refProfile, setRefProfile] = useState<RefProfileForMatch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +69,7 @@ export function FindGamesExplorer({
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [mapPins, setMapPins] = useState<MapGamePin[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
+  const [locationFilteredIds, setLocationFilteredIds] = useState<Set<string> | null>(null);
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
   const [detailsEvent, setDetailsEvent] = useState<OpenEventRecord | null>(null);
 
@@ -53,8 +77,14 @@ export function FindGamesExplorer({
     setLoading(true);
     setMsg(null);
     const params = new URLSearchParams();
+    // Only apply filters the user set — empty means "any".
     if (sport.trim()) params.set("sport", sport.trim());
-    if (dateFrom) params.set("startsAfter", new Date(dateFrom).toISOString());
+
+    const fromIso = startOfLocalDayIso(dateFrom);
+    const toIso = endOfLocalDayIso(dateTo);
+    if (fromIso) params.set("startsAfter", fromIso);
+    if (toIso) params.set("startsBefore", toIso);
+
     try {
       const res = await fetch(`/api/events/open?${params.toString()}`);
       const json = (await res.json()) as {
@@ -67,10 +97,11 @@ export function FindGamesExplorer({
         setEvents([]);
         return;
       }
-      setEvents(json.events ?? []);
+      const openEvents = (json.events ?? []).filter((event) => isEventOpenForRequests(event));
+      setEvents(openEvents);
       setRefProfile(json.refProfile ?? null);
       setRequestedIds(
-        new Set((json.events ?? []).filter((event) => event.already_requested).map((event) => event.id))
+        new Set(openEvents.filter((event) => event.already_requested).map((event) => event.id))
       );
     } catch {
       setMsg({ text: "Could not reach the server.", tone: "err" });
@@ -78,12 +109,59 @@ export function FindGamesExplorer({
     } finally {
       setLoading(false);
     }
-  }, [sport, dateFrom]);
+  }, [sport, dateFrom, dateTo]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 200);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  // Where filter (AND with sport/when): keep games within ~40 miles of the selected place.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function applyWhereFilter() {
+      if (!wherePlace) {
+        setLocationFilteredIds(null);
+        return;
+      }
+
+      const coordsByZip = await geocodeZipBatch(events.map((event) => event.zip_code));
+      if (cancelled) return;
+
+      const allowed = new Set<string>();
+      for (const event of events) {
+        let lat: number | null = null;
+        let lng: number | null = null;
+        if (
+          typeof event.map_lat === "number" &&
+          typeof event.map_lng === "number" &&
+          Number.isFinite(event.map_lat) &&
+          Number.isFinite(event.map_lng)
+        ) {
+          lat = event.map_lat;
+          lng = event.map_lng;
+        } else {
+          const zipKey = event.zip_code.trim().slice(0, 5);
+          const coords = coordsByZip.get(zipKey);
+          if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+          }
+        }
+        if (lat == null || lng == null) continue;
+        if (distanceMiles(wherePlace, { lat, lng }) <= DEFAULT_SEARCH_RADIUS_MILES) {
+          allowed.add(event.id);
+        }
+      }
+      setLocationFilteredIds(allowed);
+    }
+
+    void applyWhereFilter();
+    return () => {
+      cancelled = true;
+    };
+  }, [events, wherePlace]);
 
   useEffect(() => {
     if (view === "list") return;
@@ -134,15 +212,11 @@ export function FindGamesExplorer({
     };
   }, [events, view, wherePlace]);
 
-  const visibleEvents = useMemo(() => {
-    if (!wherePlace || mapPins.length === 0) {
-      if (!wherePlace) return events;
-      // Where set but map pins still loading — show all until filter applies
-      return events;
-    }
-    const allowed = new Set(mapPins.map((pin) => pin.id));
-    return events.filter((event) => allowed.has(event.id));
-  }, [events, mapPins, wherePlace]);
+  const displayEvents = useMemo(() => {
+    if (!wherePlace) return events;
+    if (!locationFilteredIds) return events;
+    return events.filter((event) => locationFilteredIds.has(event.id));
+  }, [events, wherePlace, locationFilteredIds]);
 
   async function applyToEvent(event: OpenEventRecord) {
     setMsg(null);
@@ -210,54 +284,92 @@ export function FindGamesExplorer({
 
   const showSplit = view === "split" || view === "map";
   const showGrid = view === "list" || view === "split";
-  const displayEvents = wherePlace ? visibleEvents : events;
+  const whenSummary = formatWhenSummary(dateFrom, dateTo);
+
+  function syncDateFrom(value: string) {
+    setDateFrom(value);
+    if (dateTo && value && value > dateTo) setDateTo(value);
+  }
+
+  function syncDateTo(value: string) {
+    setDateTo(value);
+    if (dateFrom && value && value < dateFrom) setDateFrom(value);
+  }
 
   return (
     <div className="space-y-6">
       <AirbnbMarketplaceSearch
-          onSearch={() => void load()}
-          searchLabel="Search"
-          fields={[
-            {
-              id: "marketplace-where",
-              label: "Where",
-              value: whereLabel,
-              placeholder: "Search destinations",
-              onChange: setWhereLabel,
-              renderInput: () => (
-                <PlacesWhereInput
-                  id="marketplace-where"
-                  value={whereLabel}
-                  placeholder={
-                    isGoogleMapsConfigured()
-                      ? "Search destinations"
-                      : "Add Google Maps API key for place search"
-                  }
-                  onChange={setWhereLabel}
-                  onPlaceSelect={setWherePlace}
+        onSearch={() => void load()}
+        searchLabel="Search"
+        fields={[
+          {
+            id: "marketplace-where",
+            label: "Where",
+            value: whereLabel,
+            placeholder: "Search destinations",
+            onChange: (value) => {
+              setWhereLabel(value);
+              if (!value.trim()) setWherePlace(null);
+            },
+            renderInput: () => (
+              <PlacesWhereInput
+                id="marketplace-where"
+                value={whereLabel}
+                placeholder={
+                  isGoogleMapsConfigured()
+                    ? "Search destinations"
+                    : "Add Google Maps API key for place search"
+                }
+                onChange={(value) => {
+                  setWhereLabel(value);
+                  if (!value.trim()) setWherePlace(null);
+                }}
+                onPlaceSelect={setWherePlace}
+              />
+            ),
+          },
+          {
+            id: "marketplace-when",
+            label: "When",
+            value: whenSummary,
+            placeholder: "Add dates",
+            onChange: () => undefined,
+            renderInput: () => (
+              <div className="mt-0.5 flex items-center gap-2">
+                <input
+                  id="marketplace-when-from"
+                  type="date"
+                  value={dateFrom}
+                  aria-label="From date"
+                  onChange={(e) => syncDateFrom(e.target.value)}
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-neutral-600 outline-none focus:ring-0"
                 />
-              ),
-            },
-            {
-              id: "marketplace-when",
-              label: "When",
-              value: dateFrom,
-              type: "date",
-              onChange: setDateFrom,
-            },
-            {
-              id: "marketplace-sport",
-              label: "Sport",
-              value: sport,
-              type: "select",
-              options: [
-                { value: "", label: "Any sport" },
-                ...ALL_SPORTS.map((s) => ({ value: s, label: s })),
-              ],
-              onChange: setSport,
-            },
-          ]}
-        />
+                <span className="shrink-0 text-xs font-semibold text-neutral-400">to</span>
+                <input
+                  id="marketplace-when-to"
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  aria-label="To date"
+                  onChange={(e) => syncDateTo(e.target.value)}
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-medium text-neutral-600 outline-none focus:ring-0"
+                />
+              </div>
+            ),
+          },
+          {
+            id: "marketplace-sport",
+            label: "Sport",
+            value: sport,
+            type: "select",
+            options: [
+              { value: "", label: "Any sport" },
+              ...ALL_SPORTS.map((s) => ({ value: s, label: s })),
+            ],
+            onChange: setSport,
+          },
+        ]}
+      />
 
       {!isGoogleMapsConfigured() && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -284,7 +396,7 @@ export function FindGamesExplorer({
             ? "Searching…"
             : `${displayEvents.length} game${displayEvents.length === 1 ? "" : "s"}${
                 wherePlace ? ` near ${wherePlace.label.split(",")[0]}` : ""
-              }`}
+              }${whenSummary ? ` · ${whenSummary}` : ""}${sport ? ` · ${sport}` : ""}`}
         </h3>
         {showSplit && !mapLoading && (
           <p className="text-sm text-neutral-500">
@@ -323,8 +435,7 @@ export function FindGamesExplorer({
               <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-16 text-center">
                 <p className="mt-3 text-lg font-semibold text-neutral-900">No games match your search</p>
                 <p className="mt-1 text-sm text-neutral-500">
-                  Try another destination, date, or sport
-                  {wherePlace ? ", or clear the destination filter" : ""}.
+                  Filters combine together — try widening Where, When, or Sport.
                 </p>
                 {pendingInviteCount > 0 && onOpenTrips ? (
                   <button
@@ -389,8 +500,7 @@ export function FindGamesExplorer({
       <GameDetailsApplyModal
         event={detailsEvent}
         alreadyRequested={Boolean(
-          detailsEvent &&
-            (detailsEvent.already_requested || requestedIds.has(detailsEvent.id))
+          detailsEvent && (detailsEvent.already_requested || requestedIds.has(detailsEvent.id))
         )}
         requesting={Boolean(detailsEvent && submittingId === detailsEvent.id)}
         onClose={() => setDetailsEvent(null)}

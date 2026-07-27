@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { VerificationUploadField } from "@/components/VerificationUploadField";
 import { SportsFields } from "@/components/SportsFields";
+import { RefereeIdCard } from "@/components/RefereeIdCard";
 import { formatHourlyRateRange } from "@/lib/pay-range";
+import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import {
   REF_VERIFICATION_STEPS,
   wizardIndexForStep,
@@ -32,6 +34,9 @@ type RefVerificationResubmitFlowProps = {
   baseCity: string;
   travelRadius: string;
   workRegions: string[];
+  gotrefsId?: string;
+  /** Called as soon as a new face photo is picked (blob URL) and again after it saves. */
+  onProfilePhotoUpdated?: (previewUrl: string) => void;
   onComplete: () => void;
   onClose?: () => void;
 };
@@ -62,6 +67,8 @@ export function RefVerificationResubmitFlow({
   baseCity: initialBaseCity,
   travelRadius: initialTravelRadius,
   workRegions: initialWorkRegions,
+  gotrefsId,
+  onProfilePhotoUpdated,
   onComplete,
   onClose,
 }: RefVerificationResubmitFlowProps) {
@@ -79,6 +86,9 @@ export function RefVerificationResubmitFlow({
 
   const [fullName, setFullName] = useState(initialDisplayName);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const onPhotoUpdatedRef = useRef(onProfilePhotoUpdated);
+  onPhotoUpdatedRef.current = onProfilePhotoUpdated;
   const [primarySport, setPrimarySport] = useState(initialPrimarySport);
   const [additionalSports, setAdditionalSports] = useState(initialAdditionalSports);
   const [certificationLevel, setCertificationLevel] = useState(initialCertificationLevel);
@@ -97,6 +107,17 @@ export function RefVerificationResubmitFlow({
     }
   }, [initialStep, orderedSteps]);
 
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    onPhotoUpdatedRef.current?.(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
   const currentStep = orderedSteps[wizardIndex];
   const currentMeta = REF_VERIFICATION_STEPS.find((step) => step.key === currentStep);
   const isEditMode = mode === "edit";
@@ -109,8 +130,10 @@ export function RefVerificationResubmitFlow({
 
   function validateCurrentStep(): string | null {
     if (currentStep === "profile") {
-      if (fullName.trim().split(/\s+/).filter(Boolean).length < 2) return "Enter your first and last name.";
-      if (!isEditMode && !photoFile) return "Upload a new profile photo to continue.";
+      if (!fullName.trim()) return "Enter your name.";
+      if (fullName.trim().length > 100) return "Name is too long.";
+      // Admin-requested profile resubmit always needs a new face photo.
+      if (mode === "resubmit" && !photoFile) return "Upload a clear photo of your face to continue.";
     }
     if (currentStep === "sports") {
       const sport = primarySport.trim();
@@ -152,6 +175,7 @@ export function RefVerificationResubmitFlow({
     }
     setError(null);
 
+    try {
     if (currentStep === "profile") {
       const parts = fullName.trim().split(/\s+/).filter(Boolean);
       const firstName = parts[0] ?? "";
@@ -161,18 +185,28 @@ export function RefVerificationResubmitFlow({
         profilePictureUrl = await uploadFile(memberId, photoFile, "profile_photo");
       }
       await supabase.auth.updateUser({
-        data: { full_name: fullName.trim(), first_name: firstName, last_name: lastName },
+        data: {
+          full_name: fullName.trim(),
+          first_name: firstName,
+          last_name: lastName,
+          ...(profilePictureUrl ? { profile_picture_url: profilePictureUrl } : {}),
+        },
       });
-      await supabase
+      const { error: memberError } = await supabase
         .from("members")
         .update({
           display_name: fullName.trim(),
           first_name: firstName,
           last_name: lastName,
           ...(profilePictureUrl ? { profile_picture_url: profilePictureUrl } : {}),
-          updated_at: new Date().toISOString(),
         })
         .eq("id", memberId);
+      if (memberError) throw memberError;
+
+      if (profilePictureUrl) {
+        const signed = await resolveProfilePhotoUrl(supabase, profilePictureUrl);
+        if (signed) onProfilePhotoUpdated?.(signed);
+      }
     }
 
     if (currentStep === "sports") {
@@ -260,6 +294,9 @@ export function RefVerificationResubmitFlow({
       setError("Could not reach the server. Try again in a moment.");
     } finally {
       setSubmitting(false);
+    }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save this step. Try again.");
     }
   }
 
@@ -350,6 +387,9 @@ export function RefVerificationResubmitFlow({
                 className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
               />
             </label>
+            <p className="text-sm font-semibold text-[var(--muted)]">
+              Upload a clear face photo — it updates your GotREFS ID card immediately.
+            </p>
             <label
               className={`relative block cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
                 photoFile
@@ -359,8 +399,14 @@ export function RefVerificationResubmitFlow({
             >
               {photoFile ? (
                 <>
-                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-2xl font-black text-white">
-                    ✓
+                  <span className="relative mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-green-500 text-2xl font-black text-white">
+                    {photoPreviewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoPreviewUrl} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-2xl font-black text-white">
+                      ✓
+                    </span>
                   </span>
                   <span className="mt-3 block text-sm font-bold text-green-800">Profile photo uploaded</span>
                   <span className="mt-1 block text-xs text-green-700/80">{photoFile.name} · tap to replace</span>
@@ -370,11 +416,36 @@ export function RefVerificationResubmitFlow({
               )}
               <input
                 type="file"
-                accept=".jpg,.jpeg,.png,.webp"
+                accept=".jpg,.jpeg,.png,.webp,image/*"
                 className="sr-only"
                 onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
               />
             </label>
+            <div className="mx-auto w-full max-w-[360px] pt-2">
+              <p className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+                Your GotREFS ID card
+              </p>
+              <RefereeIdCard
+                fullName={fullName}
+                gotrefsId={gotrefsId}
+                avatarUrl={photoPreviewUrl ?? undefined}
+                avatarLabel={
+                  fullName
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase() ?? "")
+                    .join("") || "REF"
+                }
+                primarySport={primarySport || undefined}
+                additionalSports={additionalSports}
+                certificationLevel={certificationLevel || undefined}
+                baseCity={baseCity || undefined}
+                emptyPlaceholders
+                onUploadPhoto={(file) => setPhotoFile(file)}
+              />
+            </div>
           </>
         )}
 

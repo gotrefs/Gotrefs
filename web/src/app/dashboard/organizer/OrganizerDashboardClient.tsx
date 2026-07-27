@@ -12,7 +12,6 @@ import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventMatchingView } from "@/components/organizer/EventMatchingView";
 import {
   OrganizerListingWizard,
-  gameLevelLabel,
   type OrganizerWizardDraft,
   type PayoutMethodPayload,
 } from "@/components/organizer/OrganizerListingWizard";
@@ -25,6 +24,11 @@ import { LeaveReviewModal } from "@/components/reviews/LeaveReviewModal";
 import { SportsFields } from "@/components/SportsFields";
 import { formatEventLocation, formatPayOffer } from "@/data/sports";
 import { marketplaceCardShadow, sportListingVisual } from "@/lib/marketplace/airbnb-styles";
+import {
+  ORGANIZER_CONTACT_IN_NOTES_MESSAGE,
+  sanitizeNotesForStorage,
+  textContainsOrganizerContact,
+} from "@/lib/marketplace/notes-for-ref";
 import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
 import {
   csvDraftToPublishBody,
@@ -931,16 +935,14 @@ export default function OrganizerDashboardClient() {
       setMsg("Enter a valid ZIP code so refs can match by area.");
       return false;
     }
+    if (textContainsOrganizerContact(draft.refInstructions)) {
+      setMsg(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
+      return false;
+    }
     try {
       await fetch("/api/auth/sync-member", { method: "POST" });
       const rateNum = draft.ratePerOfficial === "" ? null : Number(draft.ratePerOfficial);
       const publishedTitle = draft.eventTitle.trim() || `${draft.sport || "Game"} event`;
-      const contactParts: string[] = [];
-      const levelLabel = gameLevelLabel(draft.gameLevel);
-      if (levelLabel) contactParts.push(`Level: ${levelLabel}`);
-      if (draft.clubName.trim()) contactParts.push(`Club: ${draft.clubName.trim()}`);
-      // No personal names, emails, or phones on ref-facing event notes.
-      if (draft.refInstructions.trim()) contactParts.push(`Notes for refs: ${draft.refInstructions.trim()}`);
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -961,7 +963,7 @@ export default function OrganizerDashboardClient() {
           pay_type: "exact",
           pay_min: null,
           pay_max: null,
-          notes: contactParts.join(" · ") || null,
+          notes: sanitizeNotesForStorage(draft.refInstructions.trim()),
           boosts: [],
         }),
       });
@@ -998,6 +1000,11 @@ export default function OrganizerDashboardClient() {
       setMsg(text);
       return;
     }
+    if (textContainsOrganizerContact(notes)) {
+      setEventMsg(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
+      setMsg(ORGANIZER_CONTACT_IN_NOTES_MESSAGE);
+      return;
+    }
     setPublishing(true);
     try {
       await fetch("/api/auth/sync-member", { method: "POST" });
@@ -1026,7 +1033,7 @@ export default function OrganizerDashboardClient() {
           pay_type: payType,
           pay_min: payType === "range" && Number.isFinite(payMinNum as number) ? payMinNum : null,
           pay_max: payType === "range" && Number.isFinite(payMaxNum as number) ? payMaxNum : null,
-          notes: notes || null,
+          notes: sanitizeNotesForStorage(notes),
         }),
       });
       const json = (await res.json()) as { error?: string; ok?: boolean; id?: string };
@@ -2064,11 +2071,13 @@ export default function OrganizerDashboardClient() {
                       onClick={() => openStaffingForEvent(e.id)}
                       className="flex min-w-0 flex-1 items-start gap-4 text-left"
                     >
-                      <span
-                        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl ${visual.gradient}`}
-                        aria-hidden
-                      >
-                        {visual.emoji}
+                      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-neutral-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={visual.photos[0]}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-lg font-semibold text-neutral-900">{e.title}</span>

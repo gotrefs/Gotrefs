@@ -9,8 +9,17 @@ import { createClient } from "@/lib/supabase/client";
 import { ALL_SPORTS, OTHER_SPORT_VALUE, sportPickerToStored } from "@/data/sports";
 import { uploadRefSignupDocuments, submitRefVerificationForReview } from "@/lib/auth/upload-ref-signup-docs";
 import { signupDashboardLabel, type SignupDashboardPath } from "@/lib/auth/email-confirmation";
+import {
+  clearRefSignupDraft,
+  loadRefSignupDraft,
+  type RefSignupDraftFields,
+} from "@/lib/auth/signup-draft";
 import { formatHourlyRateRange } from "@/lib/pay-range";
 import { PasswordField } from "@/components/auth/PasswordField";
+import {
+  RefSignupAirbnbWizard,
+  type RefSignupWizardScreen,
+} from "@/components/auth/RefSignupAirbnbWizard";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -69,7 +78,7 @@ export function AuthFlow() {
   const [role, setRole] = useState<AudienceRole>(initialRole);
   const [wizardStep, setWizardStep] = useState(0);
   const [fullName, setFullName] = useState("");
-  const [photoSelected, setPhotoSelected] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [phone, setPhone] = useState("");
   const [primarySport, setPrimarySport] = useState("Basketball");
@@ -87,6 +96,9 @@ export function AuthFlow() {
   const [governingBodies, setGoverningBodies] = useState("");
   const [crewInvite, setCrewInvite] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [recommendedAssignorName, setRecommendedAssignorName] = useState("");
+  const [recommendedAssignorEmail, setRecommendedAssignorEmail] = useState("");
+  const [recommendedAssignorPhone, setRecommendedAssignorPhone] = useState("");
   const [error, setError] = useState<string | null>(() => {
     const authError = searchParams.get("error");
     const reason = searchParams.get("reason");
@@ -98,10 +110,51 @@ export function AuthFlow() {
   const [loading, setLoading] = useState(false);
   const [pendingRedirect, setPendingRedirect] = useState<SignupDashboardPath>("/dashboard/referee");
   const [resendCooldown, setResendCooldown] = useState(false);
+  const [resumeScreen, setResumeScreen] = useState<RefSignupWizardScreen>("intro1");
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const oauthMode = searchParams.get("oauth") === "1";
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
   const emailAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailCheckInFlight = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const draft = await loadRefSignupDraft();
+      if (cancelled || !draft) {
+        if (!cancelled) setDraftHydrated(true);
+        return;
+      }
+      const fields: RefSignupDraftFields = draft.fields;
+      setRole("ref");
+      setFullName(fields.fullName || "");
+      setEmail(fields.email || "");
+      setPrimarySport(fields.primarySport || "Basketball");
+      setCustomPrimarySport(fields.customPrimarySport || "");
+      setSecondarySport(fields.secondarySport || "");
+      setCertificationLevel(fields.certificationLevel || "");
+      setHourlyRateMin(fields.hourlyRateMin || String(SIGNUP_HOURLY_RATE_FLOOR));
+      setHourlyRateMax(fields.hourlyRateMax || "75");
+      setBaseCity(fields.baseCity || "");
+      setTravelRadius(fields.travelRadius || "25");
+      setWorkRegions(fields.workRegions?.length ? fields.workRegions : ["Local city"]);
+      setTermsAccepted(Boolean(fields.termsAccepted));
+      setRecommendedAssignorName(fields.recommendedAssignorName || "");
+      setRecommendedAssignorEmail(fields.recommendedAssignorEmail || "");
+      setRecommendedAssignorPhone(fields.recommendedAssignorPhone || "");
+      setPhotoFile(draft.files.photo);
+      setGovIdFrontFile(draft.files.govIdFront);
+      setGovIdBackFile(draft.files.govIdBack);
+      setCertDocFile(draft.files.certDoc);
+      setResumeScreen((fields.screen as RefSignupWizardScreen) || "intro1");
+      setStep("onboarding");
+      setNotice("Welcome back — we restored your signup exactly where you left off.");
+      setDraftHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (step !== "password") return;
@@ -303,8 +356,12 @@ export function AuthFlow() {
 
   function nextWizardStep() {
     setError(null);
-    if (role === "ref" && wizardStep === 0 && fullName.trim().split(/\s+/).filter(Boolean).length < 2) {
-      setError("Enter your first and last name.");
+    if (role === "ref" && wizardStep === 0 && !fullName.trim()) {
+      setError("Enter your name to continue.");
+      return;
+    }
+    if (role === "ref" && wizardStep === 0 && !photoFile) {
+      setError("Upload a clear photo of your face to continue.");
       return;
     }
     if (role === "organizer" && wizardStep === 0 && !organizationName.trim()) {
@@ -407,14 +464,23 @@ export function AuthFlow() {
     }
   }
 
-  async function register(e: React.FormEvent) {
+  async function register(e: React.FormEvent, options?: { skipAssignor?: boolean }) {
     e.preventDefault();
     setError(null);
     setNotice(null);
 
     const { firstName, lastName } = splitName(fullName);
-    if (!firstName || !lastName) {
+    if (role === "ref") {
+      if (!firstName && !lastName) {
+        setError("Enter your name to continue.");
+        return;
+      }
+    } else if (!firstName || !lastName) {
       setError("Enter your first and last name.");
+      return;
+    }
+    if (role === "ref" && !photoFile) {
+      setError("Upload a clear photo of your face for your GotREFS profile.");
       return;
     }
     if (!termsAccepted) {
@@ -426,6 +492,20 @@ export function AuthFlow() {
       const pwErr = validatePasswordStrength(password);
       if (pwErr) {
         setError(pwErr);
+        return;
+      }
+    }
+
+    const assignorName = options?.skipAssignor ? "" : recommendedAssignorName.trim();
+    const assignorEmail = options?.skipAssignor ? "" : recommendedAssignorEmail.trim();
+    const assignorPhone = options?.skipAssignor ? "" : recommendedAssignorPhone.trim();
+    if (role === "ref" && !options?.skipAssignor && (assignorName || assignorEmail || assignorPhone)) {
+      if (!assignorName) {
+        setError("Enter the assignor's name.");
+        return;
+      }
+      if (!assignorEmail && !assignorPhone) {
+        setError("Enter the assignor's email or phone number.");
         return;
       }
     }
@@ -454,7 +534,10 @@ export function AuthFlow() {
         travelRadius: Number(travelRadius) || null,
         governingBodies: governingBodies.trim() || undefined,
         crewInvite: crewInvite.trim() || undefined,
-        verificationSkipped: role === "ref" ? !(govIdFrontFile && govIdBackFile && certDocFile) : undefined,
+        recommendedAssignorName: role === "ref" && assignorName ? assignorName : undefined,
+        recommendedAssignorEmail: role === "ref" && assignorEmail ? assignorEmail : undefined,
+        recommendedAssignorPhone: role === "ref" && assignorPhone ? assignorPhone : undefined,
+        verificationSkipped: role === "ref" ? !(photoFile && govIdFrontFile && govIdBackFile && certDocFile) : undefined,
         termsAccepted,
         acceptedTermsSlug: role === "organizer" ? "event-organizer-terms" : "referee-official-terms",
         ...(oauthMode ? {} : { password }),
@@ -481,7 +564,7 @@ export function AuthFlow() {
         if (json.pendingRedirect) {
           setPendingRedirect(json.pendingRedirect);
         }
-        if (role === "ref" && govIdFrontFile && govIdBackFile && certDocFile) {
+        if (role === "ref" && photoFile && govIdFrontFile && govIdBackFile && certDocFile) {
           try {
             localStorage.setItem("gotrefs_pending_ref_docs", "1");
           } catch {
@@ -496,7 +579,7 @@ export function AuthFlow() {
       }
 
       const userId = json.userId;
-      if (role === "ref" && govIdFrontFile && govIdBackFile && certDocFile) {
+      if (role === "ref" && photoFile && govIdFrontFile && govIdBackFile && certDocFile) {
         try {
           let memberId = userId;
           if (!memberId) {
@@ -513,6 +596,7 @@ export function AuthFlow() {
                 govIdFront: govIdFrontFile,
                 govIdBack: govIdBackFile,
                 certificationDocument: certDocFile,
+                profilePhoto: photoFile,
               },
               {
                 primarySport: resolvedPrimarySport,
@@ -533,12 +617,80 @@ export function AuthFlow() {
 
       const next = searchParams.get("next");
       const destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
+      await clearRefSignupDraft();
       window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!draftHydrated) {
+    return (
+      <main className="mx-auto flex min-h-[72vh] max-w-5xl items-center justify-center px-4 py-10">
+        <p className="text-sm font-semibold text-[var(--muted)]">Loading…</p>
+      </main>
+    );
+  }
+
+  if (step === "onboarding" && role === "ref") {
+    return (
+      <RefSignupAirbnbWizard
+        loading={loading}
+        error={error}
+        oauthMode={oauthMode}
+        initialScreen={resumeScreen}
+        fullName={fullName}
+        photoFile={photoFile}
+        gotrefsId={gotrefsId}
+        primarySport={primarySport}
+        customPrimarySport={customPrimarySport}
+        secondarySport={secondarySport}
+        certificationLevel={certificationLevel}
+        hourlyRateMin={hourlyRateMin}
+        hourlyRateMax={hourlyRateMax}
+        govIdFrontFile={govIdFrontFile}
+        govIdBackFile={govIdBackFile}
+        certDocFile={certDocFile}
+        email={email}
+        baseCity={baseCity}
+        travelRadius={travelRadius}
+        workRegions={workRegions}
+        password={password}
+        termsAccepted={termsAccepted}
+        recommendedAssignorName={recommendedAssignorName}
+        recommendedAssignorEmail={recommendedAssignorEmail}
+        recommendedAssignorPhone={recommendedAssignorPhone}
+        onFullName={setFullName}
+        onPhotoFile={setPhotoFile}
+        onPrimarySport={setPrimarySport}
+        onCustomPrimarySport={setCustomPrimarySport}
+        onSecondarySport={setSecondarySport}
+        onCertificationLevel={setCertificationLevel}
+        onHourlyRateMin={setHourlyRateMin}
+        onHourlyRateMax={setHourlyRateMax}
+        onGovIdFrontFile={setGovIdFrontFile}
+        onGovIdBackFile={setGovIdBackFile}
+        onCertDocFile={setCertDocFile}
+        onEmail={setEmail}
+        onBaseCity={setBaseCity}
+        onTravelRadius={setTravelRadius}
+        onToggleRegion={toggleRegion}
+        onPassword={setPassword}
+        onTermsAccepted={setTermsAccepted}
+        onRecommendedAssignorName={setRecommendedAssignorName}
+        onRecommendedAssignorEmail={setRecommendedAssignorEmail}
+        onRecommendedAssignorPhone={setRecommendedAssignorPhone}
+        onSubmit={register}
+        onExit={(savedScreen) => {
+          if (savedScreen) setResumeScreen(savedScreen);
+          setError(null);
+          setNotice("Progress saved. Come back anytime to continue exactly where you left off.");
+          setStep("email");
+        }}
+      />
+    );
   }
 
   return (
@@ -817,22 +969,22 @@ export function AuthFlow() {
             {role === "ref" && wizardStep === 0 && (
               <div className="space-y-4">
                 <label className="block text-sm font-bold text-[var(--navy)]">
-                  Legal name
-                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="First and last name" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
+                  Name
+                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="First, last, or both" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" />
                 </label>
                 <label
                   className={`relative flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition ${
-                    photoSelected
+                    photoFile
                       ? "border-green-400 bg-green-50"
                       : "border-slate-200 hover:border-[var(--blue)]/50"
                   }`}
                 >
                   <span
                     className={`relative flex h-16 w-16 items-center justify-center rounded-full text-xs font-black ${
-                      photoSelected ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500"
+                      photoFile ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500"
                     }`}
                   >
-                    {photoSelected ? (
+                    {photoFile ? (
                       <span className="text-2xl" aria-hidden>
                         ✓
                       </span>
@@ -842,19 +994,19 @@ export function AuthFlow() {
                   </span>
                   <span>
                     <span className="block text-sm font-black text-[var(--navy)]">
-                      {photoSelected ? "Profile photo uploaded" : "Upload profile photo"}
+                      {photoFile ? "Profile photo uploaded" : "Upload profile photo"}
                     </span>
                     <span className="block text-xs text-[var(--muted)]">
-                      {photoSelected
+                      {photoFile
                         ? "Green check means you’re set — tap to replace anytime."
-                        : "Circle preview template. You can update this later."}
+                        : "Clear face photo required for your GotREFS ID card."}
                     </span>
                   </span>
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept=".jpg,.jpeg,.png,.webp,image/*"
                     className="sr-only"
-                    onChange={(event) => setPhotoSelected(Boolean(event.target.files?.[0]))}
+                    onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
                   />
                 </label>
               </div>
