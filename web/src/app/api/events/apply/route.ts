@@ -119,12 +119,14 @@ export async function POST(request: Request) {
     );
   }
 
-  if (existing?.status === "declined" || existing?.status === "withdrawn") {
+  if (existing?.status === "declined") {
     return NextResponse.json(
       { error: "This game is no longer available for you to request." },
       { status: 400 }
     );
   }
+
+  // withdrawn (or no row) → upsert a fresh pending/queued request below.
 
   async function upsertRequest(status: "queued" | "pending", message: string) {
     return admin

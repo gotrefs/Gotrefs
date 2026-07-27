@@ -48,14 +48,18 @@ export function GameDetailsApplyModal({
   event,
   alreadyRequested,
   requesting,
+  unrequesting,
   onClose,
   onApply,
+  onUnrequest,
 }: {
   event: OpenEventRecord | null;
   alreadyRequested?: boolean;
   requesting?: boolean;
+  unrequesting?: boolean;
   onClose: () => void;
   onApply: (event: OpenEventRecord) => void;
+  onUnrequest?: (event: OpenEventRecord) => void;
 }) {
   useEffect(() => {
     if (!event) return;
@@ -71,13 +75,12 @@ export function GameDetailsApplyModal({
   const requested = Boolean(alreadyRequested);
   const ended = !isEventOpenForRequests(event);
   const slotsLeft = Math.max(0, event.officials_needed - (event.booked_count ?? 0));
+  const busy = Boolean(requesting || unrequesting);
   const applyLabel = ended
     ? "Game ended"
-    : requested
-      ? "Requested to work"
-      : requesting
-        ? "Submitting…"
-        : "Apply";
+    : requesting
+      ? "Submitting…"
+      : "Apply";
   const notes = notesForRefDisplay(event.notes);
 
   return (
@@ -163,18 +166,30 @@ export function GameDetailsApplyModal({
             ) : null}
           </dl>
 
-          <button
-            type="button"
-            disabled={ended || requested || requesting || slotsLeft === 0}
-            onClick={() => onApply(event)}
-            className={`mt-1 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
-              requested
-                ? "cursor-default bg-emerald-600"
-                : "bg-[#d81d24] hover:bg-[#c01820] disabled:opacity-60"
-            }`}
-          >
-            {ended ? "Game ended" : slotsLeft === 0 && !requested ? "No openings left" : applyLabel}
-          </button>
+          {requested ? (
+            <div className="space-y-2">
+              <p className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800">
+                Requested to work
+              </p>
+              <button
+                type="button"
+                disabled={busy || !onUnrequest}
+                onClick={() => onUnrequest?.(event)}
+                className="w-full rounded-xl border border-neutral-300 bg-white py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50 disabled:opacity-60"
+              >
+                {unrequesting ? "Unrequesting…" : "Unrequest"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={ended || busy || slotsLeft === 0}
+              onClick={() => onApply(event)}
+              className="mt-1 w-full rounded-xl bg-[#d81d24] py-3 text-sm font-semibold text-white transition hover:bg-[#c01820] disabled:opacity-60"
+            >
+              {ended ? "Game ended" : slotsLeft === 0 ? "No openings left" : applyLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

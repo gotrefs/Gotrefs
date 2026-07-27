@@ -537,7 +537,10 @@ export default function OrganizerDashboardClient() {
     }
   }, [loading, signupRequests, searchParams, accountEmail, reviewApplicant]);
 
-  async function decideApplicant(applicantId: string, action: "accept" | "decline"): Promise<boolean | string> {
+  async function decideApplicant(
+    applicantId: string,
+    action: "accept" | "decline" | "withdraw"
+  ): Promise<boolean | string> {
     try {
       const res = await fetch(`/api/organizer/applicants/${applicantId}`, {
         method: "PATCH",
@@ -553,7 +556,9 @@ export default function OrganizerDashboardClient() {
       setMsg(
         action === "accept"
           ? "Ref approved for this game. They’ll see it under Upcoming and get an email."
-          : "Request denied. The ref was emailed and won’t see this game anymore."
+          : action === "withdraw"
+            ? "Request removed. The ref was notified and can request again if the game is still open."
+            : "Request denied. The ref was emailed and won’t see this game anymore."
       );
       setReviewApplicant(null);
       await load();
@@ -1080,7 +1085,7 @@ export default function OrganizerDashboardClient() {
   }
 
   async function declineApplicant(applicant: ApplicantRow) {
-    await decideApplicant(applicant.id, "decline");
+    await decideApplicant(applicant.id, "withdraw");
   }
 
   async function sendOffer(refMemberId = offerRef, eventId = offerEvent) {
@@ -2207,7 +2212,7 @@ export default function OrganizerDashboardClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Requests</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Review each official like a host profile — photo, reviews, then accept or decline.
+              Review each official like a host profile — photo, reviews, then accept or unrequest.
             </p>
           </div>
           <div className="space-y-5">
@@ -2236,7 +2241,7 @@ export default function OrganizerDashboardClient() {
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}
                 primaryLabel="Review & decide"
-                secondaryLabel="Deny"
+                secondaryLabel="Unrequest"
                 onPrimary={() =>
                   setReviewApplicant({
                     id: sr.id,

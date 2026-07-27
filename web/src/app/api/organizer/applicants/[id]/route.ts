@@ -1,13 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isQueuedSignupHold } from "@/lib/activate-queued-signups";
 import { boostedOfferPay, computeOfferBoost } from "@/lib/boosts-server";
-import { notifyApplicationDecision, notifyInBackground } from "@/lib/email/notifications";
+import {
+  notifyApplicationDecision,
+  notifyApplicationWithdrawnToRef,
+  notifyInBackground,
+} from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-type Body = { action?: "accept" | "decline" };
+type Body = { action?: "accept" | "decline" | "withdraw" };
 
 type EventJoin = {
   organizer_member_id: string;
@@ -42,8 +46,8 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (body.action !== "accept" && body.action !== "decline") {
-    return NextResponse.json({ error: "action must be accept or decline" }, { status: 400 });
+  if (body.action !== "accept" && body.action !== "decline" && body.action !== "withdraw") {
+    return NextResponse.json({ error: "action must be accept, decline, or withdraw" }, { status: 400 });
   }
 
   let admin;
@@ -82,20 +86,50 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Idempotent: already decided requests still return success so the UI can close cleanly.
-  if (row.status === "accepted" || row.status === "declined") {
+  // Idempotent: already decided/withdrawn requests still return success so the UI can close cleanly.
+  if (row.status === "accepted" || row.status === "declined" || row.status === "withdrawn") {
     return NextResponse.json({ ok: true, status: row.status, alreadyDecided: true });
   }
 
-  if (row.status !== "pending" || isQueuedSignupHold(row)) {
+  if (row.status !== "pending" && row.status !== "queued") {
+    return NextResponse.json({ error: "This application was already decided." }, { status: 400 });
+  }
+
+  // Queued holds are not visible in the live applicant list, but block accept/decline if hit directly.
+  if (
+    (body.action === "accept" || body.action === "decline") &&
+    (row.status === "queued" || isQueuedSignupHold(row))
+  ) {
     return NextResponse.json(
-      {
-        error: isQueuedSignupHold(row)
-          ? "This request is still awaiting GotREFS verification."
-          : "This application was already decided.",
-      },
+      { error: "This request is still awaiting GotREFS verification." },
       { status: 400 }
     );
+  }
+
+  if (body.action === "accept" && row.status !== "pending") {
+    return NextResponse.json({ error: "This application was already decided." }, { status: 400 });
+  }
+
+  if (body.action === "withdraw") {
+    const { error: updateError } = await admin
+      .from("event_signup_requests")
+      .update({ status: "withdrawn" })
+      .eq("id", id);
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+
+    try {
+      const sent = await notifyApplicationWithdrawnToRef({
+        admin,
+        refMemberId: row.ref_member_id,
+        eventId: row.event_id,
+        applicationId: row.id,
+        siteUrl: emailSiteUrl(request.url),
+      });
+      if (!sent) console.warn("[organizer/applicants] ref cancel email not sent", id);
+    } catch (err) {
+      console.error("[organizer/applicants] withdraw email failed", err);
+    }
+    return NextResponse.json({ ok: true, status: "withdrawn" });
   }
 
   if (body.action === "decline") {

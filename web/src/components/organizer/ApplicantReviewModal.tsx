@@ -35,13 +35,13 @@ export function ApplicantReviewModal({
 }: {
   applicant: ApplicantReviewData;
   onClose: () => void;
-  onDecide: (action: "accept" | "decline") => Promise<boolean | string>;
+  onDecide: (action: "accept" | "withdraw") => Promise<boolean | string>;
 }) {
-  const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
-  const [done, setDone] = useState<"accept" | "decline" | null>(null);
+  const [busy, setBusy] = useState<"accept" | "withdraw" | null>(null);
+  const [done, setDone] = useState<"accept" | "withdraw" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function decide(action: "accept" | "decline") {
+  async function decide(action: "accept" | "withdraw") {
     setBusy(action);
     setError(null);
     try {
@@ -52,7 +52,7 @@ export function ApplicantReviewModal({
             ? result
             : action === "accept"
               ? "Could not approve this ref. Try again."
-              : "Could not deny this request. Try again."
+              : "Could not unrequest this ref. Try again."
         );
         return;
       }
@@ -80,12 +80,12 @@ export function ApplicantReviewModal({
               ✓
             </div>
             <p className="mt-4 text-xl font-bold text-neutral-900">
-              {done === "accept" ? "Approved" : "Denied"}
+              {done === "accept" ? "Approved" : "Unrequested"}
             </p>
             <p className="mt-1 text-sm text-neutral-500">
               {done === "accept"
                 ? "The ref will see this game under Upcoming with the full address."
-                : "This ref won’t see this game anymore."}
+                : "This request was removed. The ref can request again if the game is still open."}
             </p>
           </div>
         ) : (
@@ -164,10 +164,10 @@ export function ApplicantReviewModal({
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={() => void decide("decline")}
+                onClick={() => void decide("withdraw")}
                 className="rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-bold text-neutral-800 disabled:opacity-60"
               >
-                {busy === "decline" ? "Denying…" : "Deny"}
+                {busy === "withdraw" ? "Unrequesting…" : "Unrequest"}
               </button>
               <button
                 type="button"

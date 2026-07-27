@@ -72,6 +72,7 @@ export function FindGamesExplorer({
   const [locationFilteredIds, setLocationFilteredIds] = useState<Set<string> | null>(null);
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
   const [detailsEvent, setDetailsEvent] = useState<OpenEventRecord | null>(null);
+  const [unrequestingId, setUnrequestingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -237,6 +238,7 @@ export function FindGamesExplorer({
         eventTitle?: string;
         pendingVerification?: boolean;
         status?: string;
+        applicationId?: string | null;
       };
       if (!res.ok) {
         setRequestedIds((prev) => {
@@ -247,14 +249,25 @@ export function FindGamesExplorer({
         setMsg({ text: json.error || "Could not apply.", tone: "err" });
         return;
       }
+      const applicationId = json.applicationId ?? event.application_id ?? null;
       setEvents((prev) =>
-        prev.map((row) => (row.id === event.id ? { ...row, already_requested: true } : row))
+        prev.map((row) =>
+          row.id === event.id
+            ? { ...row, already_requested: true, application_id: applicationId }
+            : row
+        )
       );
       setMapPins((prev) =>
-        prev.map((pin) => (pin.id === event.id ? { ...pin, already_requested: true } : pin))
+        prev.map((pin) =>
+          pin.id === event.id
+            ? { ...pin, already_requested: true, application_id: applicationId }
+            : pin
+        )
       );
       setDetailsEvent((prev) =>
-        prev?.id === event.id ? { ...prev, already_requested: true } : prev
+        prev?.id === event.id
+          ? { ...prev, already_requested: true, application_id: applicationId }
+          : prev
       );
       if (json.pendingVerification) {
         setMsg({
@@ -279,6 +292,60 @@ export function FindGamesExplorer({
       setMsg({ text: "Could not reach the server.", tone: "err" });
     } finally {
       setSubmittingId(null);
+    }
+  }
+
+  async function unrequestEvent(event: OpenEventRecord) {
+    const applicationId = event.application_id;
+    if (!applicationId) {
+      setMsg({
+        text: "Could not find this request. Refresh and try again from Trips → Applied.",
+        tone: "err",
+      });
+      return;
+    }
+    setMsg(null);
+    setUnrequestingId(event.id);
+    try {
+      const res = await fetch(`/api/events/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw" }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMsg({ text: json.error || "Could not unrequest this game.", tone: "err" });
+        return;
+      }
+      setRequestedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(event.id);
+        return next;
+      });
+      setEvents((prev) =>
+        prev.map((row) =>
+          row.id === event.id ? { ...row, already_requested: false, application_id: null } : row
+        )
+      );
+      setMapPins((prev) =>
+        prev.map((pin) =>
+          pin.id === event.id ? { ...pin, already_requested: false, application_id: null } : pin
+        )
+      );
+      setDetailsEvent((prev) =>
+        prev?.id === event.id
+          ? { ...prev, already_requested: false, application_id: null }
+          : prev
+      );
+      setMsg({
+        text: "Request withdrawn. You can apply again anytime while the game is open.",
+        tone: "ok",
+      });
+      onApplied?.();
+    } catch {
+      setMsg({ text: "Could not reach the server.", tone: "err" });
+    } finally {
+      setUnrequestingId(null);
     }
   }
 
@@ -503,8 +570,10 @@ export function FindGamesExplorer({
           detailsEvent && (detailsEvent.already_requested || requestedIds.has(detailsEvent.id))
         )}
         requesting={Boolean(detailsEvent && submittingId === detailsEvent.id)}
+        unrequesting={Boolean(detailsEvent && unrequestingId === detailsEvent.id)}
         onClose={() => setDetailsEvent(null)}
         onApply={(event) => void applyToEvent(event)}
+        onUnrequest={(event) => void unrequestEvent(event)}
       />
     </div>
   );

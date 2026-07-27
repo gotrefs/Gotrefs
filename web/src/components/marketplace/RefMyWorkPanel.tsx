@@ -126,7 +126,9 @@ export function RefMyWorkPanel({
   const [msg, setMsg] = useState<string | null>(null);
 
   const pendingInvites = offers.filter((offer) => offer.status === "pending");
-  const pendingApplications = applications.filter((app) => app.status === "pending");
+  const pendingApplications = applications.filter(
+    (app) => app.status === "pending" || app.status === "queued"
+  );
   const confirmedBookings = bookings.filter((booking) =>
     ["confirmed", "completed"].includes(booking.status)
   );
@@ -146,6 +148,29 @@ export function RefMyWorkPanel({
         return;
       }
       setMsg(action === "accept" ? "Invite accepted — game confirmed on your schedule." : "Invite declined.");
+      await onReload();
+    } catch {
+      setMsg("Could not reach the server. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function unrequestApplication(applicationId: string) {
+    setBusyId(applicationId);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/events/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw" }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMsg(json.error || "Could not unrequest this game.");
+        return;
+      }
+      setMsg("Request withdrawn. You can request this game again from Explore if it’s still open.");
       await onReload();
     } catch {
       setMsg("Could not reach the server. Try again.");
@@ -247,14 +272,25 @@ export function RefMyWorkPanel({
           ) : (
             pendingApplications.map((app) => {
               const ev = eventFromJoin(app.scheduled_events);
+              const queued = app.status === "queued";
               return (
                 <article key={app.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Application pending</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                    {queued ? "Queued — awaiting GotREFS verification" : "Application pending"}
+                  </p>
                   <p className="mt-1 text-lg font-semibold text-neutral-900">{ev?.title ?? "Game"}</p>
                   <p className="mt-1 text-sm text-neutral-500">
                     {ev?.sport}
                     {ev?.starts_at ? ` · ${new Date(ev.starts_at).toLocaleString()}` : ""}
                   </p>
+                  <button
+                    type="button"
+                    disabled={busyId === app.id}
+                    onClick={() => void unrequestApplication(app.id)}
+                    className="mt-4 rounded-full border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-50 disabled:opacity-60"
+                  >
+                    {busyId === app.id ? "Unrequesting…" : "Unrequest"}
+                  </button>
                 </article>
               );
             })

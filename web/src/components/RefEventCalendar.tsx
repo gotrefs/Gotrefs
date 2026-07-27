@@ -26,6 +26,7 @@ export type CalendarEvent = {
 };
 
 type SignupRequest = {
+  id: string;
   event_id: string;
   status: string;
 };
@@ -135,7 +136,7 @@ export function RefEventCalendar({
 
     const { data: req } = await supabase
       .from("event_signup_requests")
-      .select("event_id, status")
+      .select("id, event_id, status")
       .eq("ref_member_id", user.id);
 
     setRequests((req as SignupRequest[]) || []);
@@ -256,6 +257,37 @@ export function RefEventCalendar({
       setMsg(`✓ Request success for "${json.eventTitle ?? event.title}".`);
     }
     await load();
+  }
+
+  async function unrequestSignup(event: CalendarEvent) {
+    const request = requests.find(
+      (row) =>
+        row.event_id === event.id && (row.status === "pending" || row.status === "queued")
+    );
+    if (!request?.id) {
+      setMsg("Could not find this request. Refresh and try again.");
+      return;
+    }
+    setMsg(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/events/applications/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw" }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMsg(json.error || "Could not unrequest this game.");
+        return;
+      }
+      setMsg("✓ Request withdrawn. You can apply again while the game is open.");
+      await load();
+    } catch {
+      setMsg("Could not reach the server.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const monthLabel = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
@@ -421,26 +453,36 @@ export function RefEventCalendar({
               </p>
             )}
             <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={submitting || eventWorkStatus(selected.id) !== "open"}
-                onClick={() => void requestSignup(selected)}
-                className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
-                  eventWorkStatus(selected.id) === "applied"
-                    ? "bg-green-600"
-                    : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
-                }`}
-              >
-                {eventWorkStatus(selected.id) === "applied"
-                  ? "✓ Applied"
-                  : eventWorkStatus(selected.id) === "invited"
+              {eventWorkStatus(selected.id) === "applied" ? (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => void unrequestSignup(selected)}
+                  className="w-full rounded-full border border-[var(--border)] bg-white px-4 py-3 text-sm font-black text-[var(--navy)] transition-all duration-200 hover:bg-[var(--grey-light)] disabled:opacity-80"
+                >
+                  {submitting ? "Unrequesting…" : "Unrequest"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={submitting || eventWorkStatus(selected.id) !== "open"}
+                  onClick={() => void requestSignup(selected)}
+                  className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
+                    eventWorkStatus(selected.id) === "invited" ||
+                    eventWorkStatus(selected.id) === "confirmed"
+                      ? "bg-green-600"
+                      : "bg-[var(--red)] hover:bg-[var(--red-dark)]"
+                  }`}
+                >
+                  {eventWorkStatus(selected.id) === "invited"
                     ? "Invited — check My Work"
                     : eventWorkStatus(selected.id) === "confirmed"
                       ? "✓ Confirmed"
                       : submitting
                         ? "Submitting…"
                         : "Apply"}
-              </button>
+                </button>
+              )}
             </div>
           </div>
         </div>

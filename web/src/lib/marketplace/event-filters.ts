@@ -24,6 +24,8 @@ export type OpenEventRecord = {
   active_boosts?: AppliedBoost[];
   /** This ref already requested to work this event (pending). */
   already_requested?: boolean;
+  /** Signup request id when already_requested is true (for unrequest). */
+  application_id?: string | null;
   /** Pre-jittered map pin (~7 mi from true venue). Never the exact street. */
   map_lat?: number | null;
   map_lng?: number | null;

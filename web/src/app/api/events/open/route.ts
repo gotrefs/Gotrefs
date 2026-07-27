@@ -159,15 +159,15 @@ export async function GET(request: NextRequest) {
 
   const { data: myRequests } = await admin
     .from("event_signup_requests")
-    .select("event_id, status")
+    .select("id, event_id, status")
     .eq("ref_member_id", user.id);
   const hideEventIds = new Set<string>();
-  const pendingEventIds = new Set<string>();
+  const pendingByEventId = new Map<string, string>();
   for (const row of myRequests ?? []) {
-    if (row.status === "declined" || row.status === "accepted" || row.status === "withdrawn") {
+    if (row.status === "declined" || row.status === "accepted") {
       hideEventIds.add(row.event_id);
     } else if (row.status === "pending" || row.status === "queued") {
-      pendingEventIds.add(row.event_id);
+      pendingByEventId.set(row.event_id, row.id);
     }
   }
 
@@ -176,13 +176,15 @@ export async function GET(request: NextRequest) {
     .map((event) => {
       const mapCoords = publicMapCoordsFromVenue(event.id, event.venue_lat, event.venue_lng);
       const { venue_lat: _lat, venue_lng: _lng, ...publicEvent } = event;
+      const applicationId = pendingByEventId.get(event.id) ?? null;
       return {
         ...publicEvent,
         notes: notesForRefDisplay(typeof event.notes === "string" ? event.notes : null),
         map_lat: mapCoords?.lat ?? null,
         map_lng: mapCoords?.lng ?? null,
         booked_count: bookingCounts.get(event.id) ?? 0,
-        already_requested: pendingEventIds.has(event.id),
+        already_requested: Boolean(applicationId),
+        application_id: applicationId,
         active_boosts: computeAppliedBoosts({
           eventBoosts: event.boosts,
           eventStartsAt: event.starts_at,

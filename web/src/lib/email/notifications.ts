@@ -10,10 +10,13 @@ async function emailForMemberId(
 ): Promise<{ email: string; displayName: string } | null> {
   const [{ data: auth }, { data: member }] = await Promise.all([
     admin.auth.admin.getUserById(memberId),
-    admin.from("members").select("display_name").eq("id", memberId).maybeSingle(),
+    admin.from("members").select("display_name, email").eq("id", memberId).maybeSingle(),
   ]);
-  const email = auth.user?.email?.trim().toLowerCase();
-  if (!email) return null;
+  const email =
+    auth.user?.email?.trim().toLowerCase() ||
+    (typeof member?.email === "string" ? member.email.trim().toLowerCase() : "") ||
+    "";
+  if (!email || !email.includes("@")) return null;
   const displayName =
     member?.display_name?.trim() ||
     String(auth.user?.user_metadata?.full_name ?? "").trim() ||
@@ -318,6 +321,76 @@ export async function notifyOfferCanceledToRef(opts: {
   });
 }
 
+export async function notifyApplicationWithdrawnToOrganizer(opts: {
+  admin: SupabaseClient;
+  eventId: string;
+  refMemberId: string;
+  applicationId?: string | null;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const event = await eventSummary(opts.admin, opts.eventId);
+  if (!event) return false;
+
+  const { data: scheduled } = await opts.admin
+    .from("scheduled_events")
+    .select("organizer_member_id")
+    .eq("id", opts.eventId)
+    .maybeSingle();
+  if (!scheduled?.organizer_member_id) return false;
+
+  const org = await emailForMemberId(opts.admin, scheduled.organizer_member_id);
+  if (!org) return false;
+
+  const gotrefsId = await gotrefsIdForMember(opts.admin, opts.refMemberId);
+  const inboxUrl = `${dashboardUrl(siteUrl, "/dashboard/organizer")}?panel=requests`;
+
+  return sendEmail({
+    to: org.email,
+    subject: `${BRAND_NAME}: Ref canceled request — ${event.title}`,
+    html: emailLayout({
+      title: "Request canceled",
+      bodyHtml: `
+        <p>Hi ${escapeHtml(org.displayName)},</p>
+        <p><strong>Ref ${escapeHtml(gotrefsId)}</strong> canceled their request for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}).</p>
+        <p>They may request again later if the game is still open.</p>
+      `,
+      ctaLabel: "View requests",
+      ctaUrl: inboxUrl,
+    }),
+  });
+}
+
+export async function notifyApplicationWithdrawnToRef(opts: {
+  admin: SupabaseClient;
+  eventId: string;
+  refMemberId: string;
+  applicationId?: string | null;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const [ref, event] = await Promise.all([
+    emailForMemberId(opts.admin, opts.refMemberId),
+    eventSummary(opts.admin, opts.eventId),
+  ]);
+  if (!ref || !event) return false;
+
+  return sendEmail({
+    to: ref.email,
+    subject: `${BRAND_NAME}: Organizer canceled your request — ${event.title}`,
+    html: emailLayout({
+      title: "Request canceled",
+      bodyHtml: `
+        <p>Hi ${escapeHtml(ref.displayName)},</p>
+        <p>The organizer canceled your request for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}).</p>
+        <p>You can request this game again from Explore if it is still open.</p>
+      `,
+      ctaLabel: "Find games",
+      ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
+    }),
+  });
+}
+
 export async function notifyOrganizerNewApplication(opts: {
   admin: SupabaseClient;
   eventId: string;
@@ -360,7 +433,7 @@ export async function notifyOrganizerNewApplication(opts: {
           <li>${escapeHtml(event.place)}</li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>Review their GotREFS ID card, ratings, and price — then approve or deny. Names, emails, and phone numbers are never shared.</p>
+        <p>Review their GotREFS ID card, ratings, and price — then approve or unrequest. Names, emails, and phone numbers are never shared.</p>
       `,
       ctaLabel: "Review this request",
       ctaUrl: reviewUrl,
