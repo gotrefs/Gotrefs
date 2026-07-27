@@ -1,6 +1,9 @@
-import Image from "next/image";
-import { BrandName } from "@/components/BrandName";
+"use client";
+
+import { useEffect, useMemo, useState, type ReactNode, type Ref } from "react";
+import QRCode from "qrcode";
 import { BRAND_NAME } from "@/lib/brand";
+import { publicRefIdCardUrl } from "@/lib/public-card-url";
 
 export type EditableRefCardField =
   | "profile"
@@ -34,384 +37,476 @@ type RefereeIdCardProps = {
   verificationSkipped?: boolean;
   emptyPlaceholders?: boolean;
   profileComplete?: boolean;
-  /** Shown on the green badge, e.g. "Valid thru Jul 20, 2027". */
   validThrough?: string | null;
   onEditField?: (field: EditableRefCardField) => void;
-  /** When set, tapping the photo opens a file picker and uploads immediately. */
   onUploadPhoto?: (file: File) => void;
   className?: string;
+  cardRef?: Ref<HTMLDivElement>;
 };
 
-function statusLabel(value?: string | null) {
-  if (!value) return "Pending";
-  return value.replace(/_/g, " ");
+/** Brand palette from globals.css */
+const C = {
+  navy: "#26213e",
+  navyDeep: "#1a1730",
+  navyMid: "#3d3851",
+  navyHero: "#221e3f",
+  gold: "#c9a227",
+  goldLight: "#f0d78c",
+  goldDark: "#4a3208",
+  white: "#ffffff",
+  ink: "#202442",
+  accent: "#d81d24",
+};
+
+function splitList(value?: string | null): string[] {
+  if (!value?.trim()) return [];
+  return value
+    .split(/[\n,;|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
-function CardBadge({
-  active,
-  skipped,
-  label,
-  pendingLabel,
+function validYearRange(validThrough?: string | null): string | null {
+  if (!validThrough?.trim()) return null;
+  const yearMatch = validThrough.match(/(20\d{2})/);
+  if (!yearMatch) return validThrough.trim();
+  const endYear = Number(yearMatch[1]);
+  if (!Number.isFinite(endYear)) return validThrough.trim();
+  return `${endYear - 1}-${endYear}`;
+}
+
+function RefIdQr({ value }: { value: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void QRCode.toDataURL(value, {
+      errorCorrectionLevel: "L",
+      margin: 1,
+      width: 240,
+      color: { dark: "#111111", light: "#ffffff" },
+    })
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value]);
+
+  if (!src) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center text-[9px] font-bold uppercase tracking-wide"
+        style={{ color: C.navyMid }}
+      >
+        QR
+      </div>
+    );
+  }
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={`QR code for ${value}`} className="h-full w-full object-contain" />;
+}
+
+function InfoBox({
+  title,
+  onClick,
+  children,
+  className = "",
+  bodyClassName = "",
 }: {
-  active: boolean;
-  skipped?: boolean;
-  label: string;
-  pendingLabel?: string;
+  title: string;
+  onClick?: () => void;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
 }) {
   return (
-    <span
-      className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition ${
-        active
-          ? "border-emerald-200 bg-emerald-300/20 text-emerald-50 shadow-[0_0_18px_rgba(52,211,153,0.45)]"
-          : skipped
-            ? "border-red-200 bg-red-500/25 text-red-50 shadow-[0_0_18px_rgba(239,68,68,0.45)]"
-            : "border-yellow-200/40 bg-yellow-300/10 text-yellow-50/75"
-      }`}
+    <div
+      className={`flex min-h-0 flex-col overflow-hidden rounded-[6px] text-left shadow-md ${className}`}
+      style={{ background: C.white, border: `1.5px solid ${C.gold}` }}
     >
-      {active ? label : skipped ? "✕ Unverified" : pendingLabel || "Processing"}
-    </span>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className={`px-2.5 py-1.5 text-left ${onClick ? "cursor-pointer transition hover:brightness-95" : "cursor-default"}`}
+        style={{
+          background: `linear-gradient(180deg, ${C.goldLight} 0%, ${C.gold} 100%)`,
+        }}
+      >
+        <p
+          className="text-[9px] font-black uppercase tracking-[0.08em]"
+          style={{ color: C.goldDark }}
+        >
+          {title}
+        </p>
+      </button>
+      <div className={`min-h-0 overflow-y-auto overscroll-contain px-2.5 py-2 ${bodyClassName}`}>
+        {children}
+      </div>
+    </div>
   );
 }
 
-const SPORT_ICON_MAP: Record<string, string> = {
-  Basketball: "🏀",
-  Football: "🏈",
-  Soccer: "⚽",
-  Baseball: "⚾",
-  Softball: "🥎",
-  Volleyball: "🏐",
-  Hockey: "🏒",
-  Lacrosse: "🥍",
-  Wrestling: "🤼",
-  Tennis: "🎾",
-  Golf: "⛳",
-  Swimming: "🏊",
-  "Track & Field": "🏃",
-  "Cross Country": "🏃",
-  "Flag Football": "🚩",
-  "7v7 Football": "🏈",
-  Futsal: "⚽",
-};
-
-function sportIcon(sport: string) {
-  return SPORT_ICON_MAP[sport] || "🏅";
-}
-
-const editableClass =
-  "cursor-pointer text-left transition hover:border-cyan-200/60 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-200/60";
+const editableTap =
+  "cursor-pointer text-left transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]";
 
 export function RefereeIdCard({
-  fullName,
   gotrefsId,
-  cardTitle,
   primarySport,
   additionalSports = [],
   certificationLevel,
   certifiedBy,
-  rate,
   avatarUrl,
   avatarLabel = "REF",
   baseCity,
   workRegions = [],
-  travelRadius,
-  availabilitySummary,
-  govIdUploaded,
-  certUploaded,
-  backgroundStatus,
-  verificationStatus,
-  verificationSkipped,
-  emptyPlaceholders,
-  profileComplete,
   validThrough,
+  emptyPlaceholders,
   onEditField,
   onUploadPhoto,
   className = "",
+  cardRef,
 }: RefereeIdCardProps) {
-  const name = fullName?.trim() || (emptyPlaceholders ? "" : "Marcus Johnson");
-  const sport = primarySport?.trim()
-    ? `${primarySport.trim()} Official`
-    : emptyPlaceholders
-      ? ""
-      : "Football Official";
-  const cert = certificationLevel?.trim() || (emptyPlaceholders ? "" : "Certification level");
-  const certOrg = certifiedBy?.trim() || (emptyPlaceholders ? "" : "Certified By");
   const id = gotrefsId?.trim() || (emptyPlaceholders ? "" : "GR-2026-4587");
-  const city = baseCity?.trim() || (emptyPlaceholders ? "" : "Base city");
-  const regions = workRegions.filter(Boolean);
-  const regionText = regions.length
-    ? regions.slice(0, 3).join(", ")
-    : emptyPlaceholders
-      ? ""
-      : "Regions willing to work";
-  const radius = travelRadius?.trim();
-  const willingToTravel = Boolean(radius && Number(radius) > 0);
-  const availability = availabilitySummary?.trim() || (emptyPlaceholders ? "" : "Add availability");
-  const screeningClear = backgroundStatus === "clear";
-  const submitted = ["submitted", "under_review", "approved"].includes(verificationStatus ?? "");
-  const showRedUnverified = Boolean(verificationSkipped && !screeningClear && !submitted);
-  const sports = [primarySport, ...additionalSports].filter((item): item is string => Boolean(item?.trim()));
-  const hasLocation = Boolean(regionText || city || radius);
-  const hasCertification = Boolean(cert || certOrg);
-  const hasVerificationState = Boolean(
-    profileComplete || primarySport || govIdUploaded || certUploaded || screeningClear || submitted || showRedUnverified
-  );
-  const hasStatus = Boolean(screeningClear || showRedUnverified || verificationStatus);
-  const completionItems = [
-    Boolean(fullName?.trim()),
-    Boolean(primarySport?.trim()),
-    Boolean(certificationLevel?.trim()),
-    Boolean(baseCity?.trim() || workRegions.length || travelRadius?.trim()),
-    Boolean(govIdUploaded),
-    Boolean(certUploaded),
-    screeningClear || submitted,
-  ];
-  const showProgress = !emptyPlaceholders || completionItems.some(Boolean);
-  const percent = Math.round((completionItems.filter(Boolean).length / completionItems.length) * 100);
+  const sports = [primarySport, ...additionalSports]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+  const acceptedBy = splitList(certifiedBy);
+  const city =
+    baseCity?.trim() ||
+    workRegions.filter(Boolean).slice(0, 2).join(", ") ||
+    (emptyPlaceholders ? "" : "Add city");
+  const years = validYearRange(validThrough);
+  const expireLabel = validThrough?.trim() || (emptyPlaceholders ? "" : "Pending approval");
+  const typeLabel = certificationLevel?.trim() || "GotREFS Accreditation";
+
+  const gamesList = useMemo(() => {
+    if (sports.length > 0) return sports;
+    return emptyPlaceholders ? [] : ["Add sports you officiate"];
+  }, [sports, emptyPlaceholders]);
+
+  const acceptedList = useMemo(() => {
+    if (acceptedBy.length > 0) return acceptedBy;
+    return emptyPlaceholders ? [] : ["Add who certified you"];
+  }, [acceptedBy, emptyPlaceholders]);
+
+  const [publicIdUrl, setPublicIdUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) {
+      setPublicIdUrl(null);
+      return;
+    }
+    setPublicIdUrl(publicRefIdCardUrl(id));
+  }, [id]);
+
+  const qrPayload = publicIdUrl || id || "GotREFS Official ID";
+  const qrUsesProductionWhileLocal =
+    typeof window !== "undefined" &&
+    /localhost|127\.0\.0\.1/i.test(window.location.origin) &&
+    Boolean(publicIdUrl && !/localhost|127\.0\.0\.1/i.test(publicIdUrl));
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[1.5rem] border border-white/25 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/30 backdrop-blur sm:rounded-[2rem] sm:p-5 ${className}`}
+      ref={cardRef}
+      data-ref-id-card
+      className={`relative mx-auto w-full max-w-[400px] overflow-hidden rounded-[18px] shadow-[0_20px_50px_rgba(38,33,62,0.35)] ${className}`}
+      style={{
+        background: C.navy,
+        border: `3px solid ${C.gold}`,
+        color: C.ink,
+        fontFamily: "Helvetica Neue, Helvetica, Arial, sans-serif",
+      }}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(13,27,59,0.96),rgba(8,18,38,0.92)_45%,rgba(127,29,29,0.88)),radial-gradient(circle_at_top_right,rgba(239,68,68,0.45),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.45),transparent_36%)]" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-white/15 blur-3xl" />
-      <div className="absolute -right-16 top-16 h-44 w-44 rounded-full border border-white/10" />
-      <div className="absolute -bottom-20 -left-16 h-56 w-56 rounded-full border border-white/10" />
+      {/* Subtle field watermark on navy body */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage: `
+            radial-gradient(circle at 12% 40%, rgba(255,255,255,0.9) 0 1px, transparent 2px),
+            radial-gradient(circle at 88% 55%, rgba(255,255,255,0.7) 0 1px, transparent 2px),
+            repeating-linear-gradient(115deg, transparent 0 22px, rgba(255,255,255,0.35) 22px 23px)
+          `,
+          backgroundSize: "48px 48px, 56px 56px, auto",
+        }}
+      />
+
       <div className="relative">
-        <div className="flex items-start justify-between gap-3 sm:gap-4">
-          <div className="rounded-xl bg-white/95 px-2.5 py-2 shadow-lg sm:px-3">
-            <Image src="/gotrefs-logo.png" alt={BRAND_NAME} width={150} height={56} className="h-8 w-auto sm:h-10" />
-          </div>
-          <div className="text-right">
-            {id && (
-              <>
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/45">
-                  <BrandName /> ID
-                </p>
-                <p className="mt-1 rounded-full border border-cyan-200/50 bg-cyan-300/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-50 shadow-[0_0_20px_rgba(103,232,249,0.35)]">
-                  {id}
-                </p>
-              </>
-            )}
+        {/* ── Header (site navy, mockup structure) ── */}
+        <div
+          className="relative flex items-center gap-2 px-3 py-2"
+          style={{ background: C.navyDeep }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/gotrefs-logo-blue-background.png"
+            alt={BRAND_NAME}
+            className="h-9 w-auto shrink-0 object-contain sm:h-10"
+          />
+          <div className="min-w-0 flex-1 text-center pr-9 sm:pr-10">
+            <p
+              className="truncate text-[8px] font-bold uppercase tracking-[0.2em] text-white/85 sm:text-[9px]"
+            >
+              {BRAND_NAME} Verified Official Network
+            </p>
+            <h2
+              className="mt-0.5 text-[1.15rem] font-black uppercase leading-none tracking-[0.04em] text-white sm:text-[1.35rem]"
+            >
+              Official ID Card
+            </h2>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-[5.75rem_1fr] gap-3 sm:mt-6 sm:grid-cols-[7.5rem_1fr] sm:gap-4">
-          <div className="relative">
-            <label
-              className={`relative block aspect-[4/5] w-full cursor-pointer overflow-hidden rounded-[1.6rem] border border-white/25 bg-white/10 shadow-2xl shadow-black/25 ${editableClass}`}
-              aria-label={avatarUrl ? "Change profile photo" : "Add profile photo"}
-            >
-              {avatarUrl ? (
-                // Uploaded photos use signed/object URLs, so use a native image.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt={`${name} avatar`} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_20%),linear-gradient(160deg,rgba(59,130,246,0.7),rgba(239,68,68,0.72))] px-2 text-center">
-                  <span className="text-2xl font-black sm:text-3xl">{avatarLabel}</span>
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-white/90">Add photo</span>
-                </div>
-              )}
-              {onUploadPhoto ? (
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                  className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onUploadPhoto(file);
-                    e.target.value = "";
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="absolute inset-0"
-                  onClick={() => onEditField?.("photo")}
-                  aria-label="Edit profile photo"
-                />
-              )}
-            </label>
-            <div className="absolute -bottom-2 left-1/2 max-w-[95%] -translate-x-1/2 rounded-full bg-green-400 px-3 py-1 text-center text-[9px] font-black uppercase tracking-[0.12em] text-green-950 shadow-lg">
-              {validThrough ? `Valid thru ${validThrough}` : "Active"}
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-100/80">
-              {cardTitle || `${BRAND_NAME} verified official`}
-            </p>
-            <button type="button" onClick={() => onEditField?.("profile")} className="block max-w-full text-left">
-              <h3 className="mt-2 min-h-8 truncate text-2xl font-black tracking-tight hover:text-cyan-100 sm:min-h-9 sm:text-3xl">
-                {name}
-              </h3>
-            </button>
-            <button type="button" onClick={() => onEditField?.("sports")} className="mt-1 text-left">
-              <p className="min-h-5 text-sm font-bold text-cyan-100 hover:text-white sm:min-h-6 sm:text-base">
-                {sport}
+        {/* ── White identity panel with curved bottom ── */}
+        <div className="relative bg-white px-3.5 pb-5 pt-3.5 sm:px-4">
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3 sm:grid-cols-[7.25rem_1fr] sm:gap-4">
+            <div>
+              <label
+                className={`relative block aspect-square w-full overflow-hidden bg-neutral-100 ${editableTap}`}
+                style={{ border: `3px solid ${C.gold}`, borderRadius: 4 }}
+                aria-label={avatarUrl ? "Change profile photo" : "Add profile photo"}
+              >
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt="Official profile photo"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center text-white"
+                    style={{
+                      background: `linear-gradient(160deg, ${C.navyMid}, ${C.navyDeep})`,
+                    }}
+                  >
+                    <span className="text-xl font-black">{avatarLabel}</span>
+                    <span className="text-[8px] font-bold uppercase tracking-wide">Add photo</span>
+                  </div>
+                )}
+                {onUploadPhoto ? (
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onUploadPhoto(file);
+                      e.target.value = "";
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="absolute inset-0"
+                    onClick={() => onEditField?.("photo")}
+                    aria-label="Edit profile photo"
+                  />
+                )}
+              </label>
+              <p
+                className="mt-1.5 text-center text-[10px] font-black uppercase tracking-wide"
+                style={{ color: C.ink }}
+              >
+                {years ? `Valid ${years}` : "Valid pending"}
               </p>
-            </button>
-            <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:mt-4 sm:grid-cols-2">
+            </div>
+
+            <div className="min-w-0 space-y-2 pt-1 text-[12px] leading-snug sm:text-[13px]">
+              <button
+                type="button"
+                onClick={() => onEditField?.("profile")}
+                className={`block w-full ${editableTap}`}
+              >
+                <p style={{ color: C.ink }}>
+                  <span className="font-bold">Referee ID: </span>
+                  <span className="font-semibold tracking-wide">{id || "—"}</span>
+                </p>
+              </button>
+              <p style={{ color: C.ink }}>
+                <span className="font-bold">Expire Date: </span>
+                <span className="font-semibold">{expireLabel || "—"}</span>
+              </p>
               <button
                 type="button"
                 onClick={() => onEditField?.("certification")}
-                className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
+                className={`block w-full ${editableTap}`}
               >
-                {cert && <p className="text-[9px] uppercase tracking-[0.18em] text-white/45">Level</p>}
-                <p className="mt-1 min-h-4 truncate font-bold">
-                  {cert}
+                <p style={{ color: C.ink }}>
+                  <span className="font-bold">Type: </span>
+                  <span className="font-semibold uppercase">{typeLabel}</span>
                 </p>
               </button>
-              <button
-                type="button"
-                onClick={() => onEditField?.("rate")}
-                className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
-              >
-                {rate && <p className="text-[9px] uppercase tracking-[0.18em] text-white/45">Rate</p>}
-                <p className="mt-1 min-h-4 font-bold">
-                  {rate ? `$${rate}/game` : emptyPlaceholders ? "" : "Set later"}
-                </p>
-              </button>
-            </div>
-          </div>
-        </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_0.9fr]">
-          <button
-            type="button"
-            onClick={() => onEditField?.("location")}
-            className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              {hasLocation && (
-                <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">Regions willing to work</p>
-              )}
-              {radius && (
-                <span className="rounded-full bg-white/10 px-2 py-1 text-[9px] font-black uppercase text-white/70">
-                  Travel {willingToTravel ? "Yes" : "No"}
-                </span>
-              )}
-            </div>
-            <p className="mt-2 min-h-5 text-sm font-bold">
-              {regionText}
-            </p>
-            <p className="mt-1 text-xs text-white/55">
-              {city}
-              {radius ? ` · ${radius} mi radius` : ""}
-            </p>
-            <div className="mt-3 flex h-14 items-end gap-2 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
-              {hasLocation &&
-                [0, 1, 2].map((pin) => (
-                  <span
-                    key={pin}
-                    className={`block rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.55)] ${
-                      pin === 0 ? "h-6 w-2" : pin === 1 ? "h-9 w-2" : "h-4 w-2"
-                    } ${regions.length > pin || baseCity ? "opacity-100" : "opacity-25"}`}
-                  />
-                ))}
-              {hasLocation && (
-                <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
-                  Map pins
-                </span>
-              )}
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onEditField?.("sports")}
-            className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
-          >
-            {sports.length > 0 && (
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">Eligible sports</p>
-            )}
-            <div className="mt-2 flex flex-wrap gap-2">
-              {sports.slice(0, 6).map((item) => (
-                <span
-                  key={item}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-cyan-200/60 bg-cyan-300/15 text-base shadow-[0_0_16px_rgba(103,232,249,0.32)]"
-                  title={item}
+              {/* Seal (matches mockup accent under details) */}
+              <div className="flex items-center gap-2 pt-1">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-black text-white shadow"
+                  style={{
+                    background: `conic-gradient(from 40deg, ${C.gold}, ${C.navyMid}, ${C.goldLight}, ${C.navy}, ${C.gold})`,
+                    border: `2px solid ${C.gold}`,
+                  }}
+                  aria-hidden
                 >
-                  {sportIcon(item)}
-                </span>
-              ))}
-            </div>
-            {hasCertification && (
-              <>
-                <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-white/45">Certified by</p>
-                <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-bold">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[var(--red)]">
-                    ✓
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-[8px]"
+                    style={{ background: C.navyDeep }}
+                  >
+                    GR
                   </span>
-                  <span className="truncate">{certOrg}</span>
                 </div>
-              </>
-            )}
-          </button>
-        </div>
-
-        {hasVerificationState && (
-          <button
-            type="button"
-            onClick={() => onEditField?.("verification")}
-            className="mt-5 flex flex-wrap gap-2 text-left"
-          >
-            <CardBadge active={Boolean(profileComplete || primarySport)} label="Profile Ready" pendingLabel={emptyPlaceholders ? "" : "Profile Pending"} />
-            <CardBadge active={Boolean(govIdUploaded)} skipped={showRedUnverified} label="Identity Verified" pendingLabel={emptyPlaceholders ? "" : "Identity Processing"} />
-            <CardBadge active={Boolean(certUploaded)} skipped={showRedUnverified} label="Certified Official" pendingLabel={emptyPlaceholders ? "" : "Cert Processing"} />
-            <CardBadge active={screeningClear || submitted} skipped={showRedUnverified} label="Background Checked" pendingLabel={emptyPlaceholders ? "" : "Background Processing"} />
-          </button>
-        )}
-
-        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => onEditField?.("availability")}
-            className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
-          >
-            {availability && <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">Availability</p>}
-            <p className="mt-1 min-h-5 font-bold">
-              {availability}
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={() => onEditField?.("verification")}
-            className={`rounded-2xl border border-white/10 bg-white/10 p-3 ${editableClass}`}
-          >
-            {hasStatus && <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">Status</p>}
-            <p className="mt-1 font-bold capitalize">
-              {screeningClear ? (
-                "Verified"
-              ) : showRedUnverified ? (
-                "Unverified"
-              ) : emptyPlaceholders && !verificationStatus ? (
-                <span className="block h-4 w-20 rounded-full bg-white/10" />
-              ) : (
-                statusLabel(verificationStatus)
-              )}
-            </p>
-          </button>
-        </div>
-
-        {showProgress && <div className="mt-5">
-          <div className="flex items-center justify-between text-xs font-semibold text-white/70">
-            <span>Card build</span>
-            <span>{percent}%</span>
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: C.navyMid }}>
+                  Verified official
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+
+          {/* Curve into navy body */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-px left-0 right-0 h-5"
+            style={{
+              background: C.navy,
+              borderTopLeftRadius: "50% 100%",
+              borderTopRightRadius: "50% 100%",
+            }}
+          />
+        </div>
+
+        {/* ── Brand crest + data boxes ── */}
+        <div className="relative px-3 pb-3.5 pt-1 sm:px-3.5">
+          <div className="mx-auto flex max-w-[300px] flex-col items-center text-center">
+            {/* Crest: site logo in gold frame */}
             <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-blue-300 to-red-300 shadow-[0_0_18px_rgba(103,232,249,0.65)] transition-all"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>}
+              className="relative flex h-[4.75rem] w-[4.75rem] items-center justify-center overflow-hidden rounded-full p-1 shadow-lg sm:h-[5.5rem] sm:w-[5.5rem]"
+              style={{
+                background: C.navyHero,
+                border: `3px solid ${C.gold}`,
+                boxShadow: `0 0 0 3px ${C.navyDeep}, 0 10px 24px rgba(0,0,0,0.35)`,
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/gotrefs-logo-blue-background.png"
+                alt={BRAND_NAME}
+                className="h-full w-full object-contain"
+              />
+            </div>
 
-        <div className="mt-5 min-h-9 text-xs text-white/55">
-          {additionalSports.length > 0
-            ? `Also covers: ${additionalSports.slice(0, 4).join(", ")}`
-            : emptyPlaceholders
-              ? ""
-              : "Add more sports and badges as your profile grows."}
+            {/* GOT REF'S banner */}
+            <div
+              className="relative z-10 -mt-1 w-full max-w-[260px] px-3 py-1.5"
+              style={{
+                background: C.navyDeep,
+                border: `2px solid ${C.gold}`,
+                clipPath: "polygon(4% 0, 96% 0, 100% 50%, 96% 100%, 4% 100%, 0 50%)",
+              }}
+            >
+              <p
+                className="text-[1.35rem] font-black uppercase leading-none tracking-tight text-white sm:text-[1.55rem]"
+                style={{ textShadow: "0 1px 0 rgba(0,0,0,0.35)" }}
+              >
+                GOT REF&apos;S
+              </p>
+            </div>
+
+            {/* Qualified Officials ribbon */}
+            <div
+              className="relative z-0 -mt-0.5 px-4 py-1"
+              style={{
+                background: C.navyMid,
+                border: `1.5px solid ${C.gold}`,
+                clipPath: "polygon(6% 0, 94% 0, 100% 100%, 0 100%)",
+              }}
+            >
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">
+                Qualified Officials
+              </p>
+            </div>
+          </div>
+
+          {/* Games + Location */}
+          <div className="mt-3.5 grid h-[7.5rem] grid-cols-2 gap-2">
+            <InfoBox
+              title="Games certified to ref"
+              onClick={() => onEditField?.("sports")}
+              className="h-full"
+              bodyClassName="max-h-[5.25rem]"
+            >
+              <ul className="space-y-0.5 text-[10px] font-semibold leading-snug sm:text-[11px]" style={{ color: C.ink }}>
+                {gamesList.map((sport) => (
+                  <li key={sport}>• {sport}</li>
+                ))}
+              </ul>
+            </InfoBox>
+
+            <InfoBox
+              title="Location"
+              onClick={() => onEditField?.("location")}
+              className="h-full"
+              bodyClassName="max-h-[5.25rem]"
+            >
+              <p className="text-[10px] font-semibold leading-snug sm:text-[11px]" style={{ color: C.ink }}>
+                <span className="font-bold">City: </span>
+                {city || "—"}
+              </p>
+            </InfoBox>
+          </div>
+
+          {/* QR + Accepted by */}
+          <div className="mt-2 grid h-[7.75rem] grid-cols-[5.75rem_1fr] gap-2 sm:grid-cols-[6.5rem_1fr]">
+            <div
+              className="overflow-hidden rounded-[6px] p-1.5 shadow-md"
+              style={{ background: C.white, border: `1.5px solid ${C.gold}` }}
+            >
+              <div className="aspect-square w-full">
+                {id && publicIdUrl ? (
+                  <RefIdQr value={qrPayload} />
+                ) : (
+                  <div
+                    className="flex h-full items-center justify-center text-[9px] font-bold"
+                    style={{ color: C.navyMid }}
+                  >
+                    ID
+                  </div>
+                )}
+              </div>
+              <p
+                className="mt-1 text-center text-[7px] font-bold uppercase tracking-wide"
+                style={{ color: C.navyMid }}
+              >
+                Scan for photo ID
+              </p>
+              {qrUsesProductionWhileLocal ? (
+                <p className="mt-1 text-center text-[7px] leading-tight text-amber-800">
+                  Opens gotrefs.org (not localhost)
+                </p>
+              ) : null}
+            </div>
+
+            <InfoBox
+              title="Accepted by"
+              onClick={() => onEditField?.("certification")}
+              className="h-full"
+              bodyClassName="max-h-[5.5rem]"
+            >
+              <ul
+                className="space-y-0.5 text-[10px] font-semibold leading-snug sm:text-[11px]"
+                style={{ color: C.ink }}
+              >
+                {acceptedList.map((org) => (
+                  <li key={org}>• {org}</li>
+                ))}
+              </ul>
+            </InfoBox>
+          </div>
         </div>
       </div>
     </div>
