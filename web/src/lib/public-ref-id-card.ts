@@ -1,5 +1,9 @@
 import { formatCardValidThrough } from "@/lib/ref-id-card-validity";
-import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
+import {
+  isUploadedProfilePhotoPath,
+  pickProfilePhotoSource,
+  resolveProfilePhotoUrl,
+} from "@/lib/profile-photo";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export type PublicRefIdCard = {
@@ -212,10 +216,23 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
   const metaGotrefs = metaGotrefsId(meta);
   const displayId = (profile.gotrefs_id || metaGotrefs || gotrefsId).trim();
 
-  const photoSource =
-    member?.profile_picture_url ||
-    (typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null) ||
-    (typeof meta.avatar_url === "string" ? meta.avatar_url : null);
+  const photoSource = await pickProfilePhotoSource(
+    admin,
+    profile.member_id,
+    member?.profile_picture_url,
+    typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null,
+    typeof meta.avatar_url === "string" ? meta.avatar_url : null
+  );
+
+  if (photoSource && isUploadedProfilePhotoPath(photoSource)) {
+    const current = String(member?.profile_picture_url ?? "").trim();
+    if (current !== photoSource) {
+      void admin
+        .from("members")
+        .update({ profile_picture_url: photoSource })
+        .eq("id", profile.member_id);
+    }
+  }
 
   const avatarUrl = await resolveProfilePhotoUrl(admin, photoSource, 60 * 60 * 12);
 

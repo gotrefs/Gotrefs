@@ -521,19 +521,25 @@ export async function notifyVerificationDecision(opts: {
 
   return sendEmail({
     to: ref.email,
-    subject: `${BRAND_NAME}: Changes needed before approval`,
+    subject: opts.changesRequested
+      ? `${BRAND_NAME}: Changes needed before approval`
+      : `${BRAND_NAME}: Verification not approved`,
     html: emailLayout({
-      title: "Changes need to be made",
+      title: opts.changesRequested ? "Changes need to be made" : "Verification not approved",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
         <p>${
           opts.changesRequested
             ? `${BRAND_NAME} reviewed your verification and needs a few changes before we can approve your account.`
-            : `Your verification was not approved yet. Please make the requested changes and resubmit.`
+            : `Your ${BRAND_NAME} verification is not approved, so you cannot request to work games right now.`
         }</p>
         ${notes}
         ${stepsHtml}
-        <p>Sign in to your referee dashboard, update the flagged items, and resubmit for review.</p>
+        <p>${
+          opts.changesRequested || stepLabels.length > 0
+            ? "Sign in to your referee dashboard, update the flagged items, and resubmit for review."
+            : "If you have questions, reply to this email or contact GotRefs support."
+        }</p>
       `,
       ctaLabel: "Open referee dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),

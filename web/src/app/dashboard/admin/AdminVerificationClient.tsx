@@ -156,7 +156,7 @@ export default function AdminVerificationClient() {
 
   async function review(action: "approve" | "reject" | "request_info") {
     if (!selected) return;
-    if ((action === "request_info" || action === "reject") && fixRequiredSteps.length === 0) {
+    if (action === "request_info" && fixRequiredSteps.length === 0) {
       setMsg("Select at least one signup step (1–5) the referee needs to fix.");
       return;
     }
@@ -165,7 +165,7 @@ export default function AdminVerificationClient() {
       return;
     }
     if (action === "reject" && !adminNotes.trim()) {
-      setMsg("Add a message explaining what the referee needs to change.");
+      setMsg("Add a reason explaining why this referee is not approved / approval is revoked.");
       return;
     }
     setSubmitting(true);
@@ -186,11 +186,14 @@ export default function AdminVerificationClient() {
         return;
       }
       const name = selected.display_name || selected.email || "referee";
+      const wasApproved = selected.status === "approved";
       setMsg(
         action === "approve"
           ? `✓ ${name} set to approved.`
           : action === "reject"
-            ? `✓ ${name} set to rejected.`
+            ? wasApproved
+              ? `✓ Approval revoked for ${name}. They can no longer request games.`
+              : `✓ ${name} set to rejected.`
             : `✓ Requested more info from ${name}.`
       );
       setCompletedActions({ [action]: true });
@@ -397,9 +400,10 @@ export default function AdminVerificationClient() {
               </div>
 
               <label className="mt-5 block">
-                <span className="text-sm font-bold text-[var(--navy)]">What needs to be fixed? (select one or more)</span>
+                <span className="text-sm font-bold text-[var(--navy)]">What needs to be fixed? (optional for Rejected)</span>
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  These match the ref signup steps. Only the numbers you select will appear when they resubmit.
+                  Required for Needs info. For Rejected, select steps only if they should resubmit those items;
+                  otherwise a reason alone is enough to revoke approval.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {REF_VERIFICATION_STEPS.map((step) => {
@@ -432,12 +436,12 @@ export default function AdminVerificationClient() {
               </label>
 
               <label className="mt-5 block">
-                <span className="text-sm font-bold text-[var(--navy)]">Message to referee</span>
+                <span className="text-sm font-bold text-[var(--navy)]">Reason / message to referee</span>
                 <textarea
                   value={adminNotes}
                   onChange={(event) => setAdminNotes(event.target.value)}
                   rows={4}
-                  placeholder="Example: Please upload a clearer photo of your certification."
+                  placeholder="Required for Rejected or Needs info. Example: Approval revoked — certification expired. Please upload a current credential."
                   className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
                 />
               </label>
@@ -450,8 +454,9 @@ export default function AdminVerificationClient() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                  You can change this anytime — approve later after a reject, or revoke approval if needed.
-                  Request info / reject still need a message and at least one signup step selected above.
+                  You can change this anytime. Click <strong>Rejected</strong> after an approval to revoke it —
+                  they will immediately lose the ability to request games. Include a reason above (and optional
+                  fix steps if they should resubmit).
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -462,7 +467,7 @@ export default function AdminVerificationClient() {
                     approveMarked ? "bg-green-700 ring-2 ring-green-300" : "bg-green-600"
                   }`}
                 >
-                  {approveMarked ? "✓ Approved" : currentStatus === "rejected" || currentStatus === "under_review" ? "Change to approved" : "Approve"}
+                  {approveMarked ? "✓ Approved" : "Approved"}
                 </button>
                 <button
                   type="button"
@@ -472,7 +477,7 @@ export default function AdminVerificationClient() {
                     requestInfoMarked ? "bg-[var(--navy)] ring-2 ring-slate-300" : "bg-[var(--blue)]"
                   }`}
                 >
-                  {requestInfoMarked ? "✓ Needs info" : "Change to needs info"}
+                  {requestInfoMarked ? "✓ Needs info" : "Needs info"}
                 </button>
                 <button
                   type="button"
@@ -482,7 +487,7 @@ export default function AdminVerificationClient() {
                     rejectMarked ? "bg-[var(--red-dark)] ring-2 ring-red-300" : "bg-[var(--red)]"
                   }`}
                 >
-                  {rejectMarked ? "✓ Rejected" : "Change to rejected"}
+                  {rejectMarked ? "✓ Rejected" : "Rejected"}
                 </button>
                 </div>
               </div>

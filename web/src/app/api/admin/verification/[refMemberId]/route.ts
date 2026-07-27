@@ -39,15 +39,24 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
   const adminNotesInput = (body.adminNotes ?? "").trim();
   const now = new Date().toISOString();
 
-  if ((action === "reject" || action === "request_info") && fixRequiredSteps.length === 0) {
+  if (action === "reject" && !adminNotesInput) {
     return NextResponse.json(
-      { error: "Select at least one item (1–5) the referee needs to fix before sending." },
+      { error: "Add a reason explaining why this referee is not approved." },
       { status: 400 }
     );
   }
 
-  if ((action === "reject" || action === "request_info") && !adminNotesInput) {
+  if (action === "request_info" && !adminNotesInput) {
     return NextResponse.json({ error: "Add a message explaining what the referee needs to change." }, { status: 400 });
+  }
+
+  // Reject can be used to revoke a prior approval. Fix steps are optional so admins
+  // can revoke with a reason only; when steps are selected the ref gets a resubmit path.
+  if (action === "request_info" && fixRequiredSteps.length === 0) {
+    return NextResponse.json(
+      { error: "Select at least one item (1–5) the referee needs to fix before sending." },
+      { status: 400 }
+    );
   }
 
   const status =
@@ -104,23 +113,26 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         { onConflict: "ref_member_id" }
       );
     } else if (action === "reject") {
-      await admin
-        .from("screening_checks")
-        .update({
+      // Upsert so revoke-after-approve always clears eligibility even if the row was missing.
+      await admin.from("screening_checks").upsert(
+        {
+          ref_member_id: refMemberId,
           status: "consider",
-          summary: "Verification rejected — fixes requested",
+          summary: adminNotes || "Verification rejected — approval revoked",
           updated_at: now,
-        })
-        .eq("ref_member_id", refMemberId);
+        },
+        { onConflict: "ref_member_id" }
+      );
     } else {
-      await admin
-        .from("screening_checks")
-        .update({
+      await admin.from("screening_checks").upsert(
+        {
+          ref_member_id: refMemberId,
           status: "pending",
           summary: "Additional verification info requested",
           updated_at: now,
-        })
-        .eq("ref_member_id", refMemberId);
+        },
+        { onConflict: "ref_member_id" }
+      );
     }
 
     const siteUrl = emailSiteUrl(request.url);

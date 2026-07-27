@@ -54,11 +54,20 @@ export function refCanApplyToGames(args: RefEligibilityArgs): boolean {
 }
 
 export function refOfferEligible(args: RefEligibilityArgs): boolean {
+  const status = args.verificationSubmissionStatus ?? null;
+
+  // Explicit admin reject / revoke always blocks — even if screening was previously "clear".
+  if (refVerificationRejected(status)) return false;
+  if (refVerificationPendingReview(status)) return false;
+
   if (args.verificationMethod === "external" && args.externalProofPath) return true;
 
-  if (refVerificationApproved(args.verificationSubmissionStatus)) return true;
+  if (refVerificationApproved(status)) return true;
 
-  if (args.screeningStatus === "clear") return true;
+  // Legacy path: clear screening only when there is no verification decision yet.
+  if (args.screeningStatus === "clear" && (!status || status === "draft" || status === "not_submitted")) {
+    return true;
+  }
 
   return false;
 }

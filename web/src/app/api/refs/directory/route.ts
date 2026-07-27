@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { maskEmail } from "@/lib/mask-email";
 import { isOrganizerMember } from "@/lib/organizer-access";
-import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
+import { pickProfilePhotoSource, resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { sportEmoji } from "@/lib/sport-emoji";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -168,7 +168,18 @@ export async function GET() {
         : `GR-${m.id.slice(0, 8).toUpperCase()}`);
     const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
     const rating = ratingByRef.get(m.id);
-    const avatarUrl = await resolveProfilePhotoUrl(admin, m.profile_picture_url ?? null);
+    const photoSource = await pickProfilePhotoSource(
+      admin,
+      m.id,
+      m.profile_picture_url,
+      typeof authUser?.user?.user_metadata?.profile_picture_url === "string"
+        ? authUser.user.user_metadata.profile_picture_url
+        : null,
+      typeof authUser?.user?.user_metadata?.avatar_url === "string"
+        ? authUser.user.user_metadata.avatar_url
+        : null
+    );
+    const avatarUrl = await resolveProfilePhotoUrl(admin, photoSource);
 
     refs.push({
       id: m.id,

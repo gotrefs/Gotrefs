@@ -278,6 +278,8 @@ export default function OrganizerDashboardClient() {
   const [refs, setRefs] = useState<DirectoryRef[]>([]);
   const [signupRequests, setSignupRequests] = useState<ApplicantRow[]>([]);
   const [reviewApplicant, setReviewApplicant] = useState<ApplicantReviewData | null>(null);
+  const [confirmDenyApplicant, setConfirmDenyApplicant] = useState<ApplicantRow | null>(null);
+  const [denyBusy, setDenyBusy] = useState(false);
   const [sentOffers, setSentOffers] = useState<OrganizerOfferRow[]>([]);
   const [submittedRatings, setSubmittedRatings] = useState<RefRatingRow[]>([]);
   const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
@@ -392,16 +394,8 @@ export default function OrganizerDashboardClient() {
 
     const applicantsRes = await fetch("/api/organizer/applicants");
     const applicantsJson = (await applicantsRes.json()) as { applicants?: ApplicantRow[] };
-    const applicants = applicantsJson.applicants ?? [];
-    const withAvatars = await Promise.all(
-      applicants.map(async (row) => ({
-        ...row,
-        avatarUrl: row.avatarPath
-          ? await resolveProfilePhotoUrl(supabase, row.avatarPath)
-          : null,
-      }))
-    );
-    setSignupRequests(withAvatars);
+    // avatarUrl is signed server-side (service role) — organizers can't read ref storage folders.
+    setSignupRequests(applicantsJson.applicants ?? []);
 
     let { data: offers, error: offersError } = await supabase
       .from("assignment_offers")
@@ -998,7 +992,21 @@ export default function OrganizerDashboardClient() {
   }
 
   async function declineApplicant(applicant: ApplicantRow) {
-    await decideApplicant(applicant.id, "withdraw");
+    setConfirmDenyApplicant(applicant);
+  }
+
+  async function confirmDeclineApplicant() {
+    const applicant = confirmDenyApplicant;
+    if (!applicant || denyBusy) return;
+    setDenyBusy(true);
+    try {
+      const ok = await decideApplicant(applicant.id, "withdraw");
+      if (ok === true) {
+        setConfirmDenyApplicant(null);
+      }
+    } finally {
+      setDenyBusy(false);
+    }
   }
 
   async function sendOffer(refMemberId = offerRef, eventId = offerEvent) {
@@ -2098,7 +2106,7 @@ export default function OrganizerDashboardClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Requests</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Review each official like a host profile — photo, reviews, then accept or unrequest.
+              Review each official like a host profile — photo, reviews, then approve or deny.
             </p>
           </div>
           <div className="space-y-5">
@@ -2127,7 +2135,7 @@ export default function OrganizerDashboardClient() {
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}
                 primaryLabel="Review & decide"
-                secondaryLabel="Unrequest"
+                secondaryLabel="Deny"
                 onPrimary={() =>
                   setReviewApplicant({
                     id: sr.id,
@@ -2154,6 +2162,43 @@ export default function OrganizerDashboardClient() {
             ))}
           </div>
         </section>
+      )}
+
+      {confirmDenyApplicant && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Confirm</p>
+            <h2 className="mt-2 text-xl font-bold text-neutral-900">Are you sure?</h2>
+            <p className="mt-2 text-sm leading-6 text-neutral-600">
+              Deny <span className="font-semibold text-neutral-900">Ref {confirmDenyApplicant.gotrefsId}</span>{" "}
+              for{" "}
+              <span className="font-semibold text-neutral-900">{confirmDenyApplicant.eventTitle}</span>? They
+              will be notified and won’t stay on this request.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={denyBusy}
+                onClick={() => setConfirmDenyApplicant(null)}
+                className="rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-bold text-neutral-800 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={denyBusy}
+                onClick={() => void confirmDeclineApplicant()}
+                className="rounded-xl bg-[var(--red)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {denyBusy ? "Denying…" : "Yes, deny"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Messages tab ── */}

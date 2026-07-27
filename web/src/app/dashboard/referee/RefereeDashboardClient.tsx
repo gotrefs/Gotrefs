@@ -11,7 +11,12 @@ import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueMo
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
-import { findStoredProfilePhotoPath, resolveProfilePhotoUrl } from "@/lib/profile-photo";
+import {
+  findStoredProfilePhotoPath,
+  loadMemberProfilePhotoUrl,
+  resolveProfilePhotoUrl,
+} from "@/lib/profile-photo";
+import { uploadRefProfilePhoto } from "@/lib/auth/upload-ref-signup-docs";
 import {
   clearRefSignupDraft,
   loadRefSignupDraft,
@@ -218,22 +223,18 @@ export default function RefereeDashboardClient() {
       .select("profile_picture_url")
       .eq("id", user.id)
       .maybeSingle();
-    let photoSource =
-      memberRow?.profile_picture_url ||
-      (typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null) ||
-      (typeof meta.avatar_url === "string" ? meta.avatar_url : null);
-
-    // Recover photos that uploaded to storage but never saved on members (e.g. bad updated_at write).
-    if (!photoSource) {
-      const recovered = await findStoredProfilePhotoPath(supabase, user.id);
-      if (recovered) {
-        photoSource = recovered;
-        void supabase.from("members").update({ profile_picture_url: recovered }).eq("id", user.id);
-        void supabase.auth.updateUser({ data: { profile_picture_url: recovered } });
-      }
+    // Prefer uploaded GotRefs face photos over OAuth avatars — once uploaded, keep it.
+    const resolvedAvatar = await loadMemberProfilePhotoUrl(supabase, user.id, [
+      memberRow?.profile_picture_url,
+      typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null,
+      typeof meta.avatar_url === "string" ? meta.avatar_url : null,
+    ]);
+    if (resolvedAvatar) {
+      setAvatarUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return resolvedAvatar;
+      });
     }
-
-    setAvatarUrl(await resolveProfilePhotoUrl(supabase, photoSource));
 
     // After email confirmation / failed signup upload, attach saved photo to the ID card.
     try {
@@ -605,9 +606,10 @@ export default function RefereeDashboardClient() {
     if (refVerificationRejected(verificationStatus)) {
       setVerificationNotice({
         type: "rejected",
+        title: "Approval removed",
         message:
           verificationAdminNotes ||
-          "Your verification was not approved. Please contact GotRefs support if you have questions.",
+          "Your verification is not approved, so you cannot request to work games right now. Contact GotRefs if you have questions.",
       });
     }
   }, [
@@ -761,51 +763,28 @@ export default function RefereeDashboardClient() {
   async function uploadProfilePhoto(file: File) {
     if (!memberId) return;
     setMsg(null);
-    // Show the photo on the card immediately while upload finishes.
+    // Show the photo on the card immediately while upload finishes — never clear it on failure.
     const localPreview = URL.createObjectURL(file);
     setAvatarUrl((prev) => {
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
       return localPreview;
     });
     try {
-      const ext = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "jpg";
-      const safeExt = ext && ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
-      const path = `${memberId}/profile_photo_${Date.now()}.${safeExt}`;
-      const { error: upErr } = await supabase.storage
-        .from("verification_documents")
-        .upload(path, file, { upsert: true, contentType: file.type || `image/${safeExt}` });
-      if (upErr) {
-        setMsg(upErr.message);
-        return;
-      }
-      const { error: updateErr } = await supabase
-        .from("members")
-        .update({ profile_picture_url: path })
-        .eq("id", memberId);
-      if (updateErr) {
-        setMsg(updateErr.message);
-        return;
-      }
-      await supabase.auth.updateUser({
-        data: { profile_picture_url: path },
-      });
+      const path = await uploadRefProfilePhoto(memberId, file);
       const signed = await resolveProfilePhotoUrl(supabase, path);
       if (signed) {
         setAvatarUrl((prev) => {
           if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
           return signed;
         });
-      } else {
-        // Keep the local preview if signed URL generation fails.
-        setMsg("Profile photo saved. If it disappears after refresh, try uploading again.");
-        return;
       }
+      // If signed URL fails, keep the local preview on the card until the next successful load.
       setMsg("Profile photo added to your GotRefs ID card.");
       window.setTimeout(() => {
         void publishIdCardPhoto();
       }, 600);
-    } catch {
-      setMsg("Could not upload your photo. Try again.");
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Could not upload your photo. Try again.");
     }
   }
 
@@ -1215,14 +1194,14 @@ export default function RefereeDashboardClient() {
                 ? "Application Approved"
                 : verificationNotice.type === "fix_required"
                   ? "Updates needed"
-                  : "Verification update"}
+                  : "Not approved"}
             </p>
             <h2 className="mt-2 font-display text-2xl font-black text-[var(--navy)]">
               {verificationNotice.type === "approved"
                 ? verificationNotice.title || "You've been approved"
                 : verificationNotice.type === "fix_required"
                   ? verificationNotice.title || "Please fix and resubmit your application"
-                  : "Verification not approved"}
+                  : verificationNotice.title || "You can't request games right now"}
             </h2>
             {verificationNotice.type === "fix_required" && (
               <p className="mt-2 text-sm font-semibold text-amber-900">

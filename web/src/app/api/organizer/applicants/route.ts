@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isQueuedSignupHold } from "@/lib/activate-queued-signups";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { payBounds } from "@/lib/pay-range";
+import { pickProfilePhotoSource, resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -176,13 +177,36 @@ export async function GET() {
     const member = memberByRef.get(row.ref_member_id);
     const rating = ratingSummaryByRef.get(row.ref_member_id);
 
+    const { data: authUser } = await admin.auth.admin.getUserById(row.ref_member_id);
+    const authMeta = (authUser?.user?.user_metadata ?? {}) as Record<string, unknown>;
+
     let gotrefsId = profile?.gotrefs_id ?? null;
     if (!gotrefsId) {
-      const { data: authUser } = await admin.auth.admin.getUserById(row.ref_member_id);
       gotrefsId =
-        typeof authUser?.user?.user_metadata?.gotrefs_id === "string"
-          ? authUser.user.user_metadata.gotrefs_id
+        typeof authMeta.gotrefs_id === "string"
+          ? authMeta.gotrefs_id
           : `GR-${row.ref_member_id.slice(0, 8).toUpperCase()}`;
+    }
+
+    // Sign with service role — organizers cannot read another user's verification_documents folder.
+    const avatarPath = await pickProfilePhotoSource(
+      admin,
+      row.ref_member_id,
+      member?.profile_picture_url,
+      typeof authMeta.profile_picture_url === "string" ? authMeta.profile_picture_url : null,
+      typeof authMeta.avatar_url === "string" ? authMeta.avatar_url : null
+    );
+    const avatarUrl = await resolveProfilePhotoUrl(admin, avatarPath, 60 * 60 * 12);
+
+    if (
+      avatarPath &&
+      !/^https?:\/\//i.test(avatarPath) &&
+      avatarPath !== String(member?.profile_picture_url ?? "").trim()
+    ) {
+      void admin
+        .from("members")
+        .update({ profile_picture_url: avatarPath })
+        .eq("id", row.ref_member_id);
     }
 
     const refBounds = payBounds({
@@ -219,7 +243,8 @@ export async function GET() {
       primarySport: profile?.primary_sport ?? event?.sport ?? null,
       additionalSports: profile?.additional_sports ?? [],
       certificationLevel: profile?.certification_level ?? null,
-      avatarPath: member?.profile_picture_url ?? null,
+      avatarPath,
+      avatarUrl,
       eventTitle: event?.title ?? "Event",
       eventPlace: place,
       eventWhen,

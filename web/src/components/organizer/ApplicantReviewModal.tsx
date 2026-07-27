@@ -40,6 +40,7 @@ export function ApplicantReviewModal({
   const [busy, setBusy] = useState<"accept" | "withdraw" | null>(null);
   const [done, setDone] = useState<"accept" | "withdraw" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeny, setConfirmDeny] = useState(false);
 
   async function decide(action: "accept" | "withdraw") {
     setBusy(action);
@@ -52,14 +53,16 @@ export function ApplicantReviewModal({
             ? result
             : action === "accept"
               ? "Could not approve this ref. Try again."
-              : "Could not unrequest this ref. Try again."
+              : "Could not deny this request. Try again."
         );
+        setConfirmDeny(false);
         return;
       }
       setDone(action);
       window.setTimeout(() => onClose(), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save your decision. Try again.");
+      setConfirmDeny(false);
     } finally {
       setBusy(null);
     }
@@ -76,17 +79,53 @@ export function ApplicantReviewModal({
       >
         {done ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700">
+            <div
+              className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+                done === "accept" ? "bg-emerald-100 text-emerald-700" : "bg-neutral-100 text-neutral-700"
+              }`}
+            >
               ✓
             </div>
             <p className="mt-4 text-xl font-bold text-neutral-900">
-              {done === "accept" ? "Approved" : "Unrequested"}
+              {done === "accept" ? "Approved" : "Request denied"}
             </p>
             <p className="mt-1 text-sm text-neutral-500">
               {done === "accept"
                 ? "The ref will see this game under Upcoming with the full address."
                 : "This request was removed. The ref can request again if the game is still open."}
             </p>
+          </div>
+        ) : confirmDeny ? (
+          <div className="py-6 text-center sm:py-8">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Confirm</p>
+            <h2 className="mt-2 text-xl font-bold text-neutral-900">Are you sure?</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-neutral-600">
+              Deny <span className="font-semibold text-neutral-900">Ref {applicant.gotrefsId}</span> for{" "}
+              <span className="font-semibold text-neutral-900">{applicant.eventTitle}</span>? They will be
+              notified and won’t stay on this request.
+            </p>
+            {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  setConfirmDeny(false);
+                  setError(null);
+                }}
+                className="rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-bold text-neutral-800 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void decide("withdraw")}
+                className="rounded-xl bg-[var(--red)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {busy === "withdraw" ? "Denying…" : "Yes, deny"}
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -164,10 +203,13 @@ export function ApplicantReviewModal({
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={() => void decide("withdraw")}
+                onClick={() => {
+                  setError(null);
+                  setConfirmDeny(true);
+                }}
                 className="rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-bold text-neutral-800 disabled:opacity-60"
               >
-                {busy === "withdraw" ? "Unrequesting…" : "Unrequest"}
+                Deny
               </button>
               <button
                 type="button"

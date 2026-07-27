@@ -136,12 +136,24 @@ async function updateMemberOAuthMetadata(
   now: string,
   includeEmail: boolean
 ) {
-  const update = {
+  const { data: existing } = await admin
+    .from("members")
+    .select("profile_picture_url")
+    .eq("id", userId)
+    .maybeSingle();
+  const existingPhoto = String(existing?.profile_picture_url ?? "").trim();
+  // Never wipe a GotRefs-uploaded face photo with a provider avatar (or null).
+  const existingIsUploaded =
+    Boolean(existingPhoto) && !/^https?:\/\//i.test(existingPhoto) && !existingPhoto.startsWith("blob:");
+
+  const update: Record<string, unknown> = {
     ...(includeEmail ? { email: profile.email || null } : {}),
-    profile_picture_url: profile.profilePicture,
     auth_provider: provider,
     last_login_at: now,
   };
+  if (!existingIsUploaded && profile.profilePicture) {
+    update.profile_picture_url = profile.profilePicture;
+  }
 
   await updateMemberWithOptionalColumns(admin, userId, update);
 }
