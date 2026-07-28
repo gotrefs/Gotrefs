@@ -35,6 +35,7 @@ type RegisterBody = {
   rateMax?: number;
   rateType?: "exact" | "range";
   rateUnit?: "hour" | "game";
+  bio?: string;
   gotrefsId?: string;
   baseCity?: string;
   workRegions?: string[];
@@ -61,6 +62,7 @@ type ProfileSetupInput = {
   rateType: "exact" | "range" | null;
   rateUnit: "hour" | "game" | null;
   gotrefsId: string;
+  bio: string | null;
   recommendedAssignorName: string | null;
   recommendedAssignorEmail: string | null;
   recommendedAssignorPhone: string | null;
@@ -83,6 +85,7 @@ async function setupSignupProfiles(
     rateType,
     rateUnit,
     gotrefsId,
+    bio,
     recommendedAssignorName,
     recommendedAssignorEmail,
     recommendedAssignorPhone,
@@ -116,6 +119,7 @@ async function setupSignupProfiles(
         certification_level: certificationLevel || "Youth / Recreational",
         additional_certification_levels: additionalCertificationLevels,
         gotrefs_id: gotrefsId || null,
+        bio: bio || null,
         rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
         rate_min: rateMin,
         rate_max: rateMax,
@@ -139,6 +143,7 @@ async function setupSignupProfiles(
             additional_sports: additionalSports,
             certification_level: certificationLevel || "Youth / Recreational",
             gotrefs_id: gotrefsId || null,
+            bio: bio || null,
             rate_type: rateType ?? (rateMin != null && rateMax != null ? "range" : "exact"),
             rate_min: rateMin,
             rate_max: rateMax,
@@ -208,6 +213,7 @@ export async function POST(request: NextRequest) {
     typeof body.rateMax === "number" && Number.isFinite(body.rateMax) ? body.rateMax : null;
   const rateType = body.rateType === "range" ? "range" : body.rateType === "exact" ? "exact" : null;
   const rateUnit = body.rateUnit === "game" ? "game" : body.rateUnit === "hour" ? "hour" : null;
+  const bio = (body.bio ?? "").trim().slice(0, 800) || null;
   const gotrefsId = (body.gotrefsId ?? "").trim();
   const baseCity = (body.baseCity ?? "").trim();
   const workRegions = Array.isArray(body.workRegions)
@@ -356,6 +362,7 @@ export async function POST(request: NextRequest) {
     rateType,
     rateUnit,
     gotrefsId,
+    bio,
     recommendedAssignorName: role === "ref" ? recommendedAssignorName : null,
     recommendedAssignorEmail: role === "ref" ? recommendedAssignorEmail : null,
     recommendedAssignorPhone: role === "ref" ? recommendedAssignorPhone : null,

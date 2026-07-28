@@ -34,7 +34,6 @@ import {
   mapCardFieldToVerificationStep,
   normalizeFixRequiredSteps,
   REF_VERIFICATION_STEPS,
-  resubmitNoticeTitle,
   type RefVerificationStepKey,
 } from "@/lib/ref-verification-steps";
 
@@ -573,17 +572,31 @@ export default function RefereeDashboardClient() {
       return;
     }
 
-    // Always re-prompt when GotRefs asked for fixes — don't hide after dismiss until they resubmit.
+    // Changes requested: force the fix flow on each new browser session until they resubmit.
     if (refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps)) {
-      setVerificationNotice({
-        type: "fix_required",
-        title: resubmitNoticeTitle(verificationFixRequiredSteps),
-        message:
+      const dismissKey = `gotrefs-fix-wizard-session:${memberId}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}`;
+      const dismissedThisSession = window.sessionStorage.getItem(dismissKey) === "1";
+      if (dismissedThisSession) {
+        setVerificationNotice({
+          type: "fix_required",
+          title: `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`,
+          message:
+            verificationAdminNotes ||
+            "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
+          items: REF_VERIFICATION_STEPS.filter((step) =>
+            verificationFixRequiredSteps.includes(step.key)
+          ).map((step) => `${step.number}. ${step.shortLabel}`),
+        });
+        return;
+      }
+      setVerificationNotice(null);
+      setProfileWizard({
+        mode: "resubmit",
+        initialStep: verificationFixRequiredSteps[0],
+        steps: verificationFixRequiredSteps,
+        adminMessage:
           verificationAdminNotes ||
           "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
-        items: REF_VERIFICATION_STEPS.filter((step) =>
-          verificationFixRequiredSteps.includes(step.key)
-        ).map((step) => `${step.number}. ${step.shortLabel}`),
       });
       return;
     }
@@ -704,13 +717,11 @@ export default function RefereeDashboardClient() {
     const noticeType = verificationNotice?.type;
     setVerificationNotice(null);
 
-    if (noticeType === "fix_required" && verificationFixRequiredSteps.length > 0) {
-      setProfileWizard({
-        mode: "resubmit",
-        initialStep: verificationFixRequiredSteps[0],
-        steps: verificationFixRequiredSteps,
-        adminMessage: verificationAdminNotes || "GotRefs requested updates to your application.",
-      });
+    if (
+      (noticeType === "fix_required" && verificationFixRequiredSteps.length > 0) ||
+      noticeType === "rejected"
+    ) {
+      openResubmitWizard();
       return;
     }
 
@@ -789,12 +800,19 @@ export default function RefereeDashboardClient() {
   }
 
   function openResubmitWizard() {
-    if (verificationFixRequiredSteps.length === 0) return;
+    const steps =
+      verificationFixRequiredSteps.length > 0
+        ? verificationFixRequiredSteps
+        : (["government_id", "certification", "profile"] as RefVerificationStepKey[]);
     setProfileWizard({
       mode: "resubmit",
-      initialStep: verificationFixRequiredSteps[0],
-      steps: verificationFixRequiredSteps,
-      adminMessage: verificationAdminNotes || "GotRefs requested updates to your application.",
+      initialStep: steps[0],
+      steps,
+      adminMessage:
+        verificationAdminNotes ||
+        (verificationRejected
+          ? "Upload updated documents so GotRefs can review your application again."
+          : "GotRefs requested updates to your application."),
     });
   }
 
@@ -858,7 +876,9 @@ export default function RefereeDashboardClient() {
 
     const waitingForDecision =
       refVerificationPendingReview(verificationStatus) ||
-      refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps);
+      refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps) ||
+      // Keep polling while approved so a live "Needs info" revoke shows up without a full refresh.
+      refVerificationApproved(verificationStatus);
 
     const pollId = waitingForDecision
       ? window.setInterval(() => {
@@ -1072,16 +1092,18 @@ export default function RefereeDashboardClient() {
   const verificationRejected = refVerificationRejected(verificationStatus);
   const verificationNeedsFix = refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps);
   const verificationPending = refVerificationPendingReview(verificationStatus) && !verificationNeedsFix;
-  const verificationSubmitted = verificationPending || verificationApproved || verificationRejected;
+  const verificationSubmitted = verificationPending || verificationApproved || verificationRejected || verificationNeedsFix;
+  // Only show the green Approved experience when status is still approved (Needs info clears this).
+  const showApprovedHero = verificationApproved && !verificationNeedsFix;
   const showPendingReviewView = verificationPending;
-  const canApplyToGames = canAcceptOffers;
+  const canApplyToGames = canAcceptOffers && showApprovedHero;
   const backgroundReady = screening?.status === "clear" || verificationSubmitted;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
   const missingActions: {
     label: string;
     description: string;
     field: EditableRefCardField;
-  }[] = showPendingReviewView || verificationApproved
+  }[] = showPendingReviewView || showApprovedHero
     ? []
     : ([
         !profileReady && {
@@ -1231,7 +1253,7 @@ export default function RefereeDashboardClient() {
                 ? "Browse games"
                 : verificationNotice.type === "fix_required"
                   ? `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`
-                  : "Got it"}
+                  : "Resubmit documents"}
             </button>
           </div>
         </div>
@@ -1269,20 +1291,11 @@ export default function RefereeDashboardClient() {
               }}
               onComplete={() => void handleProfileWizardComplete()}
               onClose={() => {
-                setProfileWizard(null);
-                void load();
-                if (verificationFixRequiredSteps.length > 0) {
-                  setVerificationNotice({
-                    type: "fix_required",
-                    title: resubmitNoticeTitle(verificationFixRequiredSteps),
-                    message:
-                      verificationAdminNotes ||
-                      "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
-                    items: REF_VERIFICATION_STEPS.filter((step) =>
-                      verificationFixRequiredSteps.includes(step.key)
-                    ).map((step) => `${step.number}. ${step.shortLabel}`),
-                  });
+                if (profileWizard?.mode === "resubmit" && verificationFixRequiredSteps.length > 0) {
+                  const dismissKey = `gotrefs-fix-wizard-session:${memberId}:${verificationReviewedAt ?? verificationNotesUpdatedAt ?? ""}`;
+                  window.sessionStorage.setItem(dismissKey, "1");
                 }
+                setProfileWizard(null);
               }}
             />
           </div>
@@ -1295,10 +1308,10 @@ export default function RefereeDashboardClient() {
         <section ref={marketplaceRef}>
           <RefMarketplaceHub
             canApplyToEvents={canApplyToGames}
-            applicationPending={showPendingReviewView}
-            applicationRejected={verificationRejected}
+            applicationPending={showPendingReviewView || verificationNeedsFix}
+            applicationRejected={verificationRejected && !verificationNeedsFix}
             onRequireProfile={() => {
-              if (showPendingReviewView) return;
+              if (showPendingReviewView || verificationNeedsFix) return;
               const next = missingActions[0];
               if (next) openProfileWizard(next.field);
             }}
@@ -1310,7 +1323,7 @@ export default function RefereeDashboardClient() {
         </section>
       )}
 
-      {!profileWizard && !canAcceptOffers ? (
+      {!profileWizard && !showApprovedHero ? (
         <div
           ref={gamesRef}
           className="rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:p-7"
@@ -1331,18 +1344,18 @@ export default function RefereeDashboardClient() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
             {verificationNeedsFix
-              ? "GotRefs flagged part of your application. Complete only the steps we listed, then resubmit for review. You can still browse open games on the map while you wait."
+              ? "GotRefs flagged part of your application. Complete only the steps we listed, then resubmit for review. You can browse open games, but you cannot request to work until you're approved again."
               : verificationRejected
-                ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Check your notification inbox for details from GotRefs."
+                ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Upload updated docs and resubmit if you have new materials for review."
                 : "Browse open games on the map below. Once approved, you will be able to request to work. Approvals take 1-2 business days."}
           </p>
-          {verificationNeedsFix && !profileWizard && (
+          {(verificationNeedsFix || verificationRejected) && !profileWizard && (
             <button
               type="button"
               onClick={openResubmitWizard}
               className="mt-4 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-black text-white"
             >
-              Fix & resubmit application
+              {verificationNeedsFix ? "Fix & resubmit application" : "Resubmit documents"}
             </button>
           )}
         </div>
@@ -1400,9 +1413,7 @@ export default function RefereeDashboardClient() {
               verificationSkipped={cardMeta.verificationSkipped}
               profileComplete={profileComplete}
               validThrough={
-                refVerificationApproved(verificationStatus)
-                  ? formatCardValidThrough(verificationReviewedAt)
-                  : null
+                showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null
               }
               onEditField={(field) => openProfileWizard(field)}
               onUploadPhoto={(file) => void uploadProfilePhoto(file)}

@@ -84,19 +84,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       .eq("ref_member_id", refMemberId)
       .maybeSingle();
 
-    const { error: submissionError } = await admin.from("ref_verification_submissions").upsert(
-      {
-        ref_member_id: refMemberId,
-        status,
-        submitted_at: existing?.submitted_at ?? now,
-        reviewed_at: action === "request_info" || action === "reject" ? now : now,
-        resubmitted_at: action === "approve" ? null : existing ? undefined : null,
-        admin_notes: adminNotes,
-        fix_required_steps: action === "approve" ? [] : fixRequiredSteps,
-        updated_at: now,
-      },
-      { onConflict: "ref_member_id" }
-    );
+    // Needs info / reject always clears approval so the ref is pending again until re-approved.
+    const submissionPatch: Record<string, unknown> = {
+      ref_member_id: refMemberId,
+      status,
+      submitted_at: existing?.submitted_at ?? now,
+      reviewed_at: now,
+      admin_notes: adminNotes,
+      fix_required_steps: action === "approve" ? [] : fixRequiredSteps,
+      updated_at: now,
+      // Any non-approve decision ends the prior approval cycle.
+      resubmitted_at: null,
+    };
+
+    const { error: submissionError } = await admin
+      .from("ref_verification_submissions")
+      .upsert(submissionPatch, { onConflict: "ref_member_id" });
 
     if (submissionError) {
       return NextResponse.json({ error: submissionError.message }, { status: 500 });
@@ -113,7 +116,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         { onConflict: "ref_member_id" }
       );
     } else if (action === "reject") {
-      // Upsert so revoke-after-approve always clears eligibility even if the row was missing.
       await admin.from("screening_checks").upsert(
         {
           ref_member_id: refMemberId,
@@ -124,11 +126,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         { onConflict: "ref_member_id" }
       );
     } else {
+      // Needs info: revoke prior clearance so they cannot apply until they fix + you re-approve.
       await admin.from("screening_checks").upsert(
         {
           ref_member_id: refMemberId,
           status: "pending",
-          summary: "Additional verification info requested",
+          summary: "Changes requested — approval paused until ref resubmits and is re-approved",
           updated_at: now,
         },
         { onConflict: "ref_member_id" }
@@ -147,17 +150,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       queuedActivated = flushed.activated;
     }
 
-    if (action === "approve" || action === "reject" || action === "request_info") {
+    let emailSent = false;
+    try {
       // Await so serverless runtimes don't drop the Resend call.
-      await notifyVerificationDecision({
+      emailSent = await notifyVerificationDecision({
         admin,
         refMemberId,
         approved: action === "approve",
-        changesRequested: action === "request_info",
+        // Needs info always; Reject with fix steps also emails “please make these changes.”
+        changesRequested: action === "request_info" || (action === "reject" && fixRequiredSteps.length > 0),
         adminNotes,
         fixRequiredSteps: action === "approve" ? [] : fixRequiredSteps,
         siteUrl,
       });
+    } catch (error) {
+      console.error("[admin/verification] email notification failed:", error);
     }
 
     return NextResponse.json({
@@ -166,6 +173,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       adminNotes,
       fixRequiredSteps: action === "approve" ? [] : fixRequiredSteps,
       queuedActivated,
+      emailSent,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update verification.";

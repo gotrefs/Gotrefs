@@ -117,7 +117,11 @@ export function filterOpenEvents(events: OpenEventRecord[], filters: OpenEventFi
     if (startsBefore && !Number.isNaN(startsBefore.getTime()) && start > startsBefore) return false;
     // Sport is optional: empty means any sport. Only AND-filter when the user picked one.
     if (sport && event.sport.trim().toLowerCase() !== sport.toLowerCase()) return false;
-    if (zip && event.zip_code.trim() !== zip) return false;
+    if (zip) {
+      const needle = zip.replace(/\D/g, "").slice(0, 5);
+      const eventZip = event.zip_code.replace(/\D/g, "").slice(0, 5);
+      if (needle && !eventZip.startsWith(needle)) return false;
+    }
     if (filters.payMatchesRef && refProfile) {
       if (!eventPayMeetsRefMinimum(refPayInput(refProfile), eventPayInput(event))) return false;
     }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { listLatestVerificationDocs, preferLatestDocPath } from "@/lib/admin/verification-docs";
 import { normalizeFixRequiredSteps, type RefVerificationStepKey } from "@/lib/ref-verification-steps";
 
 export type VerificationQueueEntry = {
@@ -21,6 +22,8 @@ export type VerificationQueueEntry = {
   government_id_path: string | null;
   government_id_back_path: string | null;
   certification_document_path: string | null;
+  /** True when storage had a newer file than the profile path (or filled a missing path). */
+  docs_from_storage?: boolean;
   screening_status: string | null;
   screening_summary: string | null;
 };
@@ -252,6 +255,9 @@ export async function loadVerificationReviewQueue(
     };
   });
 
+  // Prefer newest files in storage so admins see resubmitted docs even if profile paths lagged.
+  await enrichEntriesWithLatestStorageDocs(admin, entries);
+
   entries.sort((a, b) => {
     const rank = (status: string) => {
       if (status === "submitted" || status === "under_review") return 0;
@@ -272,4 +278,45 @@ export async function loadVerificationReviewQueue(
   });
 
   return { entries };
+}
+
+function shouldEnrichDocs(entry: VerificationQueueEntry) {
+  if (entry.status === "submitted" || entry.status === "under_review") return true;
+  if (entry.resubmitted_at) return true;
+  return (
+    !entry.government_id_path ||
+    !entry.government_id_back_path ||
+    !entry.certification_document_path
+  );
+}
+
+async function enrichEntriesWithLatestStorageDocs(admin: SupabaseClient, entries: VerificationQueueEntry[]) {
+  const targets = entries.filter(shouldEnrichDocs);
+  if (targets.length === 0) return;
+
+  const concurrency = 8;
+  for (let i = 0; i < targets.length; i += concurrency) {
+    const batch = targets.slice(i, i + concurrency);
+    await Promise.all(
+      batch.map(async (entry) => {
+        const latest = await listLatestVerificationDocs(admin, entry.ref_member_id);
+        if (latest.length === 0) return;
+        const byKind = new Map(latest.map((file) => [file.kind, file]));
+        const front = preferLatestDocPath(entry.government_id_path, byKind.get("gov_id_front"));
+        const back = preferLatestDocPath(entry.government_id_back_path, byKind.get("gov_id_back"));
+        const cert = preferLatestDocPath(
+          entry.certification_document_path,
+          byKind.get("certification")
+        );
+        const changed =
+          front !== entry.government_id_path ||
+          back !== entry.government_id_back_path ||
+          cert !== entry.certification_document_path;
+        entry.government_id_path = front;
+        entry.government_id_back_path = back;
+        entry.certification_document_path = cert;
+        if (changed) entry.docs_from_storage = true;
+      })
+    );
+  }
 }

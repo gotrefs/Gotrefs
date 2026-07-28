@@ -39,6 +39,7 @@ type WizardScreen =
   | "secondarySport"
   | "certificationLevel"
   | "hourlyRate"
+  | "bio"
   | "intro2"
   | "govId"
   | "certDoc"
@@ -59,6 +60,7 @@ const STEP1_SCREENS: WizardScreen[] = [
   "secondarySport",
   "certificationLevel",
   "hourlyRate",
+  "bio",
 ];
 const STEP2_SCREENS: WizardScreen[] = ["intro2", "govId", "certDoc"];
 const STEP3_SCREENS: WizardScreen[] = [
@@ -87,6 +89,7 @@ export type RefSignupAirbnbWizardProps = {
   certifiedBy: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
+  bio: string;
   govIdFrontFile: File | null;
   govIdBackFile: File | null;
   certDocFile: File | null;
@@ -110,6 +113,7 @@ export type RefSignupAirbnbWizardProps = {
   onCertifiedBy: (value: string) => void;
   onHourlyRateMin: (value: string) => void;
   onHourlyRateMax: (value: string) => void;
+  onBio: (value: string) => void;
   onGovIdFrontFile: (file: File | null) => void;
   onGovIdBackFile: (file: File | null) => void;
   onCertDocFile: (file: File | null) => void;
@@ -195,6 +199,7 @@ export function RefSignupAirbnbWizard({
   certifiedBy,
   hourlyRateMin,
   hourlyRateMax,
+  bio,
   govIdFrontFile,
   govIdBackFile,
   certDocFile,
@@ -218,6 +223,7 @@ export function RefSignupAirbnbWizard({
   onCertifiedBy,
   onHourlyRateMin,
   onHourlyRateMax,
+  onBio,
   onGovIdFrontFile,
   onGovIdBackFile,
   onCertDocFile,
@@ -316,6 +322,7 @@ export function RefSignupAirbnbWizard({
           certifiedBy,
           hourlyRateMin,
           hourlyRateMax,
+          bio,
           baseCity,
           travelRadius,
           workRegions,
@@ -357,6 +364,7 @@ export function RefSignupAirbnbWizard({
         maxVal <= SIGNUP_HOURLY_RATE_CEILING
       );
     }
+    if (screen === "bio") return bio.trim().length >= 20;
     if (screen === "govId") return Boolean(govIdFrontFile && govIdBackFile);
     if (screen === "certDoc") return Boolean(certDocFile);
     if (screen === "baseCity") return Boolean(baseCity.trim());
@@ -385,6 +393,9 @@ export function RefSignupAirbnbWizard({
       else if (screen === "photo") setLocalError("Upload a clear photo of your face to continue.");
       else if (screen === "primarySport") setLocalError("Pick the sport you primarily officiate.");
       else if (screen === "certificationLevel") setLocalError("Add at least one certification to continue.");
+      else if (screen === "bio") {
+        setLocalError("Tell organizers a bit about your experience (at least a short paragraph).");
+      }
       else if (screen === "govId") setLocalError("Upload both the front and back of your government ID to continue.");
       else if (screen === "certDoc") setLocalError("Upload your certification or license document to continue.");
       else if (screen === "baseCity") setLocalError("Enter your base city.");
@@ -768,6 +779,27 @@ export function RefSignupAirbnbWizard({
                   <span>${SIGNUP_HOURLY_RATE_CEILING}/hr</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {screen === "bio" && (
+            <div className="mx-auto max-w-xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+                Tell organizers about your experience
+              </h1>
+              <p className="mt-2 text-neutral-500">
+                Share anything that helps hosts trust you — years officiating, leagues or associations, championships,
+                or sports you specialize in.
+              </p>
+              <textarea
+                className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"
+                value={bio}
+                onChange={(event) => onBio(event.target.value.slice(0, 800))}
+                placeholder="Example: I've been a CIF referee for 30 years and have worked multiple CIF championships across basketball and football."
+                maxLength={800}
+                rows={6}
+              />
+              <p className="mt-2 text-right text-xs text-neutral-500">{bio.length}/800</p>
             </div>
           )}
 

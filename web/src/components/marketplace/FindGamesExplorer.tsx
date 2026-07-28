@@ -60,6 +60,7 @@ export function FindGamesExplorer({
 }) {
   const [sport, setSport] = useState("");
   const [whereLabel, setWhereLabel] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [wherePlace, setWherePlace] = useState<{ label: string; lat: number; lng: number } | null>(
     null
   );
@@ -84,6 +85,8 @@ export function FindGamesExplorer({
     const params = new URLSearchParams();
     // Only apply filters the user set — empty means "any".
     if (sport.trim()) params.set("sport", sport.trim());
+    const zip = zipCode.replace(/\D/g, "").slice(0, 5);
+    if (zip.length >= 3) params.set("zip", zip);
 
     const fromIso = startOfLocalDayIso(dateFrom);
     const toIso = endOfLocalDayIso(dateTo);
@@ -114,7 +117,7 @@ export function FindGamesExplorer({
     } finally {
       setLoading(false);
     }
-  }, [sport, dateFrom, dateTo]);
+  }, [sport, zipCode, dateFrom, dateTo]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 200);
@@ -376,9 +379,9 @@ export function FindGamesExplorer({
         fields={[
           {
             id: "marketplace-where",
-            label: "Where",
+            label: "City",
             value: whereLabel,
-            placeholder: "Search destinations",
+            placeholder: "Search by city",
             onChange: (value) => {
               setWhereLabel(value);
               if (!value.trim()) setWherePlace(null);
@@ -389,8 +392,8 @@ export function FindGamesExplorer({
                 value={whereLabel}
                 placeholder={
                   isGoogleMapsConfigured()
-                    ? "Search destinations"
-                    : "Add Google Maps API key for place search"
+                    ? "Search by city"
+                    : "Add Google Maps API key for city search"
                 }
                 onChange={(value) => {
                   setWhereLabel(value);
@@ -399,6 +402,13 @@ export function FindGamesExplorer({
                 onPlaceSelect={setWherePlace}
               />
             ),
+          },
+          {
+            id: "marketplace-zip",
+            label: "ZIP",
+            value: zipCode,
+            placeholder: "e.g. 90210",
+            onChange: (value) => setZipCode(value.replace(/[^\d-]/g, "").slice(0, 10)),
           },
           {
             id: "marketplace-when",
@@ -446,7 +456,8 @@ export function FindGamesExplorer({
       {!isGoogleMapsConfigured() && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Set <code className="text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in{" "}
-          <code className="text-xs">web/.env.local</code> to enable destination search and Google Maps.
+          <code className="text-xs">web/.env.local</code> to enable city search and Google Maps. ZIP search
+          still works without it.
         </p>
       )}
 

@@ -24,11 +24,12 @@ type VerificationEntry = {
   government_id_path: string | null;
   government_id_back_path: string | null;
   certification_document_path: string | null;
+  docs_from_storage?: boolean;
   screening_status: string | null;
   screening_summary: string | null;
 };
 
-type QueueFilter = "pending" | "all" | "approved" | "rejected" | "incomplete";
+type QueueFilter = "pending" | "resubmitted" | "all" | "approved" | "rejected" | "incomplete";
 
 function formatWhen(value: string | null) {
   if (!value) return "—";
@@ -48,10 +49,14 @@ function isIncompleteStatus(status: string) {
   return status === "not_submitted" || status === "draft";
 }
 
+function isResubmitted(entry: VerificationEntry) {
+  return Boolean(entry.resubmitted_at) && isPendingStatus(entry.status);
+}
+
 export default function AdminVerificationClient() {
   const [entries, setEntries] = useState<VerificationEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<QueueFilter>("all");
+  const [filter, setFilter] = useState<QueueFilter>("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [fixRequiredSteps, setFixRequiredSteps] = useState<RefVerificationStepKey[]>([]);
@@ -89,10 +94,11 @@ export default function AdminVerificationClient() {
   const counts = useMemo(() => {
     const all = entries.length;
     const pending = entries.filter((entry) => isPendingStatus(entry.status)).length;
+    const resubmitted = entries.filter((entry) => isResubmitted(entry)).length;
     const approved = entries.filter((entry) => entry.status === "approved").length;
     const rejected = entries.filter((entry) => entry.status === "rejected").length;
     const incomplete = entries.filter((entry) => isIncompleteStatus(entry.status)).length;
-    return { all, pending, approved, rejected, incomplete };
+    return { all, pending, resubmitted, approved, rejected, incomplete };
   }, [entries]);
 
   const filteredEntries = useMemo(() => {
@@ -101,6 +107,7 @@ export default function AdminVerificationClient() {
       if (filter === "approved") return entry.status === "approved";
       if (filter === "rejected") return entry.status === "rejected";
       if (filter === "pending") return isPendingStatus(entry.status);
+      if (filter === "resubmitted") return isResubmitted(entry);
       if (filter === "incomplete") return isIncompleteStatus(entry.status);
       return true;
     });
@@ -180,21 +187,28 @@ export default function AdminVerificationClient() {
           fixRequiredSteps: action === "approve" ? undefined : fixRequiredSteps,
         }),
       });
-      const json = (await res.json()) as { error?: string; status?: string };
+      const json = (await res.json()) as { error?: string; status?: string; emailSent?: boolean };
       if (!res.ok) {
         setMsg(json.error || "Could not update verification.");
         return;
       }
       const name = selected.display_name || selected.email || "referee";
       const wasApproved = selected.status === "approved";
+      const emailNote =
+        json.emailSent === true
+          ? " Email sent."
+          : json.emailSent === false
+            ? " Warning: email could not be sent — check RESEND_API_KEY / RESEND_FROM_EMAIL."
+            : "";
       setMsg(
-        action === "approve"
+        (action === "approve"
           ? `✓ ${name} set to approved.`
           : action === "reject"
             ? wasApproved
               ? `✓ Approval revoked for ${name}. They can no longer request games.`
               : `✓ ${name} set to rejected.`
-            : `✓ Requested more info from ${name}.`
+            : `✓ Requested changes from ${name}. Approval paused until they resubmit and you approve again.`) +
+          emailNote
       );
       setCompletedActions({ [action]: true });
       // Keep the referee visible after a decision so you can change status again.
@@ -223,7 +237,8 @@ export default function AdminVerificationClient() {
         <h1 className="mt-1 font-display text-3xl font-black text-[var(--navy)]">Referee verification review</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
           Every referee account appears here — submitted packages, incomplete signups, approved, and rejected.
-          Review docs, then approve or change their status anytime.
+          Resubmissions land under <strong>Pending</strong> (and <strong>Resubmitted</strong>) — not Rejected.
+          Document buttons use the newest files in storage when available.
         </p>
       </div>
 
@@ -237,8 +252,9 @@ export default function AdminVerificationClient() {
         <div className="flex flex-wrap gap-2">
           {(
             [
-              ["all", "All", counts.all],
               ["pending", "Pending", counts.pending],
+              ["resubmitted", "Resubmitted", counts.resubmitted],
+              ["all", "All", counts.all],
               ["incomplete", "Not submitted", counts.incomplete],
               ["approved", "Approved", counts.approved],
               ["rejected", "Rejected", counts.rejected],
@@ -286,13 +302,18 @@ export default function AdminVerificationClient() {
             <ul className="divide-y divide-[var(--border)]">
               {filteredEntries.map((entry) => {
                 const active = selected?.ref_member_id === entry.ref_member_id;
+                const resubmitted = isResubmitted(entry);
                 return (
                   <li key={entry.ref_member_id}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(entry.ref_member_id)}
                       className={`w-full px-4 py-4 text-left transition ${
-                        active ? "bg-[var(--blue)]/5" : "hover:bg-slate-50"
+                        active
+                          ? "bg-[var(--blue)]/5"
+                          : resubmitted
+                            ? "bg-amber-50/80 hover:bg-amber-50"
+                            : "hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -307,8 +328,14 @@ export default function AdminVerificationClient() {
                             {entry.primary_sport} · {entry.certification_level}
                           </p>
                         </div>
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-[var(--navy)]">
-                          {entry.resubmitted_at && entry.status === "submitted" ? "Resubmitted" : statusLabel(entry.status)}
+                        <span
+                          className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${
+                            resubmitted
+                              ? "bg-amber-200 text-amber-950"
+                              : "bg-slate-100 text-[var(--navy)]"
+                          }`}
+                        >
+                          {resubmitted ? "Resubmitted" : statusLabel(entry.status)}
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-[var(--muted)]">
@@ -366,6 +393,12 @@ export default function AdminVerificationClient() {
                   <dt className="font-bold text-[var(--navy)]">Submitted</dt>
                   <dd className="text-[var(--muted)]">{formatWhen(selected.submitted_at)}</dd>
                 </div>
+                {selected.resubmitted_at && (
+                  <div>
+                    <dt className="font-bold text-[var(--navy)]">Resubmitted</dt>
+                    <dd className="font-semibold text-amber-800">{formatWhen(selected.resubmitted_at)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="font-bold text-[var(--navy)]">Screening</dt>
                   <dd className="text-[var(--muted)]">
@@ -379,25 +412,42 @@ export default function AdminVerificationClient() {
                 <button
                   type="button"
                   onClick={() => void openDocument(selected.government_id_path, "Government ID front")}
-                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] hover:border-[var(--blue)]"
+                  className={`rounded-full border px-4 py-2 text-sm font-bold hover:border-[var(--blue)] ${
+                    selected.government_id_path
+                      ? "border-[var(--border)] text-[var(--navy)]"
+                      : "border-dashed border-slate-300 text-slate-400"
+                  }`}
                 >
-                  View ID front
+                  View ID front{selected.government_id_path ? "" : " (missing)"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void openDocument(selected.government_id_back_path, "Government ID back")}
-                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] hover:border-[var(--blue)]"
+                  className={`rounded-full border px-4 py-2 text-sm font-bold hover:border-[var(--blue)] ${
+                    selected.government_id_back_path
+                      ? "border-[var(--border)] text-[var(--navy)]"
+                      : "border-dashed border-slate-300 text-slate-400"
+                  }`}
                 >
-                  View ID back
+                  View ID back{selected.government_id_back_path ? "" : " (missing)"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void openDocument(selected.certification_document_path, "Certification document")}
-                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--navy)] hover:border-[var(--blue)]"
+                  className={`rounded-full border px-4 py-2 text-sm font-bold hover:border-[var(--blue)] ${
+                    selected.certification_document_path
+                      ? "border-[var(--border)] text-[var(--navy)]"
+                      : "border-dashed border-slate-300 text-slate-400"
+                  }`}
                 >
-                  View certification
+                  View certification{selected.certification_document_path ? "" : " (missing)"}
                 </button>
               </div>
+              {selected.docs_from_storage && (
+                <p className="mt-2 text-xs font-semibold text-amber-800">
+                  Showing newest files from storage (profile paths were missing or out of date).
+                </p>
+              )}
 
               <label className="mt-5 block">
                 <span className="text-sm font-bold text-[var(--navy)]">What needs to be fixed? (optional for Rejected)</span>
@@ -454,9 +504,8 @@ export default function AdminVerificationClient() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                  You can change this anytime. Click <strong>Rejected</strong> after an approval to revoke it —
-                  they will immediately lose the ability to request games. Include a reason above (and optional
-                  fix steps if they should resubmit).
+                  <strong>Needs info</strong> pauses approval: they lose game requests until they fix the selected
+                  steps, resubmit, and you approve again. <strong>Rejected</strong> also blocks game requests.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                 <button

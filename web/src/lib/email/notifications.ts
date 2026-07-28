@@ -4,7 +4,6 @@ import { emailLayout, escapeHtml } from "@/lib/email/layout";
 import { emailSiteUrl, sendEmail } from "@/lib/email/resend";
 import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 import {
-  formatFixRequiredStepLabels,
   normalizeFixRequiredSteps,
   REF_VERIFICATION_STEPS,
 } from "@/lib/ref-verification-steps";
@@ -13,18 +12,32 @@ async function emailForMemberId(
   admin: SupabaseClient,
   memberId: string
 ): Promise<{ email: string; displayName: string } | null> {
-  const [{ data: auth }, { data: member }] = await Promise.all([
+  const [{ data: authData, error: authError }, memberFull] = await Promise.all([
     admin.auth.admin.getUserById(memberId),
     admin.from("members").select("display_name, email").eq("id", memberId).maybeSingle(),
   ]);
+
+  let member = memberFull.data as { display_name?: string | null; email?: string | null } | null;
+  if (memberFull.error?.message?.includes("email")) {
+    const fallback = await admin.from("members").select("display_name").eq("id", memberId).maybeSingle();
+    member = fallback.data as typeof member;
+  }
+
+  if (authError) {
+    console.error("[email] auth.admin.getUserById failed:", authError.message);
+  }
+
   const email =
-    auth.user?.email?.trim().toLowerCase() ||
+    authData.user?.email?.trim().toLowerCase() ||
     (typeof member?.email === "string" ? member.email.trim().toLowerCase() : "") ||
     "";
-  if (!email || !email.includes("@")) return null;
+  if (!email || !email.includes("@")) {
+    console.warn("[email] No deliverable address for member", memberId);
+    return null;
+  }
   const displayName =
     member?.display_name?.trim() ||
-    String(auth.user?.user_metadata?.full_name ?? "").trim() ||
+    String(authData.user?.user_metadata?.full_name ?? "").trim() ||
     email.split("@")[0];
   return { email, displayName };
 }
@@ -503,8 +516,9 @@ export async function notifyVerificationDecision(opts: {
     });
   }
 
+  const wantsChanges = Boolean(opts.changesRequested) || normalizeFixRequiredSteps(opts.fixRequiredSteps).length > 0;
   const notes = opts.adminNotes?.trim()
-    ? `<p><strong>What to fix:</strong> ${escapeHtml(opts.adminNotes.trim())}</p>`
+    ? `<p><strong>Message from GotRefs:</strong> ${escapeHtml(opts.adminNotes.trim())}</p>`
     : "";
   const stepKeys = normalizeFixRequiredSteps(opts.fixRequiredSteps);
   const stepLabels = REF_VERIFICATION_STEPS.filter((step) => stepKeys.includes(step.key)).map(
@@ -512,37 +526,40 @@ export async function notifyVerificationDecision(opts: {
   );
   const stepsHtml =
     stepLabels.length > 0
-      ? `<p><strong>Items to update:</strong></p><ul>${stepLabels
+      ? `<p><strong>Please update these items:</strong></p><ul>${stepLabels
           .map((label) => `<li>${escapeHtml(label)}</li>`)
           .join("")}</ul>`
-      : formatFixRequiredStepLabels(stepKeys)
-        ? `<p><strong>Items to update:</strong> ${escapeHtml(formatFixRequiredStepLabels(stepKeys))}.</p>`
-        : "";
+      : "";
 
-  return sendEmail({
+  const sent = await sendEmail({
     to: ref.email,
-    subject: opts.changesRequested
-      ? `${BRAND_NAME}: Changes needed before approval`
+    subject: wantsChanges
+      ? `${BRAND_NAME}: Action needed — please update your verification`
       : `${BRAND_NAME}: Verification not approved`,
     html: emailLayout({
-      title: opts.changesRequested ? "Changes need to be made" : "Verification not approved",
+      title: wantsChanges ? "Please make these changes" : "Verification not approved",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
         <p>${
-          opts.changesRequested
-            ? `${BRAND_NAME} reviewed your verification and needs a few changes before we can approve your account.`
+          wantsChanges
+            ? `${BRAND_NAME} reviewed your application and needs you to make a few changes before we can approve your account.`
             : `Your ${BRAND_NAME} verification is not approved, so you cannot request to work games right now.`
         }</p>
         ${notes}
         ${stepsHtml}
         <p>${
-          opts.changesRequested || stepLabels.length > 0
-            ? "Sign in to your referee dashboard, update the flagged items, and resubmit for review."
+          wantsChanges
+            ? "Sign in to your referee dashboard, update the items listed above, and resubmit for review. We’ll email you again once we’ve reviewed your updates."
             : "If you have questions, reply to this email or contact GotRefs support."
         }</p>
       `,
-      ctaLabel: "Open referee dashboard",
+      ctaLabel: wantsChanges ? "Fix & resubmit now" : "Open referee dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
+
+  if (!sent) {
+    console.error("[email] Verification decision email was not sent to", ref.email);
+  }
+  return sent;
 }

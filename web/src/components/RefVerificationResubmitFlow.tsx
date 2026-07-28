@@ -284,7 +284,7 @@ export function RefVerificationResubmitFlow({
         uploadFile(memberId, govIdFrontFile, "gov_id_front"),
         uploadFile(memberId, govIdBackFile, "gov_id_back"),
       ]);
-      await supabase
+      const { error: idUpdateError } = await supabase
         .from("ref_profiles")
         .update({
           government_id_path: frontPath,
@@ -292,17 +292,19 @@ export function RefVerificationResubmitFlow({
           updated_at: new Date().toISOString(),
         })
         .eq("member_id", memberId);
+      if (idUpdateError) throw idUpdateError;
     }
 
     if (currentStep === "certification" && certDocFile) {
       const certPath = await uploadFile(memberId, certDocFile, "certification");
-      await supabase
+      const { error: certUpdateError } = await supabase
         .from("ref_profiles")
         .update({
           certification_document_path: certPath,
           updated_at: new Date().toISOString(),
         })
         .eq("member_id", memberId);
+      if (certUpdateError) throw certUpdateError;
     }
 
     if (currentStep === "location") {

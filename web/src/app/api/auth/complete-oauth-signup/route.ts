@@ -20,6 +20,7 @@ type CompleteOAuthBody = {
   rateMax?: number;
   rateType?: "exact" | "range";
   rateUnit?: "hour" | "game";
+  bio?: string;
   gotrefsId?: string;
   baseCity?: string;
   workRegions?: string[];
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
     typeof body.rateMax === "number" && Number.isFinite(body.rateMax) ? body.rateMax : null;
   const rateType = body.rateType === "range" ? "range" : body.rateType === "exact" ? "exact" : null;
   const rateUnit = body.rateUnit === "game" ? "game" : body.rateUnit === "hour" ? "hour" : null;
+  const bio = (body.bio ?? "").trim().slice(0, 800) || null;
   const gotrefsId = (body.gotrefsId ?? "").trim();
   const baseCity = (body.baseCity ?? "").trim();
   const workRegions = Array.isArray(body.workRegions)
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest) {
         rate_max: rateMax,
         rate_per_game: rateType === "range" && rateMin != null ? rateMin : null,
         rate_unit: rateUnit ?? "hour",
+        bio,
         recommended_assignor_name: recommendedAssignorName,
         recommended_assignor_email: recommendedAssignorEmail,
         recommended_assignor_phone: recommendedAssignorPhone,

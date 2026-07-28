@@ -93,6 +93,7 @@ export function AuthFlow() {
   const [certifiedBy, setCertifiedBy] = useState("");
   const [hourlyRateMin, setHourlyRateMin] = useState(String(SIGNUP_HOURLY_RATE_FLOOR));
   const [hourlyRateMax, setHourlyRateMax] = useState("75");
+  const [bio, setBio] = useState("");
   const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
   const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
   const [certDocFile, setCertDocFile] = useState<File | null>(null);
@@ -154,6 +155,7 @@ export function AuthFlow() {
       setCertifiedBy(fields.certifiedBy || "");
       setHourlyRateMin(fields.hourlyRateMin || String(SIGNUP_HOURLY_RATE_FLOOR));
       setHourlyRateMax(fields.hourlyRateMax || "75");
+      setBio(fields.bio || "");
       setBaseCity(fields.baseCity || "");
       setTravelRadius(fields.travelRadius || "25");
       setWorkRegions(fields.workRegions?.length ? fields.workRegions : ["Local city"]);
@@ -554,6 +556,7 @@ export function AuthFlow() {
         rateMax: role === "ref" ? Number(hourlyRateMax) || SIGNUP_HOURLY_RATE_FLOOR : undefined,
         rateType: role === "ref" ? "range" : undefined,
         rateUnit: role === "ref" ? "hour" : undefined,
+        bio: role === "ref" ? bio.trim() || undefined : undefined,
         gotrefsId,
         baseCity: baseCity.trim() || undefined,
         workRegions,
@@ -607,6 +610,7 @@ export function AuthFlow() {
                 certifiedBy,
                 hourlyRateMin,
                 hourlyRateMax,
+                bio,
                 baseCity,
                 travelRadius,
                 workRegions,
@@ -690,6 +694,7 @@ export function AuthFlow() {
                 certifiedBy,
                 hourlyRateMin,
                 hourlyRateMax,
+                bio,
                 baseCity,
                 travelRadius,
                 workRegions,
@@ -757,6 +762,7 @@ export function AuthFlow() {
         certifiedBy={certifiedBy}
         hourlyRateMin={hourlyRateMin}
         hourlyRateMax={hourlyRateMax}
+        bio={bio}
         govIdFrontFile={govIdFrontFile}
         govIdBackFile={govIdBackFile}
         certDocFile={certDocFile}
@@ -780,6 +786,7 @@ export function AuthFlow() {
         onCertifiedBy={setCertifiedBy}
         onHourlyRateMin={setHourlyRateMin}
         onHourlyRateMax={setHourlyRateMax}
+        onBio={setBio}
         onGovIdFrontFile={setGovIdFrontFile}
         onGovIdBackFile={setGovIdBackFile}
         onCertDocFile={setCertDocFile}

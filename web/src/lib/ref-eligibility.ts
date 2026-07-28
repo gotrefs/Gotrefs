@@ -58,9 +58,18 @@ export function refOfferEligible(args: RefEligibilityArgs): boolean {
 
   // Explicit admin reject / revoke always blocks — even if screening was previously "clear".
   if (refVerificationRejected(status)) return false;
+  // Needs info / awaiting review: not eligible to apply until re-approved.
   if (refVerificationPendingReview(status)) return false;
+  // Any open fix list means approval is paused (defensive if status lagged).
+  // Callers that know fix steps should pass pending/under_review status; this keeps apply locked.
 
-  if (args.verificationMethod === "external" && args.externalProofPath) return true;
+  if (args.verificationMethod === "external" && args.externalProofPath) {
+    // External proof only counts when admin has not moved them into a pending/rejected cycle.
+    if (!status || status === "approved" || status === "draft" || status === "not_submitted") {
+      return true;
+    }
+    return false;
+  }
 
   if (refVerificationApproved(status)) return true;
 

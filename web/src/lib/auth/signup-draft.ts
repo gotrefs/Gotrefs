@@ -19,6 +19,7 @@ export type RefSignupDraftFields = {
   certifiedBy?: string;
   hourlyRateMin: string;
   hourlyRateMax: string;
+  bio?: string;
   baseCity: string;
   travelRadius: string;
   workRegions: string[];
