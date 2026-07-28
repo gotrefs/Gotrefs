@@ -181,6 +181,7 @@ export default function RefereeDashboardClient() {
   const [myRatingCount, setMyRatingCount] = useState(0);
   const [myReviews, setMyReviews] = useState<PublicReview[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
   const idCardRef = useRef<HTMLDivElement | null>(null);
   const publishCardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -211,6 +212,7 @@ export default function RefereeDashboardClient() {
     } = await supabase.auth.getUser();
     if (!user) return;
     setMemberId(user.id);
+    setEmailConfirmed(Boolean(user.email_confirmed_at));
     const meta = user.user_metadata ?? {};
     setDisplayName(
       String(meta.full_name ?? "").trim() ||
@@ -1363,15 +1365,15 @@ export default function RefereeDashboardClient() {
           {(showPendingReviewView || verificationNeedsFix) && (
             <div className="mt-5 space-y-4">
               <VerificationPartnerBadge compact />
-              <RefGearCouponNotice />
+              {emailConfirmed ? <RefGearCouponNotice /> : null}
             </div>
           )}
-          {verificationRejected && !verificationNeedsFix && (
+          {verificationRejected && !verificationNeedsFix && emailConfirmed && (
             <div className="mt-5">
               <RefGearCouponNotice />
             </div>
           )}
-          {!showPendingReviewView && !verificationNeedsFix && !verificationRejected && (
+          {!showPendingReviewView && !verificationNeedsFix && !verificationRejected && emailConfirmed && (
             <div className="mt-5">
               <RefGearCouponNotice />
             </div>
@@ -1406,9 +1408,11 @@ export default function RefereeDashboardClient() {
                 </p>
               </div>
             ) : null}
-            <div className="mt-5">
-              <RefGearCouponNotice />
-            </div>
+            {emailConfirmed ? (
+              <div className="mt-5">
+                <RefGearCouponNotice />
+              </div>
+            ) : null}
           </div>
           <div>
             <RefereeIdCard

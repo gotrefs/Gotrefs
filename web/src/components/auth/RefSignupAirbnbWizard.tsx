@@ -9,7 +9,7 @@ import { formatHourlyRateRange } from "@/lib/pay-range";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import { sportEmoji } from "@/lib/sport-emoji";
 import { saveRefSignupDraft } from "@/lib/auth/signup-draft";
-import { RefGearCouponNotice } from "@/components/partners/RefGearCouponNotice";
+import { RefGearDiscountTeaser } from "@/components/partners/RefGearCouponNotice";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -1021,7 +1021,7 @@ export function RefSignupAirbnbWizard({
                 </label>
               </div>
               <div className="mt-8">
-                <RefGearCouponNotice />
+                <RefGearDiscountTeaser />
               </div>
             </div>
           )}
