@@ -48,8 +48,7 @@ type WizardScreen =
   | "baseCity"
   | "travelRadius"
   | "workRegions"
-  | "account"
-  | "assignorRecommend";
+  | "account";
 
 export type RefSignupWizardScreen = WizardScreen;
 
@@ -70,9 +69,14 @@ const STEP3_SCREENS: WizardScreen[] = [
   "travelRadius",
   "workRegions",
   "account",
-  "assignorRecommend",
 ];
 const ALL_SCREENS: WizardScreen[] = [...STEP1_SCREENS, ...STEP2_SCREENS, ...STEP3_SCREENS];
+
+function normalizeWizardScreen(screen: string | undefined): WizardScreen {
+  if (screen === "assignorRecommend") return "account";
+  if (screen && (ALL_SCREENS as string[]).includes(screen)) return screen as WizardScreen;
+  return "intro1";
+}
 
 export type RefSignupAirbnbWizardProps = {
   loading: boolean;
@@ -100,9 +104,6 @@ export type RefSignupAirbnbWizardProps = {
   workRegions: string[];
   password: string;
   termsAccepted: boolean;
-  recommendedAssignorName: string;
-  recommendedAssignorEmail: string;
-  recommendedAssignorPhone: string;
   onFirstName: (value: string) => void;
   onLastName: (value: string) => void;
   onPhotoFile: (file: File | null) => void;
@@ -124,9 +125,6 @@ export type RefSignupAirbnbWizardProps = {
   onToggleRegion: (region: string) => void;
   onPassword: (value: string) => void;
   onTermsAccepted: (value: boolean) => void;
-  onRecommendedAssignorName: (value: string) => void;
-  onRecommendedAssignorEmail: (value: string) => void;
-  onRecommendedAssignorPhone: (value: string) => void;
   onSubmit: (event: FormEvent, options?: { skipAssignor?: boolean }) => void;
   onExit: (screen?: WizardScreen) => void;
   /** Resume at this screen after Save & exit. */
@@ -210,9 +208,6 @@ export function RefSignupAirbnbWizard({
   workRegions,
   password,
   termsAccepted,
-  recommendedAssignorName,
-  recommendedAssignorEmail,
-  recommendedAssignorPhone,
   onFirstName,
   onLastName,
   onPhotoFile,
@@ -234,17 +229,12 @@ export function RefSignupAirbnbWizard({
   onToggleRegion,
   onPassword,
   onTermsAccepted,
-  onRecommendedAssignorName,
-  onRecommendedAssignorEmail,
-  onRecommendedAssignorPhone,
   onSubmit,
   onExit,
   initialScreen = "intro1",
 }: RefSignupAirbnbWizardProps) {
   const fullName = [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(" ");
-  const [screen, setScreen] = useState<WizardScreen>(
-    ALL_SCREENS.includes(initialScreen) ? initialScreen : "intro1"
-  );
+  const [screen, setScreen] = useState<WizardScreen>(normalizeWizardScreen(initialScreen));
   const [localError, setLocalError] = useState<string | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [savingExit, setSavingExit] = useState(false);
@@ -328,9 +318,9 @@ export function RefSignupAirbnbWizard({
           travelRadius,
           workRegions,
           termsAccepted,
-          recommendedAssignorName,
-          recommendedAssignorEmail,
-          recommendedAssignorPhone,
+          recommendedAssignorName: "",
+          recommendedAssignorEmail: "",
+          recommendedAssignorPhone: "",
         },
         {
           photo: photoFile,
@@ -374,18 +364,8 @@ export function RefSignupAirbnbWizard({
       const passwordOk = oauthMode || password.trim().length >= 8;
       return emailOk && passwordOk && termsAccepted && !loading;
     }
-    if (screen === "assignorRecommend") return !loading;
     return true;
   })();
-
-  function assignorFieldsValid(): boolean {
-    const name = recommendedAssignorName.trim();
-    const emailValue = recommendedAssignorEmail.trim();
-    const phone = recommendedAssignorPhone.trim();
-    const anyFilled = Boolean(name || emailValue || phone);
-    if (!anyFilled) return true;
-    return Boolean(name && (emailValue || phone));
-  }
 
   function handleNext() {
     setLocalError(null);
@@ -407,23 +387,17 @@ export function RefSignupAirbnbWizard({
       }
       return;
     }
-    if (screen === "assignorRecommend") return;
-    goNext();
-  }
-
-  function submitAssignor(event: FormEvent, options?: { skip?: boolean }) {
-    setLocalError(null);
-    if (!options?.skip && !assignorFieldsValid()) {
-      setLocalError("Enter the assignor's name and their email or phone number.");
+    if (screen === "account") {
+      onSubmit(new Event("submit") as unknown as FormEvent, { skipAssignor: true });
       return;
     }
-    onSubmit(event, options?.skip ? { skipAssignor: true } : undefined);
+    goNext();
   }
 
   const nextLabel =
     screen === "intro1" || screen === "intro2" || screen === "intro3"
       ? "Get started"
-      : screen === "assignorRecommend"
+      : screen === "account"
         ? loading
           ? "Saving…"
           : oauthMode
@@ -431,8 +405,7 @@ export function RefSignupAirbnbWizard({
             : "Create account"
         : "Next";
 
-  const displayError =
-    screen === "account" || screen === "assignorRecommend" ? localError || error : localError;
+  const displayError = screen === "account" ? localError || error : localError;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
@@ -1047,52 +1020,6 @@ export function RefSignupAirbnbWizard({
                   </span>
                 </label>
               </div>
-            </div>
-          )}
-
-          {screen === "assignorRecommend" && (
-            <div className="mx-auto max-w-xl">
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Recommended by an assignor?
-              </h1>
-              <p className="mt-2 text-neutral-500">
-                If an assignor introduced you to GotRefs, add their name and email or phone so we can credit them.
-                You can skip this if no one recommended you.
-              </p>
-              <div className="mt-8 space-y-4">
-                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                  <span className="text-xs text-neutral-500">Assignor name</span>
-                  <input
-                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                    value={recommendedAssignorName}
-                    onChange={(event) => onRecommendedAssignorName(event.target.value)}
-                    placeholder="Full name"
-                    autoComplete="name"
-                  />
-                </label>
-                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                  <span className="text-xs text-neutral-500">Email (or phone below)</span>
-                  <input
-                    type="email"
-                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                    value={recommendedAssignorEmail}
-                    onChange={(event) => onRecommendedAssignorEmail(event.target.value)}
-                    placeholder="assignor@example.com"
-                    autoComplete="email"
-                  />
-                </label>
-                <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
-                  <span className="text-xs text-neutral-500">Phone</span>
-                  <input
-                    type="tel"
-                    className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
-                    value={recommendedAssignorPhone}
-                    onChange={(event) => onRecommendedAssignorPhone(event.target.value)}
-                    placeholder="(555) 555-5555"
-                    autoComplete="tel"
-                  />
-                </label>
-              </div>
               <div className="mt-8">
                 <RefGearCouponNotice />
               </div>
@@ -1128,35 +1055,14 @@ export function RefSignupAirbnbWizard({
               Back
             </button>
           )}
-          {screen === "assignorRecommend" ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={loading}
-                onClick={(event) => submitAssignor(event as unknown as FormEvent, { skip: true })}
-                className="rounded-lg px-4 py-3.5 text-sm font-semibold text-neutral-900 underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Skip for now
-              </button>
-              <button
-                type="button"
-                disabled={!canContinue}
-                onClick={(event) => submitAssignor(event as unknown as FormEvent)}
-                className="rounded-lg bg-neutral-900 px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {nextLabel}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={!canContinue}
-              onClick={handleNext}
-              className="rounded-lg bg-neutral-900 px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {nextLabel}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={!canContinue}
+            onClick={() => handleNext()}
+            className="rounded-lg bg-neutral-900 px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {nextLabel}
+          </button>
         </div>
       </footer>
     </div>

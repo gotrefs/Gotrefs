@@ -168,7 +168,11 @@ export function AuthFlow() {
       setGovIdFrontFile(draft.files.govIdFront);
       setGovIdBackFile(draft.files.govIdBack);
       setCertDocFile(draft.files.certDoc);
-      setResumeScreen((fields.screen as RefSignupWizardScreen) || "intro1");
+      setResumeScreen(
+        fields.screen === "assignorRecommend"
+          ? "account"
+          : ((fields.screen as RefSignupWizardScreen) || "intro1")
+      );
       setStep("onboarding");
       setNotice("Welcome back — we restored your signup exactly where you left off.");
       setDraftHydrated(true);
@@ -773,9 +777,6 @@ export function AuthFlow() {
         workRegions={workRegions}
         password={password}
         termsAccepted={termsAccepted}
-        recommendedAssignorName={recommendedAssignorName}
-        recommendedAssignorEmail={recommendedAssignorEmail}
-        recommendedAssignorPhone={recommendedAssignorPhone}
         onFirstName={setFirstName}
         onLastName={setLastName}
         onPhotoFile={setPhotoFile}
@@ -797,9 +798,6 @@ export function AuthFlow() {
         onToggleRegion={toggleRegion}
         onPassword={setPassword}
         onTermsAccepted={setTermsAccepted}
-        onRecommendedAssignorName={setRecommendedAssignorName}
-        onRecommendedAssignorEmail={setRecommendedAssignorEmail}
-        onRecommendedAssignorPhone={setRecommendedAssignorPhone}
         onSubmit={register}
         onExit={(savedScreen) => {
           if (savedScreen) setResumeScreen(savedScreen);
