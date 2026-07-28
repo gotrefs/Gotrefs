@@ -22,7 +22,7 @@ import {
   RefSignupAirbnbWizard,
   type RefSignupWizardScreen,
 } from "@/components/auth/RefSignupAirbnbWizard";
-import { RefGearPerkCard } from "@/components/partners/RefGearPerkCard";
+import { RefGearCouponNotice } from "@/components/partners/RefGearCouponNotice";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -839,14 +839,7 @@ export function AuthFlow() {
               </p>
             </div>
 
-            {pendingRedirect === "/dashboard/referee" && (
-              <div>
-                <p className="mb-3 text-sm font-semibold text-[var(--navy)]">
-                  After you confirm and open your dashboard, you&apos;ll get your member gear discount code.
-                </p>
-                <RefGearPerkCard unlocked />
-              </div>
-            )}
+            {pendingRedirect === "/dashboard/referee" && <RefGearCouponNotice />}
 
             <ul className="space-y-2 text-sm text-[var(--muted)]">
               <li>Check your spam or promotions folder if you do not see the email within a minute.</li>

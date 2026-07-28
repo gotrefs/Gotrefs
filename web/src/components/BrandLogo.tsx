@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { BRAND_NAME } from "@/lib/brand";
 
 type BrandLogoProps = {
@@ -32,9 +31,14 @@ export function BrandLogo({
     return <span className={`inline-flex items-center ${className}`}>{img}</span>;
   }
 
+  // Native anchor so dashboard → marketing home always navigates (Next Link can soft-nav fail across layouts).
   return (
-    <Link href={href} className={`inline-flex items-center ${className}`}>
+    <a
+      href={href}
+      className={`inline-flex cursor-pointer items-center ${className}`}
+      aria-label={`${BRAND_NAME} home`}
+    >
       {img}
-    </Link>
+    </a>
   );
 }

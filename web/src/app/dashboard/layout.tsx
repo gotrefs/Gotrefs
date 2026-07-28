@@ -29,7 +29,17 @@ export default async function DashboardLayout({
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
             <BrandLogo href="/" imageClassName="h-12 w-auto" />
             <nav className="flex items-center gap-3 text-sm">
-              {user && !isAdmin && <DashboardRoleLabel role={initialRole} />}
+              {user && !isAdmin && (
+                <>
+                  <a
+                    href="/"
+                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-semibold text-[var(--navy)] transition-colors hover:border-[var(--navy)] hover:bg-[var(--grey-light)]"
+                  >
+                    Return to home page
+                  </a>
+                  <DashboardRoleLabel role={initialRole} />
+                </>
+              )}
               {user && isAdmin && <AdminDashboardLink />}
               {user && !isAdmin && (
                 <Suspense fallback={null}>

@@ -9,7 +9,7 @@ import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
 import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueModal";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
-import { RefGearPerkCard } from "@/components/partners/RefGearPerkCard";
+import { RefGearCouponNotice } from "@/components/partners/RefGearCouponNotice";
 import { VerificationPartnerBadge } from "@/components/partners/VerificationPartnerBadge";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
@@ -1363,17 +1363,17 @@ export default function RefereeDashboardClient() {
           {(showPendingReviewView || verificationNeedsFix) && (
             <div className="mt-5 space-y-4">
               <VerificationPartnerBadge compact />
-              <RefGearPerkCard unlocked showCoupon />
+              <RefGearCouponNotice />
             </div>
           )}
           {verificationRejected && !verificationNeedsFix && (
             <div className="mt-5">
-              <RefGearPerkCard unlocked showCoupon />
+              <RefGearCouponNotice />
             </div>
           )}
           {!showPendingReviewView && !verificationNeedsFix && !verificationRejected && (
             <div className="mt-5">
-              <RefGearPerkCard unlocked showCoupon />
+              <RefGearCouponNotice />
             </div>
           )}
         </div>
@@ -1407,7 +1407,7 @@ export default function RefereeDashboardClient() {
               </div>
             ) : null}
             <div className="mt-5">
-              <RefGearPerkCard unlocked showCoupon />
+              <RefGearCouponNotice />
             </div>
           </div>
           <div>
