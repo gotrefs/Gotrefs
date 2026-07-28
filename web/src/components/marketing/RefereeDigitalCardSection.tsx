@@ -8,7 +8,10 @@ const VERIFIED_REF_CARD_SRC = "/gotrefs-verified-ref-card.png";
 /** Full-screen digital referee player card showcase. */
 export function RefereeDigitalCardSection() {
   return (
-    <section className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-white px-4">
+    <section
+      data-snap-section
+      className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
+    >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center text-center">
         <p className="marketing-eyebrow text-[var(--red)]">Verified officials</p>
         <h2 className="marketing-headline-dense max-w-4xl text-[#1b2132]">

@@ -21,7 +21,8 @@ export function OrganizerBenefitsSection() {
   return (
     <section
       id="for-organizers"
-      className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
+      data-snap-section
+      className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
       <div className="mx-auto w-full max-w-6xl">
         <p className="marketing-eyebrow text-[#1b2132]">For Event Organizers</p>

@@ -41,7 +41,7 @@ export default async function HomePage({
   return (
     <>
       {/* First viewport: header + hero share one full-height blue panel (no white strip) */}
-      <div className="hero-arbiter-bg flex min-h-dvh flex-col">
+      <div data-snap-section className="hero-arbiter-bg flex h-dvh min-h-dvh flex-col">
         <MarketingHeader />
 
         <section className="flex min-h-0 flex-1 items-center text-white">
@@ -82,7 +82,10 @@ export default async function HomePage({
       <MarketingFaqSection />
 
       {/* Final CTA — same full-viewport rhythm as the first blue page */}
-      <section className="hero-arbiter-bg viewport-screen flex flex-col justify-center px-4 text-center text-white">
+      <section
+        data-snap-section
+        className="hero-arbiter-bg viewport-screen flex flex-col justify-center px-4 text-center text-white"
+      >
         <div className="mx-auto max-w-2xl">
           <h2 className="marketing-headline text-white">{cta.title}</h2>
           <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-white/80 sm:mt-5 md:text-lg md:leading-7">

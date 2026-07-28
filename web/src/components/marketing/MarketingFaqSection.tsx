@@ -73,7 +73,8 @@ export function MarketingFaqSection() {
 
   return (
     <section
-      className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
+      data-snap-section
+      className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
       id="faq"
     >
       <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col justify-center">
@@ -113,7 +114,10 @@ export function MarketingFaqSection() {
           ))}
         </div>
 
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--border)] bg-white">
+        <div
+          data-snap-scroll
+          className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-white"
+        >
           <div className="divide-y divide-[var(--border)]">
             {visibleItems.map((item) => (
               <details

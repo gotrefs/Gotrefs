@@ -13,7 +13,8 @@ export function ApartSection({ title, items }: { title: string; items: ApartItem
   return (
     <section
       id="features"
-      className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
+      data-snap-section
+      className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-white px-4"
     >
       <div className="mx-auto w-full max-w-6xl">
         <h2 className="marketing-headline text-center text-[#1b2132]">{displayTitle}</h2>

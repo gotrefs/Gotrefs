@@ -34,8 +34,14 @@ html {
   scroll-behavior: smooth;
 }
 
+html.marketing-fullpage-scroll {
+  /* Wheel / touch advances are handled in JS; avoid CSS snap fighting the footer. */
+  scroll-snap-type: none;
+  scroll-padding-top: 0;
+}
+
 @media (min-width: 1024px) {
-  html {
+  html:not(.marketing-fullpage-scroll) {
     scroll-snap-type: y proximity;
   }
 }
@@ -146,12 +152,14 @@ body {
 
 /* Full-viewport marketing panels — same screen height as the first blue page */
 .hero-fullscreen,
-.viewport-screen {
+.viewport-screen,
+[data-snap-section] {
   box-sizing: border-box;
   min-height: 100dvh;
   height: 100dvh;
   overflow: hidden;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .viewport-screen {

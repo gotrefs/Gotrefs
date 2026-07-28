@@ -22,7 +22,8 @@ export function VerifiedRefCardSection() {
   return (
     <section
       id="ref-verification"
-      className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
+      data-snap-section
+      className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col justify-center">
         <p className="marketing-eyebrow text-[var(--red)]">For Referees</p>
