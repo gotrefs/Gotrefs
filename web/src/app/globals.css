@@ -144,7 +144,7 @@ body {
   }
 }
 
-/* Full-viewport sections below the first screen (equal screen height when scrolling) */
+/* Full-viewport marketing panels — same screen height as the first blue page */
 .hero-fullscreen,
 .viewport-screen {
   box-sizing: border-box;
@@ -155,8 +155,100 @@ body {
 }
 
 .viewport-screen {
-  padding-top: 2rem;
-  padding-bottom: 2rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .viewport-screen {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .viewport-screen {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+/* Shared type scale — matches first blue hero */
+.marketing-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 640px) {
+  .marketing-eyebrow {
+    font-size: 0.875rem;
+    letter-spacing: 0.22em;
+  }
+}
+
+.marketing-headline {
+  margin-top: 0.75rem;
+  font-size: 2.35rem;
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 640px) {
+  .marketing-headline {
+    margin-top: 1rem;
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .marketing-headline {
+    font-size: 3.75rem;
+  }
+}
+
+.marketing-headline-dense {
+  margin-top: 0.75rem;
+  font-size: 1.875rem;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 640px) {
+  .marketing-headline-dense {
+    margin-top: 1rem;
+    font-size: 2.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .marketing-headline-dense {
+    font-size: 3rem;
+  }
+}
+
+.marketing-body {
+  margin-top: 1rem;
+  max-width: 48rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (min-width: 640px) {
+  .marketing-body {
+    margin-top: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .marketing-body {
+    font-size: 1.125rem;
+    line-height: 1.75;
+  }
 }
 
 .section-padding {
@@ -165,11 +257,6 @@ body {
 }
 
 @media (min-width: 1024px) {
-  .viewport-screen {
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
   .section-padding {
     padding-top: 5rem;
     padding-bottom: 5rem;

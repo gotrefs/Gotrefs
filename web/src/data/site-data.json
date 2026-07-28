@@ -165,7 +165,7 @@
         "description": "Every referee on GotRefs completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
         "bullets": [
           "Government ID and certification document upload",
-          "Background screening via Checkr integration",
+          "Background screening with National SportsID (NSID)",
           "External verification path for existing credentials",
           "Organizers only see eligible, verified refs"
         ],

@@ -79,17 +79,16 @@ export default async function HomePage({
 
       <ApartSection title={apart.title} items={apart.items} />
 
-      {/* FAQ */}
       <MarketingFaqSection />
 
-      {/* Screen 5 — CTA */}
-      <section className="hero-arbiter-bg viewport-screen flex flex-col items-center justify-center px-4 text-center text-white">
+      {/* Final CTA — same full-viewport rhythm as the first blue page */}
+      <section className="hero-arbiter-bg viewport-screen flex flex-col justify-center px-4 text-center text-white">
         <div className="mx-auto max-w-2xl">
-          <h2 className="text-2xl font-bold md:text-3xl">{cta.title}</h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-[var(--grey-light)] md:text-base">
+          <h2 className="marketing-headline text-white">{cta.title}</h2>
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-white/80 sm:mt-5 md:text-lg md:leading-7">
             {normalizeBrandInText(cta.subtext)}
           </p>
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:mt-8 sm:flex-row">
             <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
               {cta.primaryButton}
             </Link>

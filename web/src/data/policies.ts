@@ -62,8 +62,8 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "3. NSID Background Verification",
         body: [
-          "Where required by an Organizer or governing body, Officials may be required to complete a background screening through National Sports ID (NSID) or another approved provider.",
-          "Completion of a background check does not guarantee assignment eligibility, nor does it constitute an endorsement by GotRefs. Organizers may establish additional screening requirements beyond those required by GotRefs.",
+          "Where required by an Organizer or governing body, Officials may be required to complete a background screening through National SportsID (NSID), GotRefs’ verification partner, or another approved provider.",
+          "Completion of a background check does not guarantee assignment eligibility, nor does it constitute an endorsement by GotRefs. Organizers may establish additional screening requirements beyond those required by GotRefs. GotRefs still reviews submitted credentials before approving an official to request games.",
         ],
         bullets: [
           "Criminal history review, where permitted by law.",

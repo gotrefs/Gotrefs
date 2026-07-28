@@ -69,7 +69,7 @@ export function LandingAuthPopup() {
 
             <p className="mt-28 text-xs leading-5 text-slate-500 md:mt-32">
               By joining GotRefs, you agree to our{" "}
-              <Link href="/#faq" className="font-bold text-emerald-700 underline">
+              <Link href="/policies/referee-official-terms" className="font-bold text-emerald-700 underline">
                 Terms of Service
               </Link>{" "}
               and acknowledge that we use data to operate your marketplace account.

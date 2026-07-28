@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandName } from "@/components/BrandName";
+import { RefGearPerkCard } from "@/components/partners/RefGearPerkCard";
 
 const REFEREE_REASONS = [
   {
@@ -21,36 +22,38 @@ export function VerifiedRefCardSection() {
   return (
     <section
       id="ref-verification"
-      className="viewport-screen scroll-mt-[4.25rem] flex flex-col items-center justify-center border-t border-[var(--border)] bg-slate-50 px-4"
+      className="viewport-screen scroll-mt-[4.25rem] flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
-      <div className="mx-auto w-full max-w-6xl">
-        <p className="text-base font-black uppercase tracking-[0.18em] text-[var(--red)] sm:text-lg sm:tracking-[0.22em]">
-          For Referees
-        </p>
-        <h2 className="mt-3 text-[2.6rem] font-black leading-[1.02] tracking-tight text-[#1b2132] sm:text-5xl md:text-[3.5rem] lg:text-7xl">
-          Your Whistle. Your Backyard.
-        </h2>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)] md:text-xl md:leading-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col justify-center">
+        <p className="marketing-eyebrow text-[var(--red)]">For Referees</p>
+        <h2 className="marketing-headline text-[#1b2132]">Your Whistle. Your Backyard.</h2>
+        <p className="marketing-body">
           Stop chasing gigs across state lines. With <BrandName />, local event organizers come directly to you. Sleep
           in your own bed, call the games you love, and own your home turf.
         </p>
 
-        <h3 className="mt-8 text-xl font-black text-[#1b2132] md:text-2xl">Top 3 Reasons to Join:</h3>
-        <ul className="mt-4 grid gap-4 sm:grid-cols-3">
+        <h3 className="mt-5 text-base font-black text-[#1b2132] sm:mt-6 sm:text-lg md:text-xl">
+          Top 3 Reasons to Join:
+        </h3>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-4">
           {REFEREE_REASONS.map((reason) => (
             <li
               key={reason.title}
-              className="rounded-xl border border-[var(--border)] bg-white px-5 py-5 shadow-sm"
+              className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4"
             >
-              <p className="text-base font-black text-[#1b2132] md:text-xl">{reason.title}</p>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] md:text-base md:leading-7">
+              <p className="text-sm font-black text-[#1b2132] sm:text-base md:text-lg">{reason.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--muted)] sm:mt-2 sm:text-sm">
                 {reason.description}
               </p>
             </li>
           ))}
         </ul>
 
-        <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-8 inline-flex w-full sm:w-auto">
+        <div className="mt-4 sm:mt-5">
+          <RefGearPerkCard unlocked compact />
+        </div>
+
+        <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
           Join as a referee
         </Link>
       </div>

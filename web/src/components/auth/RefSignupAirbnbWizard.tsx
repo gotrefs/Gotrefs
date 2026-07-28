@@ -9,6 +9,7 @@ import { formatHourlyRateRange } from "@/lib/pay-range";
 import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import { sportEmoji } from "@/lib/sport-emoji";
 import { saveRefSignupDraft } from "@/lib/auth/signup-draft";
+import { RefGearPerkCard } from "@/components/partners/RefGearPerkCard";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -1091,6 +1092,10 @@ export function RefSignupAirbnbWizard({
                     autoComplete="tel"
                   />
                 </label>
+              </div>
+              <div className="mt-8">
+                <p className="mb-3 text-sm font-semibold text-neutral-900">Member perk — gear discount after you join</p>
+                <RefGearPerkCard unlocked />
               </div>
             </div>
           )}

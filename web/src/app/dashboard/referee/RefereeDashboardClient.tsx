@@ -9,6 +9,8 @@ import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
 import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueModal";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
+import { RefGearPerkCard } from "@/components/partners/RefGearPerkCard";
+import { VerificationPartnerBadge } from "@/components/partners/VerificationPartnerBadge";
 import { RefReviewsButton } from "@/components/reviews/RefReviewsButton";
 import type { PublicReview } from "@/components/reviews/ReviewsModal";
 import {
@@ -1358,6 +1360,22 @@ export default function RefereeDashboardClient() {
               {verificationNeedsFix ? "Fix & resubmit application" : "Resubmit documents"}
             </button>
           )}
+          {(showPendingReviewView || verificationNeedsFix) && (
+            <div className="mt-5 space-y-4">
+              <VerificationPartnerBadge compact />
+              <RefGearPerkCard unlocked showCoupon />
+            </div>
+          )}
+          {verificationRejected && !verificationNeedsFix && (
+            <div className="mt-5">
+              <RefGearPerkCard unlocked showCoupon />
+            </div>
+          )}
+          {!showPendingReviewView && !verificationNeedsFix && !verificationRejected && (
+            <div className="mt-5">
+              <RefGearPerkCard unlocked showCoupon />
+            </div>
+          )}
         </div>
       ) : !profileWizard ? (
         <div className="grid gap-6 rounded-[2rem] border border-green-200 bg-gradient-to-br from-green-50 via-white to-[var(--blue)]/10 p-5 shadow-sm lg:grid-cols-[1fr_0.9fr] lg:p-7">
@@ -1388,6 +1406,9 @@ export default function RefereeDashboardClient() {
                 </p>
               </div>
             ) : null}
+            <div className="mt-5">
+              <RefGearPerkCard unlocked showCoupon />
+            </div>
           </div>
           <div>
             <RefereeIdCard

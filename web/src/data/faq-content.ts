@@ -67,7 +67,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "Are officials background checked?",
-        a: "Verified officials complete background screening requirements as part of the verification process, and we also use a national verification partner for officials who need to complete screening. Some officials might not have verification yet — that will show on their profile. Event organizers can choose whether they want verified or non-verified officials when posting an event.",
+        a: "Verified officials complete background screening requirements as part of the verification process. GotRefs partners with National SportsID (NSID) to check and verify officials, and GotRefs reviews submitted credentials before approval. Some officials might not have verification yet — that will show on their profile. Event organizers can choose whether they want verified or non-verified officials when posting an event.",
       },
       {
         q: "How does GotRefs help me find officials?",
@@ -88,7 +88,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "How do I get verified?",
-        a: "Officials can upload government-issued ID, state or national certifications, background screening documentation, and additional sport-specific credentials. Verified officials receive a digital verification card that organizers can trust. If you don't have a current verification on file, you can also use our third-party national verification partner and get verified for a small fee.",
+        a: "Officials can upload government-issued ID, state or national certifications, background screening documentation, and additional sport-specific credentials. GotRefs reviews your package with our verification partner National SportsID (NSID). Verified officials receive a digital verification card that organizers can trust. If you don't have a current verification on file, you can also complete screening through National SportsID when required.",
       },
       {
         q: "Can I set my availability?",
