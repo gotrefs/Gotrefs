@@ -349,6 +349,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  // Supabase hides "email already registered" by returning a user with no identities and no session.
+  const identities = data.user?.identities ?? [];
+  if (data.user && identities.length === 0 && !data.session) {
+    return NextResponse.json(
+      {
+        error:
+          "That email already has a GotRefs account. Log in instead, use Forgot password, or ask an admin to delete the auth user in Supabase.",
+      },
+      { status: 409 }
+    );
+  }
+
   const userId = data.user?.id ?? null;
   const profileInput: ProfileSetupInput = {
     role,
@@ -422,12 +434,18 @@ export async function POST(request: NextRequest) {
     : await supabase.auth.signInWithPassword({ email, password });
 
   if (signInError) {
+    // After a fresh signUp this usually means email confirmation is still required,
+    // not that the address is permanently taken.
+    const lower = signInError.message.toLowerCase();
+    const looksUnconfirmed =
+      lower.includes("email not confirmed") ||
+      lower.includes("not confirmed") ||
+      lower.includes("invalid login credentials");
     return NextResponse.json(
       {
-        error:
-          signInError.message.toLowerCase().includes("invalid login credentials")
-            ? "That email may already have a GotRefs account, or the account could not be created. Try logging in, using Continue with Google, or use a different email."
-            : signInError.message,
+        error: looksUnconfirmed
+          ? "Account created — check your email for a confirmation link before logging in. If you already confirmed, try Forgot password or a private browser window (old sessions can look like the email is still taken)."
+          : signInError.message,
       },
       { status: 400 }
     );
