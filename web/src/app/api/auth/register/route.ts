@@ -5,6 +5,7 @@ import {
   buildEmailConfirmationRedirectUrl,
   signupDashboardPath,
 } from "@/lib/auth/email-confirmation";
+import { sendCrossDeviceSignupConfirmationEmail } from "@/lib/auth/send-signup-confirmation";
 import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
 import {
   isReusableOnboardingTestEmail,
@@ -389,6 +390,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: profileResult.error }, { status: 503 });
       }
       await markMemberOnboarded(admin, userId);
+      // Prefer a token_hash email so confirm works on phone even if signup was on computer.
+      await sendCrossDeviceSignupConfirmationEmail({
+        admin,
+        email,
+        siteUrl,
+        pendingRedirect,
+      });
     } catch {
       return NextResponse.json(
         {

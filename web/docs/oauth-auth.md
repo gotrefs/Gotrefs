@@ -49,8 +49,18 @@ Signup flow:
 
 1. User completes the wizard and clicks **Create account**.
 2. App shows **Confirm your email address** (no dashboard yet).
-3. User clicks the link in their email → `/auth/callback?code=...&next=/dashboard/referee` (or organizer/assignor).
-4. Callback exchanges the code for a session and redirects to the role dashboard.
+3. GotRefs sends a **token_hash** confirmation email (works on phone or computer).
+4. User clicks the link → `/auth/callback?token_hash=...&type=magiclink&next=/dashboard/referee`.
+5. Callback verifies the OTP and redirects to the role dashboard.
+6. The original signup browser also polls and opens the dashboard once the email is confirmed.
+
+### Important: Supabase Confirm signup template (if using Auth emails)
+
+Default Supabase confirmation links use a PKCE `code=` that **fails when opened on a different device** (signup on laptop, click on phone). Prefer GotRefs Resend emails (`RESEND_API_KEY`), or change the Supabase **Confirm signup** template to:
+
+```html
+<a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup&next=/dashboard">Confirm your email</a>
+```
 
 Local dev bypass (optional): set `AUTH_SKIP_EMAIL_CONFIRMATION=true` in `web/.env.local` to skip the inbox step during testing.
 

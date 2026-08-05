@@ -501,6 +501,37 @@ export function AuthFlow() {
     }
   }
 
+  // When they confirm on another device (phone), keep this signup tab watching and open the dashboard.
+  useEffect(() => {
+    if (step !== "verify-email") return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) return;
+
+    let cancelled = false;
+    const tryEnterDashboard = async () => {
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail, password }),
+        });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { redirect?: string };
+        const destination = json.redirect || pendingRedirect || "/dashboard/referee";
+        window.location.assign(destination);
+      } catch {
+        // Keep waiting — email may not be confirmed yet.
+      }
+    };
+
+    void tryEnterDashboard();
+    const timer = window.setInterval(() => void tryEnterDashboard(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [step, email, password, pendingRedirect]);
+
   async function register(e: React.FormEvent, options?: { skipAssignor?: boolean }) {
     e.preventDefault();
     setError(null);
@@ -871,19 +902,19 @@ export function AuthFlow() {
               <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Confirm your email address</h2>
               <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
                 We sent a verification link to{" "}
-                <span className="font-bold text-[var(--navy)]">{email}</span>. Open your inbox and click the link to
-                finish creating your account.
+                <span className="font-bold text-[var(--navy)]">{email}</span>. You can open it on your phone or
+                this computer — leave this page open.
               </p>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                After confirming, you&apos;ll go straight to your{" "}
+                As soon as you confirm, this screen will automatically take you to your{" "}
                 <span className="font-semibold text-[var(--navy)]">{signupDashboardLabel(pendingRedirect)}</span>{" "}
                 dashboard.
               </p>
             </div>
 
             <ul className="space-y-2 text-sm text-[var(--muted)]">
-              <li>Check your spam or promotions folder if you do not see the email within a minute.</li>
-              <li>The link expires after a while — use Resend below if needed.</li>
+              <li>Use the newest email if you resend — older links may expire.</li>
+              <li>Check spam or promotions if you do not see it within a minute.</li>
               {pendingRedirect === "/dashboard/referee" && (
                 <li>After you confirm, your 10% gear discount code will appear on your referee dashboard.</li>
               )}

@@ -1,11 +1,26 @@
-import Image from "next/image";
 import Link from "next/link";
+import { RefereeIdCard } from "@/components/RefereeIdCard";
 import { VerificationPartnerBadge } from "@/components/partners/VerificationPartnerBadge";
-import { BRAND_NAME } from "@/lib/brand";
 
-const VERIFIED_REF_CARD_SRC = "/gotrefs-verified-ref-card.png";
+/** Demo data for the marketing digital-card showcase (matches live GotRefs ID card UI). */
+const DEMO_REF = {
+  fullName: "Jordan Miles",
+  gotrefsId: "GR-2026-4821",
+  avatarLabel: "JM",
+  primarySport: "Basketball",
+  additionalSports: ["Flag Football", "Volleyball"],
+  certificationLevel: "NFHS",
+  additionalCertificationLevels: ["CIF"],
+  certifiedBy: "NFHS / CIF",
+  rate: "$45–$65 / hr",
+  baseCity: "Los Angeles, CA",
+  workRegions: ["Local city", "County-wide"],
+  travelRadius: "25",
+  availabilitySummary: "Weeknights & weekends",
+  validThrough: "2026-2027",
+} as const;
 
-/** Full-screen digital referee player card showcase. */
+/** Full-screen digital referee ID card showcase. */
 export function RefereeDigitalCardSection() {
   return (
     <section
@@ -20,14 +35,32 @@ export function RefereeDigitalCardSection() {
         <p className="marketing-body mx-auto max-w-2xl text-center">
           Organizers see at a glance that you&apos;re identity-verified, certified, and ready to work your games.
         </p>
-        <div className="relative mt-4 flex h-[min(32svh,240px)] w-full max-w-2xl items-center justify-center sm:mt-5 sm:h-[min(36vh,300px)] md:h-[min(40vh,340px)]">
-          <Image
-            src={VERIFIED_REF_CARD_SRC}
-            alt={`${BRAND_NAME} verified referee digital player card showing front and back with verification badges, sports, and profile details`}
-            width={1200}
-            height={900}
-            className="mx-auto h-full w-full rounded-xl object-contain shadow-2xl ring-1 ring-black/10"
-          />
+        <div className="relative mt-4 flex w-full max-w-[400px] items-center justify-center sm:mt-5">
+          <div className="w-full origin-top scale-[0.85] sm:scale-90 md:scale-100">
+            <RefereeIdCard
+              fullName={DEMO_REF.fullName}
+              gotrefsId={DEMO_REF.gotrefsId}
+              avatarLabel={DEMO_REF.avatarLabel}
+              primarySport={DEMO_REF.primarySport}
+              additionalSports={[...DEMO_REF.additionalSports]}
+              certificationLevel={DEMO_REF.certificationLevel}
+              additionalCertificationLevels={[...DEMO_REF.additionalCertificationLevels]}
+              certifiedBy={DEMO_REF.certifiedBy}
+              rate={DEMO_REF.rate}
+              baseCity={DEMO_REF.baseCity}
+              workRegions={[...DEMO_REF.workRegions]}
+              travelRadius={DEMO_REF.travelRadius}
+              availabilitySummary={DEMO_REF.availabilitySummary}
+              govIdUploaded
+              certUploaded
+              backgroundStatus="clear"
+              verificationStatus="approved"
+              profileComplete
+              validThrough={DEMO_REF.validThrough}
+              hideQr
+              className="mx-auto shadow-2xl ring-1 ring-black/10"
+            />
+          </div>
         </div>
         <div className="mt-3 flex justify-center sm:mt-4">
           <VerificationPartnerBadge large />

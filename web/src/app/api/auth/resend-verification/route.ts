@@ -3,9 +3,11 @@ import {
   buildEmailConfirmationRedirectUrl,
   safeSignupRedirectPath,
 } from "@/lib/auth/email-confirmation";
+import { sendCrossDeviceSignupConfirmationEmail } from "@/lib/auth/send-signup-confirmation";
 import { validateEmail } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
+import { createServiceClient } from "@/lib/supabase/service";
 
 type ResendBody = {
   email?: string;
@@ -36,8 +38,28 @@ export async function POST(request: NextRequest) {
 
   const pendingRedirect = safeSignupRedirectPath(body.pendingRedirect);
   const siteUrl = resolveSiteUrlFromRequest(request);
-  const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
 
+  // Prefer token_hash magic links (work on any device). Fall back to Supabase resend.
+  try {
+    const admin = createServiceClient();
+    const result = await sendCrossDeviceSignupConfirmationEmail({
+      admin,
+      email,
+      siteUrl,
+      pendingRedirect,
+    });
+    if (result.sent) {
+      return NextResponse.json({
+        ok: true,
+        message: "Verification email sent. Use the newest email — the link works on phone or computer.",
+      });
+    }
+    console.warn("[resend-verification] cross-device send failed:", result.error);
+  } catch (err) {
+    console.warn("[resend-verification] generateLink unavailable:", err);
+  }
+
+  const emailRedirectTo = buildEmailConfirmationRedirectUrl(siteUrl, pendingRedirect);
   const sessionResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, sessionResponse);
   const { error } = await supabase.auth.resend({

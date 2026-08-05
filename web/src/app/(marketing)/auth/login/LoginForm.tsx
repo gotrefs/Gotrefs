@@ -18,12 +18,12 @@ export function LoginForm() {
     const reason = searchParams.get("reason") || "";
     const decoded = decodeURIComponent(reason);
     if (decoded === "pkce_failed" || decoded.toLowerCase().includes("pkce")) {
-      return "That email link can’t be verified in this browser (common when opening from a mail app). Request a new password reset, then open the newest email — or update the Supabase Reset password template to use token_hash (see docs).";
+      return "That confirmation link only works in the same browser that started signup. Go back to Sign up → Resend verification email, then open the newest email (those links work on any phone or computer).";
     }
     if (decoded && decoded !== "missing_code") {
-      return `Email link failed: ${decoded}. Request a new password reset from Forgot password and open the newest email.`;
+      return `Email link failed: ${decoded}. Use Resend verification email on the signup screen and open the newest message.`;
     }
-    return "Email link expired or could not be verified. Request a new password reset and open the newest email right away.";
+    return "Email link expired or could not be verified. Use Resend verification email and open the newest message right away.";
   });
   const [loading, setLoading] = useState(false);
 
