@@ -10,6 +10,7 @@ import {
   ORGANIZER_CONTACT_IN_NOTES_MESSAGE,
   textContainsOrganizerContact,
 } from "@/lib/marketplace/notes-for-ref";
+import { BRAND_NAME } from "@/lib/brand";
 
 function SportListingPreview({
   sport,
@@ -594,7 +595,7 @@ export function OrganizerListingWizard({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-8">
-        <p className="text-sm font-semibold tracking-tight text-neutral-900">gotrefs</p>
+        <p className="text-sm font-semibold tracking-tight text-neutral-900">{BRAND_NAME}</p>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -1354,16 +1355,20 @@ export function OrganizerListingWizard({
             <p className="mt-6 text-5xl" aria-hidden>
               🪙
             </p>
-            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Add a payout method</h2>
+            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">How will you pay for games?</h2>
+            <p className="mt-2 text-center text-sm text-neutral-500">
+              This is your preferred way to fund bookings on GotRefs (card/ACH checkout). Referee ACH deposits are
+              set up separately when each ref connects Stripe Express.
+            </p>
             <p className="mt-2 text-sm text-neutral-500">
-              You&apos;ll be able to pay refs once you set up a payout method.
+              You can pay accepted refs from Listings once checkout is available.
             </p>
             <button
               type="button"
               onClick={() => setPayoutStage("method")}
               className="mt-6 w-full rounded-lg bg-neutral-900 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-800"
             >
-              Add payout method
+              Continue
             </button>
           </div>
         </div>
@@ -1372,7 +1377,7 @@ export function OrganizerListingWizard({
       {(payoutStage === "method" || payoutStage === "holder" || payoutStage === "bank") && (
         <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true">
           <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-8">
-            <p className="text-sm font-semibold tracking-tight text-neutral-900">gotrefs</p>
+            <p className="text-sm font-semibold tracking-tight text-neutral-900">{BRAND_NAME}</p>
             <button
               type="button"
               onClick={() => void finishPayout(true)}
@@ -1385,9 +1390,9 @@ export function OrganizerListingWizard({
             <div className="mx-auto w-full max-w-lg px-4 py-10">
               {payoutStage === "method" && (
                 <>
-                  <h2 className="text-center text-2xl font-semibold text-neutral-900">Let&apos;s add a payout method</h2>
+                  <h2 className="text-center text-2xl font-semibold text-neutral-900">Preferred funding method</h2>
                   <p className="mt-2 text-center text-sm text-neutral-500">
-                    To start, let us know where you&apos;d like us to send your money.
+                    Tell us how you usually fund games. Live checkout still runs through Stripe (card or ACH).
                   </p>
                   <p className="mt-8 font-semibold text-neutral-900">Billing country/region</p>
                   <div className="mt-2 overflow-hidden rounded-2xl border border-neutral-300">

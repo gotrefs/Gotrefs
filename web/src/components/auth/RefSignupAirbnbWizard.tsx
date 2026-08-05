@@ -10,6 +10,7 @@ import { sportListingVisual } from "@/lib/marketplace/airbnb-styles";
 import { sportEmoji } from "@/lib/sport-emoji";
 import { saveRefSignupDraft } from "@/lib/auth/signup-draft";
 import { RefGearDiscountTeaser } from "@/components/partners/RefGearCouponNotice";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const SIGNUP_HOURLY_RATE_FLOOR = 10;
 const SIGNUP_HOURLY_RATE_CEILING = 150;
@@ -37,7 +38,6 @@ type WizardScreen =
   | "legalName"
   | "photo"
   | "primarySport"
-  | "secondarySport"
   | "certificationLevel"
   | "hourlyRate"
   | "bio"
@@ -57,7 +57,6 @@ const STEP1_SCREENS: WizardScreen[] = [
   "legalName",
   "photo",
   "primarySport",
-  "secondarySport",
   "certificationLevel",
   "hourlyRate",
   "bio",
@@ -74,6 +73,7 @@ const ALL_SCREENS: WizardScreen[] = [...STEP1_SCREENS, ...STEP2_SCREENS, ...STEP
 
 function normalizeWizardScreen(screen: string | undefined): WizardScreen {
   if (screen === "assignorRecommend") return "account";
+  if (screen === "secondarySport") return "certificationLevel";
   if (screen && (ALL_SCREENS as string[]).includes(screen)) return screen as WizardScreen;
   return "intro1";
 }
@@ -88,7 +88,7 @@ export type RefSignupAirbnbWizardProps = {
   gotrefsId?: string;
   primarySport: string;
   customPrimarySport: string;
-  secondarySport: string;
+  additionalSports: string[];
   certificationLevel: string;
   additionalCertificationLevels: string[];
   certifiedBy: string;
@@ -109,7 +109,7 @@ export type RefSignupAirbnbWizardProps = {
   onPhotoFile: (file: File | null) => void;
   onPrimarySport: (value: string) => void;
   onCustomPrimarySport: (value: string) => void;
-  onSecondarySport: (value: string) => void;
+  onAdditionalSports: (sports: string[]) => void;
   onCertificationLevel: (value: string) => void;
   onAdditionalCertificationLevels: (levels: string[]) => void;
   onCertifiedBy: (value: string) => void;
@@ -192,7 +192,7 @@ export function RefSignupAirbnbWizard({
   gotrefsId,
   primarySport,
   customPrimarySport,
-  secondarySport,
+  additionalSports,
   certificationLevel,
   additionalCertificationLevels,
   certifiedBy,
@@ -213,7 +213,7 @@ export function RefSignupAirbnbWizard({
   onPhotoFile,
   onPrimarySport,
   onCustomPrimarySport,
-  onSecondarySport,
+  onAdditionalSports,
   onCertificationLevel,
   onAdditionalCertificationLevels,
   onCertifiedBy,
@@ -307,7 +307,8 @@ export function RefSignupAirbnbWizard({
           email,
           primarySport,
           customPrimarySport,
-          secondarySport,
+          secondarySport: additionalSports[0] || "",
+          additionalSports,
           certificationLevel,
           additionalCertificationLevels,
           certifiedBy,
@@ -355,7 +356,7 @@ export function RefSignupAirbnbWizard({
         maxVal <= SIGNUP_HOURLY_RATE_CEILING
       );
     }
-    if (screen === "bio") return bio.trim().length >= 20;
+    if (screen === "bio") return true; // optional — organizers benefit from it, but signup can continue
     if (screen === "govId") return Boolean(govIdFrontFile && govIdBackFile);
     if (screen === "certDoc") return Boolean(certDocFile);
     if (screen === "baseCity") return Boolean(baseCity.trim());
@@ -372,10 +373,11 @@ export function RefSignupAirbnbWizard({
     if (!canContinue) {
       if (screen === "legalName") setLocalError("Enter your first and last name to continue.");
       else if (screen === "photo") setLocalError("Upload a clear photo of your face to continue.");
-      else if (screen === "primarySport") setLocalError("Pick the sport you primarily officiate.");
+      else if (screen === "primarySport") setLocalError("Pick at least one sport you officiate.");
       else if (screen === "certificationLevel") setLocalError("Add at least one certification to continue.");
       else if (screen === "bio") {
-        setLocalError("Tell organizers a bit about your experience (at least a short paragraph).");
+        // Bio is optional; keep this branch unused but safe if validation changes.
+        setLocalError(null);
       }
       else if (screen === "govId") setLocalError("Upload both the front and back of your government ID to continue.");
       else if (screen === "certDoc") setLocalError("Upload your certification or license document to continue.");
@@ -410,7 +412,12 @@ export function RefSignupAirbnbWizard({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-8">
-        <p className="text-sm font-semibold tracking-tight text-neutral-900">gotrefs</p>
+        <BrandLogo
+          href="/"
+          src="/gotrefs-logo-blue-background.png"
+          imageClassName="h-10 w-auto sm:h-12"
+          priority
+        />
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -539,8 +546,10 @@ export function RefSignupAirbnbWizard({
                     accept=".jpg,.jpeg,.png,.webp,image/*"
                     className="sr-only"
                     onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      event.target.value = "";
                       setLocalError(null);
-                      onPhotoFile(event.target.files?.[0] ?? null);
+                      onPhotoFile(file);
                     }}
                   />
                 </label>
@@ -565,7 +574,7 @@ export function RefSignupAirbnbWizard({
                         ? customPrimarySport.trim() || undefined
                         : primarySport || undefined
                     }
-                    additionalSports={secondarySport ? [secondarySport] : []}
+                    additionalSports={additionalSports}
                     certificationLevel={certificationLevel || undefined}
                     additionalCertificationLevels={additionalCertificationLevels}
                     certifiedBy={certifiedBy || certificationLevel || undefined}
@@ -584,19 +593,43 @@ export function RefSignupAirbnbWizard({
           {screen === "primarySport" && (
             <div>
               <h1 className="text-center text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Which sport do you primarily officiate?
+                Which sports do you officiate?
               </h1>
+              <p className="mx-auto mt-2 max-w-xl text-center text-neutral-500">
+                Select all that apply. Your first pick is your primary sport.
+              </p>
               <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {ALL_SPORTS.map((sport) => {
-                  const selected = primarySport === sport;
+                  const selectedList = [
+                    primarySport,
+                    ...additionalSports.filter((item) => item && item !== primarySport),
+                  ].filter(Boolean);
+                  const selected = selectedList.includes(sport);
                   return (
                     <button
                       key={sport}
                       type="button"
                       onClick={() => {
-                        onPrimarySport(sport);
-                        onCustomPrimarySport("");
-                        if (secondarySport === sport) onSecondarySport("");
+                        const current = [
+                          primarySport,
+                          ...additionalSports.filter((item) => item && item !== primarySport),
+                        ].filter(Boolean);
+                        let next: string[];
+                        if (current.includes(sport)) {
+                          next = current.filter((item) => item !== sport);
+                        } else {
+                          next = [...current, sport];
+                        }
+                        if (next.length === 0) {
+                          onPrimarySport("");
+                          onAdditionalSports([]);
+                          onCustomPrimarySport("");
+                          return;
+                        }
+                        const [first, ...rest] = next;
+                        onPrimarySport(first);
+                        onAdditionalSports(rest.filter((item) => item !== OTHER_SPORT_VALUE));
+                        if (first !== OTHER_SPORT_VALUE) onCustomPrimarySport("");
                       }}
                       className={`rounded-2xl border px-4 py-5 text-left transition ${
                         selected ? "border-2 border-neutral-900 bg-neutral-50" : "border-neutral-300 hover:border-neutral-500"
@@ -606,12 +639,37 @@ export function RefSignupAirbnbWizard({
                         {sportEmoji(sport)}
                       </span>
                       <span className="mt-3 block text-base font-medium text-neutral-900">{sport}</span>
+                      {selected ? (
+                        <span className="mt-2 block text-xs font-semibold text-neutral-600">
+                          {primarySport === sport ? "Primary · selected" : "Selected"}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
                 <button
                   type="button"
-                  onClick={() => onPrimarySport(OTHER_SPORT_VALUE)}
+                  onClick={() => {
+                    const current = [
+                      primarySport,
+                      ...additionalSports.filter((item) => item && item !== primarySport),
+                    ].filter(Boolean);
+                    if (current.includes(OTHER_SPORT_VALUE)) {
+                      const next = current.filter((item) => item !== OTHER_SPORT_VALUE);
+                      if (next.length === 0) {
+                        onPrimarySport("");
+                        onAdditionalSports([]);
+                        onCustomPrimarySport("");
+                        return;
+                      }
+                      onPrimarySport(next[0]);
+                      onAdditionalSports(next.slice(1));
+                      onCustomPrimarySport("");
+                      return;
+                    }
+                    onPrimarySport(OTHER_SPORT_VALUE);
+                    onAdditionalSports(current.filter((item) => item !== OTHER_SPORT_VALUE));
+                  }}
                   className={`rounded-2xl border px-4 py-5 text-left transition ${
                     primarySport === OTHER_SPORT_VALUE
                       ? "border-2 border-neutral-900 bg-neutral-50"
@@ -626,7 +684,7 @@ export function RefSignupAirbnbWizard({
               </div>
               {primarySport === OTHER_SPORT_VALUE ? (
                 <label className="mx-auto mt-6 block max-w-xl rounded-2xl border border-neutral-300 px-5 py-4">
-                  <span className="text-xs text-neutral-500">Type your sport</span>
+                  <span className="text-xs text-neutral-500">Type your primary sport</span>
                   <input
                     className="mt-1 w-full border-0 bg-transparent p-0 text-base text-neutral-900 placeholder:text-neutral-400 outline-none"
                     value={customPrimarySport}
@@ -635,57 +693,6 @@ export function RefSignupAirbnbWizard({
                   />
                 </label>
               ) : null}
-            </div>
-          )}
-
-          {screen === "secondarySport" && (
-            <div className="mx-auto max-w-xl">
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Do you officiate a second sport?
-              </h1>
-              <p className="mt-2 text-neutral-500">Optional — skip if you only work one sport.</p>
-              <div className="mt-8 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => onSecondarySport("")}
-                  className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-5 py-5 text-left transition ${
-                    !secondarySport
-                      ? "border-2 border-neutral-900 bg-neutral-50"
-                      : "border-neutral-300 hover:border-neutral-500"
-                  }`}
-                >
-                  <div>
-                    <p className="text-lg font-semibold text-neutral-900">Primary sport only</p>
-                    <p className="mt-1 text-sm text-neutral-500">I&apos;ll stick with one sport for now.</p>
-                  </div>
-                  <span className="text-2xl" aria-hidden>
-                    ✓
-                  </span>
-                </button>
-                {ALL_SPORTS.filter((sport) => sport !== primarySport).map((sport) => {
-                  const selected = secondarySport === sport;
-                  return (
-                    <button
-                      key={sport}
-                      type="button"
-                      onClick={() => onSecondarySport(sport)}
-                      className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-5 py-5 text-left transition ${
-                        selected
-                          ? "border-2 border-neutral-900 bg-neutral-50"
-                          : "border-neutral-300 hover:border-neutral-500"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-lg font-semibold text-neutral-900">{sport}</p>
-                        <p className="mt-1 text-sm text-neutral-500">Also add this to your profile.</p>
-                      </div>
-                      <span className="text-2xl" aria-hidden>
-                        {sportEmoji(sport)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           )}
 
@@ -762,8 +769,8 @@ export function RefSignupAirbnbWizard({
                 Tell organizers about your experience
               </h1>
               <p className="mt-2 text-neutral-500">
-                Share anything that helps hosts trust you — years officiating, leagues or associations, championships,
-                or sports you specialize in.
+                Optional — share anything that helps hosts trust you: years officiating, leagues, championships, or
+                sports you specialize in. You can skip this and continue.
               </p>
               <textarea
                 className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"

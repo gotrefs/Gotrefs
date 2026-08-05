@@ -13,7 +13,9 @@ export type RefSignupDraftFields = {
   email: string;
   primarySport: string;
   customPrimarySport: string;
+  /** @deprecated Prefer additionalSports; kept for older drafts. */
   secondarySport: string;
+  additionalSports?: string[];
   certificationLevel: string;
   additionalCertificationLevels?: string[];
   certifiedBy?: string;

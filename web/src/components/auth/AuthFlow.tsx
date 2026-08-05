@@ -87,7 +87,7 @@ export function AuthFlow() {
   const [phone, setPhone] = useState("");
   const [primarySport, setPrimarySport] = useState("Basketball");
   const [customPrimarySport, setCustomPrimarySport] = useState("");
-  const [secondarySport, setSecondarySport] = useState("");
+  const [additionalSports, setAdditionalSports] = useState<string[]>([]);
   const [certificationLevel, setCertificationLevel] = useState("");
   const [additionalCertificationLevels, setAdditionalCertificationLevels] = useState<string[]>([]);
   const [certifiedBy, setCertifiedBy] = useState("");
@@ -149,7 +149,14 @@ export function AuthFlow() {
       setEmail(fields.email || "");
       setPrimarySport(fields.primarySport || "Basketball");
       setCustomPrimarySport(fields.customPrimarySport || "");
-      setSecondarySport(fields.secondarySport || "");
+      const fromDraftAdditional = Array.isArray(fields.additionalSports)
+        ? fields.additionalSports.filter((sport) => typeof sport === "string" && sport.trim())
+        : [];
+      const fromSecondary =
+        fields.secondarySport?.trim() && fields.secondarySport !== fields.primarySport
+          ? [fields.secondarySport.trim()]
+          : [];
+      setAdditionalSports(fromDraftAdditional.length ? fromDraftAdditional : fromSecondary);
       setCertificationLevel(fields.certificationLevel || "");
       setAdditionalCertificationLevels(fields.additionalCertificationLevels ?? []);
       setCertifiedBy(fields.certifiedBy || "");
@@ -170,7 +177,9 @@ export function AuthFlow() {
       setResumeScreen(
         fields.screen === "assignorRecommend"
           ? "account"
-          : ((fields.screen as RefSignupWizardScreen) || "intro1")
+          : fields.screen === "secondarySport"
+            ? "certificationLevel"
+            : ((fields.screen as RefSignupWizardScreen) || "intro1")
       );
       setStep("onboarding");
       setNotice("Welcome back — we restored your signup exactly where you left off.");
@@ -246,10 +255,9 @@ export function AuthFlow() {
         ? ["Organization", "Payments", "Account"]
         : ["Authority", "Crew", "Account"];
   const resolvedPrimarySport = sportPickerToStored(primarySport, customPrimarySport);
-  const resolvedAdditionalSports =
-    secondarySport.trim() && secondarySport !== resolvedPrimarySport && secondarySport !== OTHER_SPORT_VALUE
-      ? [secondarySport.trim()]
-      : [];
+  const resolvedAdditionalSports = additionalSports
+    .map((sport) => sport.trim())
+    .filter((sport) => sport && sport !== resolvedPrimarySport && sport !== OTHER_SPORT_VALUE);
   const resolvedCerts = normalizeCertificationLevels(certificationLevel, additionalCertificationLevels);
 
   function toggleRegion(region: string) {
@@ -608,7 +616,8 @@ export function AuthFlow() {
                 email,
                 primarySport,
                 customPrimarySport,
-                secondarySport,
+                secondarySport: additionalSports[0] || "",
+                additionalSports,
                 certificationLevel,
                 additionalCertificationLevels,
                 certifiedBy,
@@ -692,7 +701,8 @@ export function AuthFlow() {
                 email,
                 primarySport,
                 customPrimarySport,
-                secondarySport,
+                secondarySport: additionalSports[0] || "",
+                additionalSports,
                 certificationLevel,
                 additionalCertificationLevels,
                 certifiedBy,
@@ -760,7 +770,7 @@ export function AuthFlow() {
         gotrefsId={gotrefsId}
         primarySport={primarySport}
         customPrimarySport={customPrimarySport}
-        secondarySport={secondarySport}
+        additionalSports={additionalSports}
         certificationLevel={certificationLevel}
         additionalCertificationLevels={additionalCertificationLevels}
         certifiedBy={certifiedBy}
@@ -778,10 +788,45 @@ export function AuthFlow() {
         termsAccepted={termsAccepted}
         onFirstName={setFirstName}
         onLastName={setLastName}
-        onPhotoFile={setPhotoFile}
+        onPhotoFile={(file) => {
+          setPhotoFile(file);
+          if (!file) return;
+          void saveRefSignupDraft(
+            {
+              screen: "photo",
+              fullName: [firstName, lastName].filter(Boolean).join(" ") || fullName,
+              firstName,
+              lastName,
+              email,
+              primarySport,
+              customPrimarySport,
+              secondarySport: additionalSports[0] || "",
+              additionalSports,
+              certificationLevel,
+              additionalCertificationLevels,
+              certifiedBy,
+              hourlyRateMin,
+              hourlyRateMax,
+              bio,
+              baseCity,
+              travelRadius,
+              workRegions,
+              termsAccepted,
+              recommendedAssignorName,
+              recommendedAssignorEmail,
+              recommendedAssignorPhone,
+            },
+            {
+              photo: file,
+              govIdFront: govIdFrontFile,
+              govIdBack: govIdBackFile,
+              certDoc: certDocFile,
+            }
+          );
+        }}
         onPrimarySport={setPrimarySport}
         onCustomPrimarySport={setCustomPrimarySport}
-        onSecondarySport={setSecondarySport}
+        onAdditionalSports={setAdditionalSports}
         onCertificationLevel={setCertificationLevel}
         onAdditionalCertificationLevels={setAdditionalCertificationLevels}
         onCertifiedBy={setCertifiedBy}
@@ -1152,7 +1197,7 @@ export function AuthFlow() {
               <SportsAndCerts
                 primarySport={primarySport}
                 customPrimarySport={customPrimarySport}
-                secondarySport={secondarySport}
+                secondarySport={additionalSports[0] || ""}
                 certificationLevel={certificationLevel}
                 additionalCertificationLevels={additionalCertificationLevels}
                 certifiedBy={certifiedBy}
@@ -1160,7 +1205,7 @@ export function AuthFlow() {
                 hourlyRateMax={hourlyRateMax}
                 onPrimarySport={setPrimarySport}
                 onCustomPrimarySport={setCustomPrimarySport}
-                onSecondarySport={setSecondarySport}
+                onSecondarySport={(sport) => setAdditionalSports(sport ? [sport] : [])}
                 onCertificationLevel={setCertificationLevel}
                 onAdditionalCertificationLevels={setAdditionalCertificationLevels}
                 onCertifiedBy={setCertifiedBy}
@@ -1249,9 +1294,11 @@ export function AuthFlow() {
 
             {role === "organizer" && wizardStep === 1 && (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                <p className="text-sm font-black text-emerald-900">Payout setup</p>
+                <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
-                  Stripe Connect onboarding will live here. For now, your account can be created and you can add events while payments are configured.
+                  After you create your account, pay accepted refs from your organizer dashboard with Stripe Checkout
+                  (card or ACH). Refs receive ACH direct deposit through Stripe Connect; GotRefs handles 1099 reporting
+                  from paid transfers.
                 </p>
               </div>
             )}
