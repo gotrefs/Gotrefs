@@ -160,6 +160,7 @@ const editableTap =
   "cursor-pointer text-left transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]";
 
 export function RefereeIdCard({
+  fullName,
   gotrefsId,
   primarySport,
   additionalSports = [],
@@ -170,6 +171,8 @@ export function RefereeIdCard({
   avatarLabel = "REF",
   baseCity,
   workRegions = [],
+  travelRadius,
+  availabilitySummary,
   validThrough,
   emptyPlaceholders,
   hideQr = false,
@@ -179,6 +182,7 @@ export function RefereeIdCard({
   cardRef,
 }: RefereeIdCardProps) {
   const id = gotrefsId?.trim() || (emptyPlaceholders ? "" : "GR-2026-4587");
+  const name = fullName?.trim() || "";
   const sports = [primarySport, ...additionalSports]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item));
@@ -187,6 +191,9 @@ export function RefereeIdCard({
     baseCity?.trim() ||
     workRegions.filter(Boolean).slice(0, 2).join(", ") ||
     (emptyPlaceholders ? "" : "Add city");
+  const regions = workRegions.map((item) => item?.trim()).filter((item): item is string => Boolean(item));
+  const travel = travelRadius?.trim() || "";
+  const availability = availabilitySummary?.trim() || "";
   const years = validYearRange(validThrough);
   const expireLabel = validThrough?.trim() || (emptyPlaceholders ? "" : "Pending approval");
   const typeLabel = certificationLevel?.trim() || `${BRAND_NAME} Accreditation`;
@@ -331,6 +338,14 @@ export function RefereeIdCard({
                 onClick={() => onEditField?.("profile")}
                 className={`block w-full ${editableTap}`}
               >
+                {name ? (
+                  <p
+                    className="mb-1 text-[15px] font-black uppercase leading-tight tracking-wide sm:text-[16px]"
+                    style={{ color: C.navyDeep }}
+                  >
+                    {name}
+                  </p>
+                ) : null}
                 <p style={{ color: C.ink }}>
                   <span className="font-bold">Referee ID: </span>
                   <span className="font-semibold tracking-wide">{id || "—"}</span>
@@ -460,10 +475,30 @@ export function RefereeIdCard({
               className="h-full"
               bodyClassName="max-h-[5.25rem]"
             >
-              <p className="text-[10px] font-semibold leading-snug sm:text-[11px]" style={{ color: C.ink }}>
-                <span className="font-bold">City: </span>
-                {city || "—"}
-              </p>
+              <div className="space-y-1 text-[10px] font-semibold leading-snug sm:text-[11px]" style={{ color: C.ink }}>
+                <p>
+                  <span className="font-bold">City: </span>
+                  {city || "—"}
+                </p>
+                {regions.length > 0 ? (
+                  <p>
+                    <span className="font-bold">Regions: </span>
+                    {regions.join(", ")}
+                  </p>
+                ) : null}
+                {travel ? (
+                  <p>
+                    <span className="font-bold">Travel: </span>
+                    Up to {travel} miles
+                  </p>
+                ) : null}
+                {availability ? (
+                  <p>
+                    <span className="font-bold">Available: </span>
+                    {availability}
+                  </p>
+                ) : null}
+              </div>
             </InfoBox>
           </div>
 
