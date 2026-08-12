@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { BRAND_NAME } from "@/lib/brand";
@@ -74,7 +75,11 @@ export function AuthFlow() {
     requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref"
       ? requestedRole
       : "ref";
-  const [step, setStep] = useState<AuthStep>("email");
+  const [step, setStep] = useState<AuthStep>(() =>
+    requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref"
+      ? "onboarding"
+      : "role"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AudienceRole>(initialRole);
@@ -118,6 +123,7 @@ export function AuthFlow() {
   const [pendingRedirect, setPendingRedirect] = useState<SignupDashboardPath>("/dashboard/referee");
   const [resendCooldown, setResendCooldown] = useState(false);
   const [resumeScreen, setResumeScreen] = useState<RefSignupWizardScreen>("intro1");
+  const [hasSavedRefDraft, setHasSavedRefDraft] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const oauthMode = searchParams.get("oauth") === "1";
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,8 +134,9 @@ export function AuthFlow() {
     let cancelled = false;
     void (async () => {
       const draft = await loadRefSignupDraft();
-      if (cancelled || !draft) {
-        if (!cancelled) setDraftHydrated(true);
+      if (cancelled) return;
+      if (!draft) {
+        setDraftHydrated(true);
         return;
       }
       const fields: RefSignupDraftFields = draft.fields;
@@ -181,14 +188,21 @@ export function AuthFlow() {
             ? "certificationLevel"
             : ((fields.screen as RefSignupWizardScreen) || "intro1")
       );
-      setStep("onboarding");
-      setNotice("Welcome back — we restored your signup exactly where you left off.");
+      setHasSavedRefDraft(true);
+      // Deep link ?role=ref resumes immediately; otherwise wait until they pick Referee.
+      if (requestedRole === "ref") {
+        setStep("onboarding");
+        setNotice("Welcome back — we restored your signup exactly where you left off.");
+      } else {
+        setStep("role");
+        setNotice("You have a saved referee signup. Choose “I am a Referee” to continue where you left off.");
+      }
       setDraftHydrated(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedRole]);
 
   useEffect(() => {
     if (step !== "password") return;
@@ -356,7 +370,11 @@ export function AuthFlow() {
     const normalized = email.trim().toLowerCase();
     if (normalized) setEmail(normalized);
     setWizardStep(0);
-    setStep(requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref" ? "onboarding" : "role");
+    if (requestedRole === "organizer" || requestedRole === "assignor" || requestedRole === "ref") {
+      setStep("onboarding");
+      return;
+    }
+    setStep("role");
   }
 
   async function login(e: React.FormEvent) {
@@ -437,10 +455,7 @@ export function AuthFlow() {
       setError("Upload the front and back of your government ID to continue.");
       return;
     }
-    if (role === "ref" && wizardStep === 3 && !certDocFile) {
-      setError("Upload your certification or license document to continue.");
-      return;
-    }
+    // Certification document is optional at signup; refs can add it later from the dashboard.
     setWizardStep((current) => Math.min(current + 1, progress.length - 1));
   }
 
@@ -552,6 +567,10 @@ export function AuthFlow() {
       setError("Upload a clear photo of your face for your GotRefs profile.");
       return;
     }
+    if (role === "ref" && (!govIdFrontFile || !govIdBackFile)) {
+      setError("Upload the front and back of your government ID to continue.");
+      return;
+    }
     if (!termsAccepted) {
       setError("Please confirm that you accept the GotRefs terms and policies to create your account.");
       return;
@@ -609,7 +628,10 @@ export function AuthFlow() {
         recommendedAssignorName: role === "ref" && assignorName ? assignorName : undefined,
         recommendedAssignorEmail: role === "ref" && assignorEmail ? assignorEmail : undefined,
         recommendedAssignorPhone: role === "ref" && assignorPhone ? assignorPhone : undefined,
-        verificationSkipped: role === "ref" ? !(photoFile && govIdFrontFile && govIdBackFile && certDocFile) : undefined,
+        // Photo + gov ID are required; missing cert alone marks verification incomplete until they upload later.
+        verificationSkipped:
+          role === "ref" ? !(photoFile && govIdFrontFile && govIdBackFile && certDocFile) : undefined,
+        certificationPending: role === "ref" ? !certDocFile : undefined,
         termsAccepted,
         acceptedTermsSlug: role === "organizer" ? "event-organizer-terms" : "referee-official-terms",
         ...(oauthMode ? {} : { password }),
@@ -791,6 +813,7 @@ export function AuthFlow() {
   if (step === "onboarding" && role === "ref") {
     return (
       <RefSignupAirbnbWizard
+        key={`ref-signup-${resumeScreen}-${hasSavedRefDraft ? "draft" : "new"}`}
         loading={loading}
         error={error}
         oauthMode={oauthMode}
@@ -876,9 +899,10 @@ export function AuthFlow() {
         onSubmit={register}
         onExit={(savedScreen) => {
           if (savedScreen) setResumeScreen(savedScreen);
+          setHasSavedRefDraft(true);
           setError(null);
-          setNotice("Progress saved. Come back anytime to continue exactly where you left off.");
-          setStep("email");
+          setNotice("Progress saved. Choose “I am a Referee” anytime to continue where you left off.");
+          setStep("role");
         }}
       />
     );
@@ -889,10 +913,22 @@ export function AuthFlow() {
       <section className="w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
         <div className="mb-6">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Secure marketplace access</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--navy)]">Welcome to {BRAND_NAME}</h1>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--navy)]">
+            {step === "role" ? `Join ${BRAND_NAME}` : `Welcome to ${BRAND_NAME}`}
+          </h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            One clean entry point for referees, organizers, and assignors.
+            {step === "role"
+              ? "Choose how you’ll use GotRefs. If you already started signup on this device, we’ll pick up where you left off."
+              : "One clean entry point for referees, organizers, and assignors."}
           </p>
+          {notice ? (
+            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              {notice}
+            </p>
+          ) : null}
+          {error && step === "role" ? (
+            <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>
+          ) : null}
         </div>
 
         {step === "verify-email" && (
@@ -1095,9 +1131,12 @@ export function AuthFlow() {
         {step === "role" && (
           <div className="space-y-4">
             {!oauthMode && (
-              <button type="button" onClick={() => setStep("email")} className="text-sm font-bold text-[var(--muted)]">
-                Back to email
-              </button>
+              <p className="text-sm text-[var(--muted)]">
+                Already have an account?{" "}
+                <Link href="/auth/login" className="font-semibold text-[var(--red)] underline">
+                  Log in
+                </Link>
+              </p>
             )}
             {oauthMode && (
               <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
@@ -1107,6 +1146,11 @@ export function AuthFlow() {
             <div>
               <h2 className="text-xl font-black text-[var(--navy)]">What is your primary role today?</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">We will tailor setup around how you use {BRAND_NAME}.</p>
+              {hasSavedRefDraft ? (
+                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Saved referee progress found — pick Referee to jump back to your last signup step.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-3">
               {ROLE_CARDS.map((card) => (
@@ -1130,11 +1174,18 @@ export function AuthFlow() {
               type="button"
               onClick={() => {
                 setWizardStep(0);
+                if (role === "ref" && hasSavedRefDraft) {
+                  setNotice("Welcome back — continuing your referee signup where you left off.");
+                } else {
+                  setNotice(null);
+                }
                 setStep("onboarding");
               }}
               className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black text-white"
             >
-              Continue as {roleCard.title.replace("I am a ", "")}
+              {role === "ref" && hasSavedRefDraft
+                ? "Continue referee signup"
+                : `Continue as ${roleCard.title.replace("I am a ", "").replace("I am an ", "")}`}
             </button>
           </div>
         )}

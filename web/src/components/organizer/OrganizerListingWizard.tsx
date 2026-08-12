@@ -550,15 +550,15 @@ export function OrganizerListingWizard({
     goNext();
   }
 
-  async function finishPayout(skip: boolean) {
+  async function finishPayout(skip: boolean, override?: Partial<PayoutMethodPayload> & { last4?: string }) {
     if (!skip && onSavePayoutMethod) {
       setSavingPayout(true);
       try {
         await onSavePayoutMethod({
-          method: (payoutMethod || "bank") as PayoutMethodPayload["method"],
-          accountHolder: payoutHolder,
-          accountType: payoutAccountType,
-          last4: accountNumber.slice(-4),
+          method: (override?.method || payoutMethod || "bank") as PayoutMethodPayload["method"],
+          accountHolder: override?.accountHolder || payoutHolder || organizationName || "Organization",
+          accountType: (override?.accountType || payoutAccountType || "checking") as PayoutMethodPayload["accountType"],
+          last4: override?.last4 || accountNumber.slice(-4) || "0000",
         });
       } finally {
         setSavingPayout(false);
@@ -1339,36 +1339,48 @@ export function OrganizerListingWizard({
         </div>
       )}
 
-      {/* Payout flow — Airbnb-style step by step */}
+      {/* Payout flow — Stripe Checkout for organizers who pay refs */}
       {payoutStage === "prompt" && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-2xl">
             <button
               type="button"
-              aria-label="Skip payout for now"
+              aria-label="Skip payment setup for now"
               onClick={() => void finishPayout(true)}
               className="float-right -mr-3 -mt-3 text-lg text-neutral-500 hover:text-neutral-800"
             >
               ✕
             </button>
-            <p className="text-sm text-neutral-500">Required to get set up</p>
+            <p className="text-sm text-neutral-500">Required to pay officials</p>
             <p className="mt-6 text-5xl" aria-hidden>
-              🪙
+              💳
             </p>
-            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">How will you pay for games?</h2>
+            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
             <p className="mt-2 text-center text-sm text-neutral-500">
-              This is your preferred way to fund bookings on GotRefs (card/ACH checkout). Referee ACH deposits are
-              set up separately when each ref connects Stripe Express.
-            </p>
-            <p className="mt-2 text-sm text-neutral-500">
-              You can pay accepted refs from Listings once checkout is available.
+              When you staff a game, you’ll pay through Stripe Checkout (card or ACH). GotRefs then deposits each
+              official by ACH after they connect their bank.
             </p>
             <button
               type="button"
-              onClick={() => setPayoutStage("method")}
+              onClick={() => {
+                setPayoutMethod("bank");
+                void finishPayout(false, {
+                  method: "bank",
+                  accountHolder: organizationName || "Organization",
+                  accountType: "checking",
+                  last4: "strp",
+                });
+              }}
               className="mt-6 w-full rounded-lg bg-neutral-900 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-800"
             >
-              Continue
+              Continue with Stripe
+            </button>
+            <button
+              type="button"
+              onClick={() => setPayoutStage("method")}
+              className="mt-3 w-full rounded-lg border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              Other funding preferences
             </button>
           </div>
         </div>

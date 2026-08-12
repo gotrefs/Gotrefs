@@ -16,6 +16,7 @@ type FindView = "list" | "map" | "calendar";
 
 export function RefMarketplaceHub({
   canApplyToEvents,
+  applyBlockedLabel,
   applicationPending,
   applicationRejected,
   onRequireProfile,
@@ -25,6 +26,7 @@ export function RefMarketplaceHub({
   bookings,
 }: {
   canApplyToEvents: boolean;
+  applyBlockedLabel?: string;
   applicationPending: boolean;
   applicationRejected: boolean;
   onRequireProfile?: () => void;
@@ -109,6 +111,7 @@ export function RefMarketplaceHub({
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <RefEventCalendar
                 canApplyToEvents={canApplyToEvents}
+                applyBlockedLabel={applyBlockedLabel}
                 applicationPending={applicationPending}
                 applicationRejected={applicationRejected}
                 onRequireProfile={onRequireProfile}
@@ -118,6 +121,7 @@ export function RefMarketplaceHub({
             <OpenGamesList
               view={findView === "map" ? "split" : "list"}
               canApplyToEvents={canApplyToEvents}
+              applyBlockedLabel={applyBlockedLabel}
               applicationPending={applicationPending}
               applicationRejected={applicationRejected}
               onRequireProfile={onRequireProfile}

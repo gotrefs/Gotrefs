@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
     governing_bodies: isAssignor ? governingBodies || null : null,
     crew_invite_seed: isAssignor ? crewInvite || null : null,
     verification_skipped: role === "ref" ? verificationSkipped : false,
+    certification_pending: role === "ref" ? verificationSkipped : false,
     accepted_terms_slug: requiredTermsSlug,
     accepted_terms_at: new Date().toISOString(),
     accepted_privacy_policy: true,

@@ -19,6 +19,15 @@ export type RefEligibilityArgs = {
   profile?: RefProfileForEligibility;
 };
 
+export type RefMissingApplyStep =
+  | "profile"
+  | "government_id"
+  | "certification"
+  | "submit"
+  | "pending_review"
+  | "fix_required"
+  | "rejected";
+
 export function refVerificationDocsComplete(profile: RefProfileForEligibility): boolean {
   if (!profile) return false;
   const hasId = Boolean(profile.government_id_path || profile.verification_doc_path);
@@ -46,6 +55,50 @@ export function refVerificationApproved(status?: string | null): boolean {
 
 export function refVerificationRejected(status?: string | null): boolean {
   return status === "rejected";
+}
+
+/** First blocking reason when a ref tries to book / apply. */
+export function refMissingApplyStep(args: RefEligibilityArgs): RefMissingApplyStep | null {
+  if (refOfferEligible(args)) return null;
+
+  const status = args.verificationSubmissionStatus ?? null;
+  if (refVerificationRejected(status)) return "rejected";
+  if (refVerificationPendingReview(status)) return "pending_review";
+
+  const profile = args.profile;
+  const hasSport = Boolean(profile?.primary_sport?.trim());
+  const hasCertLevel = Boolean(profile?.certification_level?.trim());
+  if (!hasSport || !hasCertLevel) return "profile";
+
+  const hasId = Boolean(profile?.government_id_path || profile?.verification_doc_path);
+  if (!hasId) return "government_id";
+
+  const hasCert = Boolean(profile?.certification_document_path);
+  if (!hasCert) return "certification";
+
+  if (!refVerificationApproved(status)) return "submit";
+  return "pending_review";
+}
+
+export function applyBlockedMessageForStep(step: RefMissingApplyStep | null): string {
+  switch (step) {
+    case "certification":
+      return "Add your certification or license to book games";
+    case "government_id":
+      return "Upload your government ID to book games";
+    case "profile":
+      return "Finish your profile to book games";
+    case "submit":
+      return "Submit your verification for review to book games";
+    case "pending_review":
+      return "Awaiting GotRefs approval";
+    case "fix_required":
+      return "Fix your verification to book games";
+    case "rejected":
+      return "Verification required — resubmit your documents";
+    default:
+      return "Verification required";
+  }
 }
 
 /** Refs can request to work games only after admin approval (or equivalent verified path). */

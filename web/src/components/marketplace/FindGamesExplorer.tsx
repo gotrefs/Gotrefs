@@ -42,6 +42,7 @@ function formatWhenSummary(dateFrom: string, dateTo: string): string {
 export function FindGamesExplorer({
   view,
   canApplyToEvents = true,
+  applyBlockedLabel = "Verification required",
   applicationPending = false,
   applicationRejected = false,
   onRequireProfile,
@@ -51,6 +52,7 @@ export function FindGamesExplorer({
 }: {
   view: "list" | "map" | "split";
   canApplyToEvents?: boolean;
+  applyBlockedLabel?: string;
   applicationPending?: boolean;
   applicationRejected?: boolean;
   onRequireProfile?: () => void;
@@ -231,11 +233,7 @@ export function FindGamesExplorer({
     if (!canApplyToEvents) {
       onRequireProfile?.();
       setMsg({
-        text: applicationPending
-          ? "Your verification is still under review. You can browse games, but you can’t request to work until GotRefs approves you."
-          : applicationRejected
-            ? "Your verification wasn’t approved. Resolve that before requesting games."
-            : "GotRefs must approve your verification before you can request to work games.",
+        text: applyBlockedLabel,
         tone: "err",
       });
       return;
@@ -256,6 +254,8 @@ export function FindGamesExplorer({
         error?: string;
         eventTitle?: string;
         applicationId?: string | null;
+        missingStep?: string;
+        code?: string;
       };
       if (!res.ok) {
         setRequestedIds((prev) => {
@@ -263,6 +263,9 @@ export function FindGamesExplorer({
           next.delete(event.id);
           return next;
         });
+        if (res.status === 403 && json.code === "VERIFICATION_REQUIRED") {
+          onRequireProfile?.();
+        }
         setMsg({ text: json.error || "Could not apply.", tone: "err" });
         return;
       }
@@ -575,9 +578,7 @@ export function FindGamesExplorer({
                 requestingId={submittingId}
                 canApply={canApplyToEvents}
                 applyBlockedLabel={
-                  applicationPending
-                    ? "Awaiting GotRefs approval"
-                    : "Verification required"
+                  applicationPending ? "Awaiting GotRefs approval" : applyBlockedLabel
                 }
                 onRequest={(event) => void applyToEvent(event)}
               />
@@ -598,8 +599,8 @@ export function FindGamesExplorer({
           applicationPending
             ? "Awaiting GotRefs approval"
             : applicationRejected
-              ? "Verification required"
-              : "Verification required"
+              ? applyBlockedLabel
+              : applyBlockedLabel
         }
         onClose={() => setDetailsEvent(null)}
         onApply={(event) => void applyToEvent(event)}

@@ -14,16 +14,21 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(() => {
-    if (searchParams.get("error") !== "confirmation_failed") return null;
+    const authError = searchParams.get("error");
     const reason = searchParams.get("reason") || "";
-    const decoded = decodeURIComponent(reason);
-    if (decoded === "pkce_failed" || decoded.toLowerCase().includes("pkce")) {
-      return "That confirmation link only works in the same browser that started signup. Go back to Sign up → Resend verification email, then open the newest email (those links work on any phone or computer).";
+    const decoded = reason ? decodeURIComponent(reason) : "";
+    if (!authError) return null;
+    if (authError === "confirmation_failed") {
+      if (decoded === "pkce_failed" || decoded.toLowerCase().includes("pkce")) {
+        return "That confirmation link only works in the same browser that started signup. Go back to Sign up → Resend verification email, then open the newest email.";
+      }
+      if (decoded && decoded !== "missing_code") {
+        return `Email link failed: ${decoded}. Use Resend verification email on the signup screen and open the newest message.`;
+      }
+      return "Email link expired or could not be verified. Use Resend verification email and open the newest message right away.";
     }
-    if (decoded && decoded !== "missing_code") {
-      return `Email link failed: ${decoded}. Use Resend verification email on the signup screen and open the newest message.`;
-    }
-    return "Email link expired or could not be verified. Use Resend verification email and open the newest message right away.";
+    if (decoded) return `Sign-in failed: ${decoded}.`;
+    return "Sign-in failed. Please try again.";
   });
   const [loading, setLoading] = useState(false);
 
@@ -67,9 +72,7 @@ export function LoginForm() {
             (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
       window.location.href = dest;
     } catch {
-      setError(
-        "Could not reach Supabase. Check web/.env.local and restart npm run dev."
-      );
+      setError("Could not reach Supabase. Check web/.env.local and restart npm run dev.");
     } finally {
       setLoading(false);
     }
@@ -78,44 +81,45 @@ export function LoginForm() {
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
       <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-sm">
-      <h1 className="text-3xl font-bold text-[var(--blue-text)]">Log in</h1>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        No account?{" "}
-        <Link href="/auth/signup" className="text-[var(--red)] underline">
-          Sign up
-        </Link>
-      </p>
-      <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--blue-text)]">Email</span>
-          <input
-            type="email"
+        <h1 className="text-3xl font-bold text-[var(--blue-text)]">Log in</h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          No account?{" "}
+          <Link href="/auth/signup" className="font-semibold text-[var(--red)] underline">
+            Sign up
+          </Link>
+        </p>
+        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--blue-text)]">Email</span>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="rounded-lg border border-[var(--border)] px-3 py-2"
+              autoComplete="email"
+            />
+          </label>
+          <PasswordField
+            ref={passwordInputRef}
+            label="Password"
+            labelClassName="flex flex-col gap-1 text-sm font-medium text-[var(--blue-text)]"
+            inputClassName="w-full rounded-lg border border-[var(--border)] py-2 pl-3 pr-12"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-[var(--border)] px-3 py-2"
-            autoComplete="email"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
           />
-        </label>
-        <PasswordField
-          ref={passwordInputRef}
-          label="Password"
-          labelClassName="flex flex-col gap-1 text-sm font-medium text-[var(--blue-text)]"
-          inputClassName="w-full rounded-lg border border-[var(--border)] py-2 pl-3 pr-12"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary w-full py-2.5 disabled:opacity-50"
-        >
-          {loading ? "Signing in…" : "Log in"}
-        </button>
-      </form>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 disabled:opacity-50">
+            {loading ? "Signing in…" : "Log in"}
+          </button>
+          <p className="text-center text-sm text-[var(--muted)]">
+            <Link href="/auth/signup" className="font-semibold text-[var(--navy)] underline">
+              Need an account? Create one
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   );

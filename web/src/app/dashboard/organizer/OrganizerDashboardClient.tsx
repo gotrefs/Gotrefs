@@ -8,6 +8,8 @@ import {
   OrganizerEventComposer,
   type JustPublishedEvent,
 } from "@/components/marketplace/OrganizerEventComposer";
+import { OrganizerTaxDocsPanel } from "@/components/payments/OrganizerTaxDocsPanel";
+import { VendorPaymentsPanel } from "@/components/payments/VendorPaymentsPanel";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventMatchingView } from "@/components/organizer/EventMatchingView";
 import {
@@ -230,7 +232,10 @@ export default function OrganizerDashboardClient() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [payoutWizardOpen, setPayoutWizardOpen] = useState(false);
   const [payoutSet, setPayoutSet] = useState(false);
-  const [activeTab, setActiveTab] = useState<"today" | "calendar" | "listings" | "messages">("today");
+  const [activeTab, setActiveTab] = useState<
+    "today" | "calendar" | "listings" | "payments" | "messages"
+  >("today");
+  const [highlightPaymentId, setHighlightPaymentId] = useState<string | null>(null);
   const [todayFilter, setTodayFilter] = useState<"today" | "upcoming">("today");
   const [displayName, setDisplayName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -569,12 +574,25 @@ export default function OrganizerDashboardClient() {
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
+    const paymentId = searchParams.get("payment");
+    const tab = searchParams.get("tab");
+    if (tab === "tax" || tab === "payments" || paymentId) {
+      setActiveTab("payments");
+    }
+    if (paymentId) setHighlightPaymentId(paymentId);
+
     const message =
       checkout === "success"
-        ? "Payment complete. Stripe is holding the booking funds for this event."
+        ? paymentId
+          ? "Payment received. Your receipt is ready below — GotRefs will ACH-deposit each ref once their bank and W-9 are on file."
+          : "Payment received. GotRefs will ACH-deposit each ref once their Stripe Connect bank and W-9 are on file. Open Payments for receipts."
         : checkout === "cancelled"
           ? "Stripe checkout was cancelled. You can restart payment from the event card."
-          : null;
+          : searchParams.get("vendorPay") === "success"
+            ? "Vendor payment received. Funds transfer to their Connect account for ACH deposit when onboarding is complete. Receipts are under Payments."
+            : searchParams.get("vendorPay") === "cancelled"
+              ? "Vendor checkout was cancelled."
+              : null;
     if (!message) return;
     const frame = window.requestAnimationFrame(() => setMsg(message));
     return () => window.cancelAnimationFrame(frame);
@@ -1621,6 +1639,7 @@ export default function OrganizerDashboardClient() {
             { id: "today", label: "Today" },
             { id: "calendar", label: "Calendar" },
             { id: "listings", label: "Listings" },
+            { id: "payments", label: "Payments" },
             { id: "messages", label: "Messages" },
           ] as const
         ).map((tab) => (
@@ -1670,8 +1689,8 @@ export default function OrganizerDashboardClient() {
                 🪙
               </span>
               <span>
-                <span className="block text-sm font-semibold text-neutral-900">Add a payout method</span>
-                <span className="mt-0.5 block text-xs text-neutral-500">Required to get paid</span>
+                <span className="block text-sm font-semibold text-neutral-900">Set up Stripe payments</span>
+                <span className="mt-0.5 block text-xs text-neutral-500">Pay officials by card or ACH</span>
               </span>
             </button>
           )}
@@ -2028,6 +2047,18 @@ export default function OrganizerDashboardClient() {
         )}
       </section>
       )}
+
+      {activeTab === "listings" ? (
+        <div className="mt-6">
+          <VendorPaymentsPanel />
+        </div>
+      ) : null}
+
+      {activeTab === "payments" ? (
+        <div className="mt-6">
+          <OrganizerTaxDocsPanel highlightPaymentId={highlightPaymentId} />
+        </div>
+      ) : null}
 
       {activeTab === "today" && completedUnratedOffers.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">

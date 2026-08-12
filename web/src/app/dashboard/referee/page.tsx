@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { dashboardPathForRole, resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
@@ -15,5 +16,15 @@ export default async function RefereeDashboardPage() {
     redirect(dashboardPathForRole(role));
   }
 
-  return <RefereeDashboardClient />;
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
+          <p className="text-sm font-semibold text-neutral-800">Loading your referee dashboard…</p>
+        </div>
+      }
+    >
+      <RefereeDashboardClient />
+    </Suspense>
+  );
 }

@@ -1,26 +1,14 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
+import type Stripe from "stripe";
+import { getStripe, dollarsToCents } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
-import { serverEnv } from "@/lib/env/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
 import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
 
 type CheckoutBody = {
   eventId?: string;
 };
-
-function dollarsToCents(value: number | string | null | undefined) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return Math.round(amount * 100);
-}
-
-function getStripe() {
-  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
-  if (!secretKey) {
-    throw new Error("Missing STRIPE_SECRET_KEY");
-  }
-  return new Stripe(secretKey);
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -55,7 +43,7 @@ export async function POST(request: Request) {
 
   const { data: offers, error: offersError } = await supabase
     .from("assignment_offers")
-    .select("id, ref_member_id, offered_pay")
+    .select("id, ref_member_id, offered_pay, payment_status")
     .eq("event_id", event.id)
     .eq("status", "accepted");
 
@@ -63,9 +51,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: offersError.message }, { status: 400 });
   }
 
-  const acceptedOffers = offers ?? [];
+  const acceptedOffers = (offers ?? []).filter((offer) => offer.payment_status !== "paid");
   if (acceptedOffers.length === 0) {
-    return NextResponse.json({ error: "No accepted refs are ready for checkout yet." }, { status: 400 });
+    return NextResponse.json(
+      { error: "No unpaid accepted refs are ready for checkout yet." },
+      { status: 400 }
+    );
   }
 
   const refSubtotalCents = acceptedOffers.reduce(
@@ -80,17 +71,60 @@ export async function POST(request: Request) {
   }
 
   const platformFeeCents = calcPlatformFeeCents(refSubtotalCents);
-  const origin = serverEnv.siteUrl() || new URL(request.url).origin;
-  const stripe = getStripe();
+  const origin = resolveSiteUrlFromRequest(request) || serverEnv.siteUrl();
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch {
+    return NextResponse.json({ error: "Stripe is not configured." }, { status: 503 });
+  }
+
   const eventDate = new Date(event.starts_at).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
+  const offerIds = acceptedOffers.map((offer) => offer.id);
+  const metadata = {
+    purpose: "event_refs",
+    eventId: event.id,
+    organizerMemberId: user.id,
+    acceptedOfferIds: offerIds.join(","),
+    refCount: String(acceptedOffers.length),
+    refSubtotalCents: String(refSubtotalCents),
+    platformFeeCents: String(platformFeeCents),
+  };
+
+  let paymentId: string | null = null;
+  try {
+    const admin = createServiceClient();
+    const { data: payment, error: paymentError } = await admin
+      .from("payments")
+      .insert({
+        organizer_member_id: user.id,
+        event_id: event.id,
+        purpose: "event_refs",
+        amount_total_cents: refSubtotalCents + platformFeeCents,
+        amount_subtotal_cents: refSubtotalCents,
+        platform_fee_cents: platformFeeCents,
+        status: "pending",
+        accepted_offer_ids: offerIds,
+        metadata,
+      })
+      .select("id")
+      .single();
+    if (paymentError) {
+      return NextResponse.json({ error: paymentError.message }, { status: 400 });
+    }
+    paymentId = payment.id;
+  } catch {
+    // Continue without local ledger row if service role is unavailable; webhook can still insert.
+  }
+
+  const sessionParams = {
+    mode: "payment" as const,
+    payment_method_types: ["card", "us_bank_account"] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
     line_items: [
       {
         quantity: 1,
@@ -116,27 +150,57 @@ export async function POST(request: Request) {
       },
     ],
     metadata: {
-      eventId: event.id,
-      organizerMemberId: user.id,
-      acceptedOfferIds: acceptedOffers.map((offer) => offer.id).join(","),
-      refCount: String(acceptedOffers.length),
-      refSubtotalCents: String(refSubtotalCents),
-      platformFeeCents: String(platformFeeCents),
+      ...metadata,
+      paymentId: paymentId || "",
     },
     payment_intent_data: {
       metadata: {
-        eventId: event.id,
-        organizerMemberId: user.id,
-        acceptedOfferIds: acceptedOffers.map((offer) => offer.id).join(","),
+        ...metadata,
+        paymentId: paymentId || "",
       },
+      transfer_group: event.id,
     },
-    success_url: `${origin}/dashboard/organizer?checkout=success&event=${event.id}`,
+    success_url: `${origin}/dashboard/organizer?checkout=success&event=${event.id}${
+      paymentId ? `&payment=${paymentId}&tab=tax` : "&tab=tax"
+    }`,
     cancel_url: `${origin}/dashboard/organizer?checkout=cancelled&event=${event.id}`,
-  });
+  };
+
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create(sessionParams);
+  } catch (err) {
+    // ACH debit may not be enabled yet on the Stripe account — fall back to card-only.
+    const message = err instanceof Error ? err.message : "";
+    if (/us_bank_account|payment_method_types/i.test(message)) {
+      session = await stripe.checkout.sessions.create({
+        ...sessionParams,
+        payment_method_types: ["card"],
+      });
+    } else {
+      throw err;
+    }
+  }
 
   if (!session.url) {
     return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 502 });
   }
 
-  return NextResponse.json({ url: session.url });
+  if (paymentId) {
+    try {
+      const admin = createServiceClient();
+      await admin
+        .from("payments")
+        .update({
+          stripe_checkout_session_id: session.id,
+          status: "processing",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", paymentId);
+    } catch {
+      // Non-fatal.
+    }
+  }
+
+  return NextResponse.json({ url: session.url, paymentId });
 }

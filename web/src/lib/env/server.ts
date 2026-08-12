@@ -61,6 +61,9 @@ export const serverEnv = {
   checkrApiKey: () => read("CHECKR_API_KEY"),
   checkrWebhookSecret: () => read("CHECKR_WEBHOOK_SECRET"),
   stripeSecretKey: () => read("STRIPE_SECRET_KEY"),
+  stripeWebhookSecret: () => read("STRIPE_WEBHOOK_SECRET"),
+  /** Local/test only: allow Connect onboarding without MFA when using sk_test_ keys. */
+  stripeAllowConnectWithoutMfa: () => process.env.STRIPE_ALLOW_CONNECT_WITHOUT_MFA === "true",
   googleClientId: () => read("GOOGLE_CLIENT_ID"),
   googleClientSecret: () => read("GOOGLE_CLIENT_SECRET"),
   facebookClientId: () => read("FACEBOOK_CLIENT_ID"),

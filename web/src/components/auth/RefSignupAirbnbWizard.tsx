@@ -358,7 +358,8 @@ export function RefSignupAirbnbWizard({
     }
     if (screen === "bio") return true; // optional — organizers benefit from it, but signup can continue
     if (screen === "govId") return Boolean(govIdFrontFile && govIdBackFile);
-    if (screen === "certDoc") return Boolean(certDocFile);
+    // Certification document is optional at signup — “Add certifications later” advances without a file.
+    if (screen === "certDoc") return true;
     if (screen === "baseCity") return Boolean(baseCity.trim());
     if (screen === "account") {
       const emailOk = Boolean(email.trim() && email.includes("@"));
@@ -380,7 +381,6 @@ export function RefSignupAirbnbWizard({
         setLocalError(null);
       }
       else if (screen === "govId") setLocalError("Upload both the front and back of your government ID to continue.");
-      else if (screen === "certDoc") setLocalError("Upload your certification or license document to continue.");
       else if (screen === "baseCity") setLocalError("Enter your base city.");
       else if (screen === "account") {
         if (!email.trim() || !email.includes("@")) setLocalError("Enter a valid email address.");
@@ -405,7 +405,9 @@ export function RefSignupAirbnbWizard({
           : oauthMode
             ? "Finish setup"
             : "Create account"
-        : "Next";
+        : screen === "certDoc" && !certDocFile
+          ? "Continue without certification"
+          : "Next";
 
   const displayError = screen === "account" ? localError || error : localError;
 
@@ -837,7 +839,10 @@ export function RefSignupAirbnbWizard({
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
                 Add your certification or license
               </h1>
-              <p className="mt-2 text-neutral-500">NFHS card, state license, USSF badge, or similar credential.</p>
+              <p className="mt-2 text-neutral-500">
+                NFHS card, state license, USSF badge, or similar credential. You can browse games without it, but
+                you&apos;ll need to upload a certification before requesting to work.
+              </p>
               <div className="mt-8">
                 <FileUploadCard
                   title="Certification / license document"
@@ -849,6 +854,36 @@ export function RefSignupAirbnbWizard({
                   }}
                 />
               </div>
+              {!certDocFile ? (
+                <div className="mt-6 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalError(null);
+                      goNext();
+                    }}
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                  >
+                    Add certifications later
+                  </button>
+                  {/* Partner cert site: set NEXT_PUBLIC_CERT_PARTNER_URL when ready */}
+                  {process.env.NEXT_PUBLIC_CERT_PARTNER_URL ? (
+                    <a
+                      href={process.env.NEXT_PUBLIC_CERT_PARTNER_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-center text-sm font-semibold text-[var(--navy)] underline underline-offset-2"
+                    >
+                      Need certification?
+                    </a>
+                  ) : (
+                    <p className="text-center text-xs text-neutral-500">
+                      Need certification? Partner options coming soon — you can still finish signup and add yours
+                      later.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

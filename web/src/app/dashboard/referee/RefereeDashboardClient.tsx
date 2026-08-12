@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
+import { RefPayoutPanel } from "@/components/payments/RefPayoutPanel";
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
@@ -29,7 +30,15 @@ import {
 } from "@/lib/auth/upload-ref-signup-docs";
 import { formatCardValidThrough } from "@/lib/ref-id-card-validity";
 import { publishOfficialIdCardImage } from "@/lib/ref-id-card-jpeg";
-import { refOfferEligible, refProfilePackageComplete, refVerificationApproved, refVerificationPendingReview, refVerificationRejected } from "@/lib/ref-eligibility";
+import {
+  applyBlockedMessageForStep,
+  refMissingApplyStep,
+  refOfferEligible,
+  refProfilePackageComplete,
+  refVerificationApproved,
+  refVerificationPendingReview,
+  refVerificationRejected,
+} from "@/lib/ref-eligibility";
 import {
   ALL_REF_VERIFICATION_STEP_KEYS,
   formatFixRequiredStepLabels,
@@ -207,10 +216,14 @@ export default function RefereeDashboardClient() {
   }, [memberId, cardMeta.gotrefsId, avatarUrl, sport, cert, cardMeta.certifiedBy, cardMeta.baseCity, loading, publishIdCardPhoto]);
 
   const load = useCallback(async () => {
+    try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setMemberId(user.id);
     setEmailConfirmed(Boolean(user.email_confirmed_at));
     const meta = user.user_metadata ?? {};
@@ -530,8 +543,12 @@ export default function RefereeDashboardClient() {
       setMyRatingCount(0);
       setMyReviews([]);
     }
-
-    setLoading(false);
+    } catch (err) {
+      console.error("Referee dashboard load failed", err);
+      setMsg("Could not fully load your dashboard. Refresh to try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [
     supabase,
     setAdditionalSports,
@@ -748,9 +765,34 @@ export default function RefereeDashboardClient() {
         ? "Application successfully submitted — we'll review your updates within 1-2 business days."
         : "Profile updated."
     );
-    if (!verificationSubmitted && govIdPath && certDocPath && profileReady) {
-      await submitVerificationPackage();
+
+    // Re-read paths after upload — React state from `load()` may not have flushed yet.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const [{ data: rp }, { data: vs }] = await Promise.all([
+        supabase
+          .from("ref_profiles")
+          .select(
+            "government_id_path, verification_doc_path, certification_document_path, bio, primary_sport, certification_level"
+          )
+          .eq("member_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("ref_verification_submissions")
+          .select("status")
+          .eq("ref_member_id", user.id)
+          .maybeSingle(),
+      ]);
+      const packageReady = refProfilePackageComplete(rp);
+      const alreadyInReview =
+        refVerificationPendingReview(vs?.status) || refVerificationApproved(vs?.status);
+      if (packageReady && !alreadyInReview && !wasResubmit) {
+        await submitVerificationPackage();
+      }
     }
+
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -912,6 +954,23 @@ export default function RefereeDashboardClient() {
     }
   }, [loading, searchParams]);
 
+  useEffect(() => {
+    const connect = searchParams.get("connect");
+    if (!connect) return;
+    if (connect === "return") {
+      setMsg("You're all set — you can start getting paid instantly. Check Get paid below for bank & W-9 status.");
+    } else if (connect === "refresh") {
+      setMsg("Stripe onboarding expired — open Get paid and continue setup.");
+    }
+    // Clear the query so a refresh doesn't re-trigger, and scroll to payout status.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("connect");
+    window.history.replaceState({}, "", url.pathname + url.search);
+    window.requestAnimationFrame(() => {
+      document.getElementById("ref-payout-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [searchParams]);
+
   async function toggleAssignor(enabled: boolean) {
     setAssignorSaving(true);
     setMsg(null);
@@ -1030,8 +1089,8 @@ export default function RefereeDashboardClient() {
       return;
     }
     if (!nextCertDocPath) {
-      setMsg("Next, upload your certification.");
-      openProfileWizard("verification");
+      setMsg("Add your certification or license to book games.");
+      openProfileWizard("certification");
       return;
     }
     if (!nextBackgroundReady) {
@@ -1100,8 +1159,24 @@ export default function RefereeDashboardClient() {
   // Only show the green Approved experience when status is still approved (Needs info clears this).
   const showApprovedHero = verificationApproved && !verificationNeedsFix;
   const showPendingReviewView = verificationPending;
+  const applyGateStep = verificationNeedsFix
+    ? ("fix_required" as const)
+    : refMissingApplyStep({
+        screeningStatus: screening?.status,
+        verificationMethod,
+        externalProofPath,
+        verificationSubmissionStatus: verificationStatus,
+        profile: {
+          government_id_path: govIdPath,
+          verification_doc_path: govIdPath,
+          certification_document_path: certDocPath,
+          bio,
+          primary_sport: sport,
+          certification_level: cert,
+        },
+      });
+  const applyBlockedLabel = applyBlockedMessageForStep(applyGateStep);
   const canApplyToGames = canAcceptOffers && showApprovedHero;
-  const backgroundReady = screening?.status === "clear" || verificationSubmitted;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
   const missingActions: {
     label: string;
@@ -1123,7 +1198,7 @@ export default function RefereeDashboardClient() {
         !certificationReady && {
           label: "Certification",
           description: "Upload NFHS, state association, or league credentials.",
-          field: "verification" as const,
+          field: "certification" as const,
         },
         !verificationSubmitted && {
           label: "Submit for review",
@@ -1144,7 +1219,12 @@ export default function RefereeDashboardClient() {
     .toUpperCase() || "REF";
 
   if (loading) {
-    return <p className="text-[var(--muted)]">Loading…</p>;
+    return (
+      <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
+        <p className="text-sm font-semibold text-neutral-800">Loading your referee dashboard…</p>
+        <p className="mt-2 text-xs text-neutral-500">This usually takes a second after Stripe Connect.</p>
+      </div>
+    );
   }
 
   return (
@@ -1312,12 +1392,23 @@ export default function RefereeDashboardClient() {
         <section ref={marketplaceRef}>
           <RefMarketplaceHub
             canApplyToEvents={canApplyToGames}
+            applyBlockedLabel={applyBlockedLabel}
             applicationPending={showPendingReviewView || verificationNeedsFix}
             applicationRejected={verificationRejected && !verificationNeedsFix}
             onRequireProfile={() => {
-              if (showPendingReviewView || verificationNeedsFix) return;
+              if (showPendingReviewView) {
+                setMsg(applyBlockedLabel);
+                return;
+              }
+              if (verificationNeedsFix || verificationRejected) {
+                setMsg(applyBlockedLabel);
+                openResubmitWizard();
+                return;
+              }
+              setMsg(applyBlockedLabel);
               const next = missingActions[0];
               if (next) openProfileWizard(next.field);
+              else openProfileWizard("certification");
             }}
             onReload={load}
             offers={offers}
@@ -1326,6 +1417,12 @@ export default function RefereeDashboardClient() {
           />
         </section>
       )}
+
+      {!profileWizard ? (
+        <div id="ref-payout-panel" className="mt-6">
+          <RefPayoutPanel />
+        </div>
+      ) : null}
 
       {!profileWizard && !showApprovedHero ? (
         <div
@@ -1351,8 +1448,36 @@ export default function RefereeDashboardClient() {
               ? "GotRefs flagged part of your application. Complete only the steps we listed, then resubmit for review. You can browse open games, but you cannot request to work until you're approved again."
               : verificationRejected
                 ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Upload updated docs and resubmit if you have new materials for review."
-                : "Browse open games on the map below. Once approved, you will be able to request to work. Approvals take 1-2 business days."}
+                : !certificationReady
+                  ? "Browse open games now. Add your certification or license when you're ready — you'll need it before you can request to work a game."
+                  : "Browse open games on the map below. Once approved, you will be able to request to work. Approvals take 1-2 business days."}
           </p>
+          {!certificationReady && !showPendingReviewView && !verificationNeedsFix && !verificationRejected ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMsg("Add your certification or license to book games.");
+                  openProfileWizard("certification");
+                }}
+                className="rounded-full bg-[var(--navy)] px-5 py-2.5 text-sm font-black text-white"
+              >
+                Add certification or license
+              </button>
+              {process.env.NEXT_PUBLIC_CERT_PARTNER_URL ? (
+                <a
+                  href={process.env.NEXT_PUBLIC_CERT_PARTNER_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold text-[var(--navy)] underline underline-offset-2"
+                >
+                  Need certification?
+                </a>
+              ) : (
+                <span className="text-xs text-neutral-500">Need certification? Partner options coming soon.</span>
+              )}
+            </div>
+          ) : null}
           {(verificationNeedsFix || verificationRejected) && !profileWizard && (
             <button
               type="button"

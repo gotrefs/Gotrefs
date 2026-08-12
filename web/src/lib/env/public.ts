@@ -25,6 +25,7 @@ export const publicEnv = {
   supabasePublishableKey: () => process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "",
   siteUrl: () => process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000",
   googleMapsApiKey: () => process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "",
+  stripePublishableKey: () => process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ?? "",
 } as const;
 
 /** True when real Supabase URL + anon key are set (not placeholders). */

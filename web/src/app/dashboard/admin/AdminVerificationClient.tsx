@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdminTax1099Panel } from "@/components/admin/AdminTax1099Panel";
 import {
   REF_VERIFICATION_STEPS,
   type RefVerificationStepKey,
@@ -546,6 +547,8 @@ export default function AdminVerificationClient() {
           )}
         </section>
       </div>
+
+      <AdminTax1099Panel />
     </div>
   );
 }

@@ -3,7 +3,11 @@ import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { isQueuedSignupHold } from "@/lib/activate-queued-signups";
 import { notifyInBackground, notifyOrganizerNewApplication } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
-import { refCanApplyToGames } from "@/lib/ref-eligibility";
+import {
+  applyBlockedMessageForStep,
+  refCanApplyToGames,
+  refMissingApplyStep,
+} from "@/lib/ref-eligibility";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -50,19 +54,24 @@ export async function POST(request: Request) {
   const [{ data: profile }, { data: submission }, { data: screening }] = await Promise.all([
     admin
       .from("ref_profiles")
-      .select("verification_method, external_verification_proof_path")
+      .select(
+        "verification_method, external_verification_proof_path, government_id_path, verification_doc_path, certification_document_path, primary_sport, certification_level, bio"
+      )
       .eq("member_id", user.id)
       .maybeSingle(),
     admin.from("ref_verification_submissions").select("status").eq("ref_member_id", user.id).maybeSingle(),
     admin.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
   ]);
 
-  const eligible = refCanApplyToGames({
+  const eligibilityArgs = {
     screeningStatus: screening?.status,
     verificationMethod: profile?.verification_method,
     externalProofPath: profile?.external_verification_proof_path,
     verificationSubmissionStatus: submission?.status,
-  });
+    profile,
+  };
+  const eligible = refCanApplyToGames(eligibilityArgs);
+  const missingStep = refMissingApplyStep(eligibilityArgs);
 
   const { data: event, error: eventError } = await admin
     .from("scheduled_events")
@@ -121,7 +130,15 @@ export async function POST(request: Request) {
 
   // withdrawn (or no row) → only fully approved refs may create a new request.
   if (!eligible) {
-    return NextResponse.json({ error: APPLY_REQUIRES_APPROVAL_MESSAGE }, { status: 403 });
+    const message = applyBlockedMessageForStep(missingStep) || APPLY_REQUIRES_APPROVAL_MESSAGE;
+    return NextResponse.json(
+      {
+        error: message,
+        missingStep,
+        code: "VERIFICATION_REQUIRED",
+      },
+      { status: 403 }
+    );
   }
 
   const { data: upserted, error: upsertError } = await admin

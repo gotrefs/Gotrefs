@@ -68,11 +68,13 @@ function formatEventPay(event: CalendarEvent, decimals = 2) {
 export function RefEventCalendar({
   embedded = false,
   canApplyToEvents = true,
+  applyBlockedLabel = "Verification required",
   applicationPending = false,
   applicationRejected = false,
   onRequireProfile,
 }: {
   canApplyToEvents?: boolean;
+  applyBlockedLabel?: string;
   applicationPending?: boolean;
   applicationRejected?: boolean;
   onRequireProfile?: () => void;
@@ -221,13 +223,7 @@ export function RefEventCalendar({
     setMsg(null);
     if (!canApplyToEvents) {
       onRequireProfile?.();
-      setMsg(
-        applicationPending
-          ? "Your verification is still under review. You can browse games, but you can’t request to work until GotRefs approves you."
-          : applicationRejected
-            ? "Your verification wasn’t approved. Resolve that before requesting games."
-            : "GotRefs must approve your verification before you can request to work games."
-      );
+      setMsg(applyBlockedLabel);
       return;
     }
     setSubmitting(true);
@@ -491,7 +487,7 @@ export function RefEventCalendar({
                       : !canApplyToEvents
                         ? applicationPending
                           ? "Awaiting GotRefs approval"
-                          : "Verification required"
+                          : applyBlockedLabel
                         : submitting
                           ? "Submitting…"
                           : "Apply"}

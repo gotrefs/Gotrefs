@@ -66,9 +66,10 @@ export function mapCardFieldToVerificationStep(
     case "photo":
       return "profile";
     case "sports":
-    case "certification":
     case "rate":
       return "sports";
+    case "certification":
+      return "certification";
     case "verification":
       return "government_id";
     case "location":
