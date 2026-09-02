@@ -101,8 +101,8 @@ async function eventSummary(
   };
 }
 
-function dashboardUrl(siteUrl: string, path: "/dashboard/referee" | "/dashboard/organizer") {
-  return `${siteUrl.replace(/\/$/, "")}${path}`;
+function dashboardUrl(siteUrl: string, path: string) {
+  return `${siteUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function gotrefsIdForMember(admin: SupabaseClient, memberId: string): Promise<string> {
@@ -252,10 +252,10 @@ export async function notifyOfferResponseToOrganizer(opts: {
   return sendEmail({
     to: org.email,
     subject: opts.accepted
-      ? `${BRAND_NAME}: Ref ${refId} accepted your offer`
+      ? `${BRAND_NAME}: Ref ${refId} accepted — confirm pay`
       : `${BRAND_NAME}: Ref ${refId} declined your offer`,
     html: emailLayout({
-      title: opts.accepted ? "Offer accepted" : "Offer declined",
+      title: opts.accepted ? "Offer accepted — payment ready" : "Offer declined",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
         <p><strong>Ref ${escapeHtml(refId)}</strong> ${opts.accepted ? "accepted" : "declined"} your offer for:</p>
@@ -263,10 +263,14 @@ export async function notifyOfferResponseToOrganizer(opts: {
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>${opts.accepted ? "Your booking is confirmed in GotRefs." : "You can invite another verified official from your dashboard."}</p>
+        <p>${
+          opts.accepted
+            ? "Confirm and pay in your dashboard to finish hiring. Total includes referee pay, a 20% GotRefs fee on that pay, and a refundable deposit (1 game rate × each ref)."
+            : "You can invite another verified official from your dashboard."
+        }</p>
       `,
-      ctaLabel: "Open organizer dashboard",
-      ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer"),
+      ctaLabel: opts.accepted ? "Confirm and pay" : "Open organizer dashboard",
+      ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer?tab=payments"),
     }),
   });
 }
@@ -562,4 +566,83 @@ export async function notifyVerificationDecision(opts: {
     console.error("[email] Verification decision email was not sent to", ref.email);
   }
   return sent;
+}
+
+/**
+ * Airbnb-style prompt to add a Stripe Connect payout method.
+ * Used when pay is held, or as a day-after-signup setup nudge (no amount yet).
+ */
+export async function notifyPayoutMethodNeeded(opts: {
+  admin: SupabaseClient;
+  refMemberId: string;
+  amountCents?: number | null;
+  eventId?: string | null;
+  reason?: "pending_onboarding" | "pending_tax" | "missing_account" | "setup_nudge";
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const ref = await emailForMemberId(opts.admin, opts.refMemberId);
+  if (!ref) return false;
+
+  const hasAmount =
+    opts.amountCents != null && Number.isFinite(opts.amountCents) && opts.amountCents > 0;
+  const amount = hasAmount
+    ? new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format((opts.amountCents as number) / 100)
+    : null;
+
+  let eventLine = "";
+  if (opts.eventId) {
+    const event = await eventSummary(opts.admin, opts.eventId);
+    if (event) {
+      eventLine = `<p>This pay is for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}).</p>`;
+    }
+  }
+
+  const needsTax = opts.reason === "pending_tax";
+  const payoutUrl = dashboardUrl(siteUrl, "/dashboard/referee?panel=payout");
+  const isSetupNudge = !hasAmount || opts.reason === "setup_nudge";
+
+  const subject = amount
+    ? `${BRAND_NAME}: Your ${amount} payout is waiting — add a payout method`
+    : `${BRAND_NAME}: Add a payout method so you’re ready to get paid`;
+
+  const title = amount
+    ? "The money you earned officiating is waiting for you"
+    : "Add a payout method so you’re ready to get paid";
+
+  const lead = amount
+    ? `<p>You earned <strong>${escapeHtml(amount)}</strong> working a game through ${BRAND_NAME}. Take a moment to ${
+        needsTax ? "finish your W-9 / tax ID" : "add or update your payout method"
+      } so you get the income you earned.</p>`
+    : `<p>You’re set up on ${BRAND_NAME}. Take a moment to add a payout method in your account so when organizers pay for your games, you get the officiating income you earn — by ACH direct deposit.</p>`;
+
+  return sendEmail({
+    to: ref.email,
+    subject,
+    html: emailLayout({
+      title,
+      bodyHtml: `
+        <p>Hi ${escapeHtml(ref.displayName)},</p>
+        ${lead}
+        ${eventLine}
+        <p>Or you can visit your referee dashboard and update your payout method under <strong>Payments</strong>.</p>
+        <p style="margin-top:24px;font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#7B8FA0;">Frequently asked questions</p>
+        <p style="margin:12px 0 4px;"><strong>Where do I find my payout information?</strong><br/>Open your GotRefs referee dashboard → <em>Payments</em>.</p>
+        <p style="margin:12px 0 4px;"><strong>How do I set up a way to get paid?</strong><br/>Tap <em>Add payout method</em> below. Stripe Express will walk you through connecting your bank${
+          needsTax ? " and tax details" : ""
+        } for ACH direct deposit.</p>
+        <p style="margin:12px 0 4px;"><strong>How do I calculate my payout?</strong><br/>${
+          isSetupNudge
+            ? "Your payout matches the pay you accept for each game. GotRefs transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
+            : "Your payout matches the pay you accepted for the game. GotRefs transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
+        }</p>
+      `,
+      ctaLabel: "Add payout method",
+      ctaUrl: payoutUrl,
+      ctaLarge: true,
+    }),
+  });
 }

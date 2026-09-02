@@ -10,8 +10,9 @@ import { emailSiteUrl } from "@/lib/email/resend";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { normalizeGamesCount } from "@/lib/stripe/offer-checkout-amount";
 
-type Body = { action?: "accept" | "decline" | "withdraw" };
+type Body = { action?: "accept" | "decline" | "withdraw"; gamesCount?: number | null };
 
 type EventJoin = {
   organizer_member_id: string;
@@ -190,6 +191,7 @@ export async function PATCH(
 
   const approvalMessage = "Organizer approved your request — see Upcoming games for the full address.";
   let offerId = existingOffer?.id ?? existingBooking?.offer_id ?? null;
+  const gamesCount = normalizeGamesCount(body.gamesCount, 1);
 
   // Never reset an accepted offer back to pending (that breaks booking uniqueness).
   if (existingBooking || existingOffer?.status === "accepted") {
@@ -200,6 +202,7 @@ export async function PATCH(
           status: "accepted",
           message: approvalMessage,
           offered_pay: boostedOfferPay(basePay, boost.percent),
+          games_count: gamesCount,
         })
         .eq("id", offerId);
     } else if (offerId) {
@@ -208,6 +211,7 @@ export async function PATCH(
         .update({
           message: approvalMessage,
           offered_pay: boostedOfferPay(basePay, boost.percent),
+          games_count: gamesCount,
         })
         .eq("id", offerId);
     }
@@ -218,6 +222,7 @@ export async function PATCH(
         status: "accepted",
         message: approvalMessage,
         offered_pay: boostedOfferPay(basePay, boost.percent),
+        games_count: gamesCount,
       })
       .eq("id", existingOffer.id);
 
@@ -235,6 +240,7 @@ export async function PATCH(
       offered_pay: boostedOfferPay(basePay, boost.percent),
       base_pay: basePay,
       boost_percent: boost.percent,
+      games_count: gamesCount,
       message: approvalMessage,
       status: "pending" as const,
     };
@@ -245,14 +251,17 @@ export async function PATCH(
       .select("id, status")
       .maybeSingle();
 
-    if (offerError && /boost_percent|base_pay/.test(offerError.message ?? "")) {
-      const withoutBoost = {
+    if (offerError && /boost_percent|base_pay|games_count/.test(offerError.message ?? "")) {
+      const withoutBoost: Record<string, unknown> = {
         event_id: offerPayload.event_id,
         ref_member_id: offerPayload.ref_member_id,
         offered_pay: offerPayload.offered_pay,
         message: offerPayload.message,
         status: offerPayload.status,
       };
+      if (!/games_count/.test(offerError.message ?? "")) {
+        withoutBoost.games_count = gamesCount;
+      }
       const retry = await admin.from("assignment_offers").insert(withoutBoost).select("id, status").maybeSingle();
       offerRow = retry.data;
       offerError = retry.error;
@@ -277,6 +286,8 @@ export async function PATCH(
       }
     }
   }
+
+  // Payment happens on organizer confirm-pay (ref pay + fee + deposit).
 
   // Ensure a booking exists even if the DB trigger only runs on UPDATE and was skipped.
   if (offerId) {

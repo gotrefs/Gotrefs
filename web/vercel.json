@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/payout-setup-nudges",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refund-event-deposits",
+      "schedule": "15 * * * *"
+    }
+  ]
+}

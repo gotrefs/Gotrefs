@@ -6,12 +6,14 @@ import { eventPayMeetsRefMinimum } from "@/lib/pay-range";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
+import { normalizeGamesCount } from "@/lib/stripe/offer-checkout-amount";
 
 type Body = {
   eventId: string;
   refMemberId: string;
   offeredPay?: number | null;
   message?: string | null;
+  gamesCount?: number | null;
 };
 
 export async function POST(request: Request) {
@@ -127,6 +129,7 @@ export async function POST(request: Request) {
     eventBoosts: event.boosts,
   });
   const offeredPay = boostedOfferPay(basePay, boost.percent);
+  const gamesCount = normalizeGamesCount(body.gamesCount, 1);
 
   let { data, error } = await supabase
     .from("assignment_offers")
@@ -136,6 +139,7 @@ export async function POST(request: Request) {
       offered_pay: offeredPay,
       base_pay: basePay,
       boost_percent: boost.percent,
+      games_count: gamesCount,
       message: body.message ?? null,
       status: "pending",
     }, {
@@ -143,16 +147,24 @@ export async function POST(request: Request) {
     })
     .select("id")
     .single();
-  if (error && /boost_percent|base_pay/.test(error.message ?? "")) {
+  if (error && /boost_percent|base_pay|games_count/.test(error.message ?? "")) {
+    const retryPayload: Record<string, unknown> = {
+      event_id: body.eventId,
+      ref_member_id: body.refMemberId,
+      offered_pay: offeredPay,
+      message: body.message ?? null,
+      status: "pending",
+    };
+    if (!/games_count/.test(error.message ?? "")) {
+      retryPayload.games_count = gamesCount;
+    }
+    if (!/boost_percent|base_pay/.test(error.message ?? "")) {
+      retryPayload.base_pay = basePay;
+      retryPayload.boost_percent = boost.percent;
+    }
     const retry = await supabase
       .from("assignment_offers")
-      .upsert({
-        event_id: body.eventId,
-        ref_member_id: body.refMemberId,
-        offered_pay: offeredPay,
-        message: body.message ?? null,
-        status: "pending",
-      }, {
+      .upsert(retryPayload, {
         onConflict: "event_id,ref_member_id",
       })
       .select("id")

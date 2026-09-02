@@ -4,9 +4,10 @@ import { activateQueuedSignupRequests } from "@/lib/activate-queued-signups";
 import { notifyVerificationDecision } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { normalizeFixRequiredSteps } from "@/lib/ref-verification-steps";
+import { schedulePayoutSetupNudge } from "@/lib/stripe/payout-setup-nudge";
 import { createServiceClient } from "@/lib/supabase/service";
 
-type ReviewAction = "approve" | "reject" | "request_info";
+type ReviewAction = "approve" | "reject" | "request_info" | "remove" | "restore";
 
 type ReviewBody = {
   action?: ReviewAction;
@@ -31,44 +32,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
   }
 
   const action = body.action;
-  if (action !== "approve" && action !== "reject" && action !== "request_info") {
-    return NextResponse.json({ error: "action must be approve, reject, or request_info." }, { status: 400 });
-  }
-
-  const fixRequiredSteps = normalizeFixRequiredSteps(body.fixRequiredSteps);
-  const adminNotesInput = (body.adminNotes ?? "").trim();
-  const now = new Date().toISOString();
-
-  if (action === "reject" && !adminNotesInput) {
+  if (
+    action !== "approve" &&
+    action !== "reject" &&
+    action !== "request_info" &&
+    action !== "remove" &&
+    action !== "restore"
+  ) {
     return NextResponse.json(
-      { error: "Add a reason explaining why this referee is not approved." },
+      { error: "action must be approve, reject, request_info, remove, or restore." },
       { status: 400 }
     );
   }
-
-  if (action === "request_info" && !adminNotesInput) {
-    return NextResponse.json({ error: "Add a message explaining what the referee needs to change." }, { status: 400 });
-  }
-
-  // Reject can be used to revoke a prior approval. Fix steps are optional so admins
-  // can revoke with a reason only; when steps are selected the ref gets a resubmit path.
-  if (action === "request_info" && fixRequiredSteps.length === 0) {
-    return NextResponse.json(
-      { error: "Select at least one item (1–5) the referee needs to fix before sending." },
-      { status: 400 }
-    );
-  }
-
-  const status =
-    action === "approve" ? "approved" : action === "reject" ? "rejected" : "under_review";
-
-  const adminNotes =
-    adminNotesInput ||
-    (action === "approve"
-      ? "Application Approved — you can now request to work games on GotRefs!"
-      : action === "reject"
-        ? "Your verification was not approved. Please complete the requested fixes and resubmit."
-        : null);
 
   try {
     const admin = createServiceClient();
@@ -78,13 +53,76 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       return NextResponse.json({ error: "Referee not found." }, { status: 404 });
     }
 
+    if (action === "remove" || action === "restore") {
+      const now = new Date().toISOString();
+      const { error } = await admin.from("ref_profiles").upsert(
+        {
+          member_id: refMemberId,
+          admin_queue_hidden_at: action === "remove" ? now : null,
+          updated_at: now,
+        },
+        { onConflict: "member_id" }
+      );
+
+      if (error) {
+        if (/admin_queue_hidden_at/i.test(error.message)) {
+          return NextResponse.json(
+            {
+              error:
+                "Admin queue hide is not enabled yet. Run supabase/migrations/20260824140000_ref_admin_queue_hidden.sql in Supabase.",
+            },
+            { status: 503 }
+          );
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        action,
+        adminQueueHiddenAt: action === "remove" ? now : null,
+      });
+    }
+
+    const fixRequiredSteps = normalizeFixRequiredSteps(body.fixRequiredSteps);
+    const adminNotesInput = (body.adminNotes ?? "").trim();
+    const now = new Date().toISOString();
+
+    if (action === "reject" && !adminNotesInput) {
+      return NextResponse.json(
+        { error: "Add a reason explaining why this referee is not approved." },
+        { status: 400 }
+      );
+    }
+
+    if (action === "request_info" && !adminNotesInput) {
+      return NextResponse.json({ error: "Add a message explaining what the referee needs to change." }, { status: 400 });
+    }
+
+    if (action === "request_info" && fixRequiredSteps.length === 0) {
+      return NextResponse.json(
+        { error: "Select at least one item (1–5) the referee needs to fix before sending." },
+        { status: 400 }
+      );
+    }
+
+    const status =
+      action === "approve" ? "approved" : action === "reject" ? "rejected" : "under_review";
+
+    const adminNotes =
+      adminNotesInput ||
+      (action === "approve"
+        ? "Application Approved — you can now request to work games on GotRefs!"
+        : action === "reject"
+          ? "Your verification was not approved. Please complete the requested fixes and resubmit."
+          : null);
+
     const { data: existing } = await admin
       .from("ref_verification_submissions")
       .select("submitted_at")
       .eq("ref_member_id", refMemberId)
       .maybeSingle();
 
-    // Needs info / reject always clears approval so the ref is pending again until re-approved.
     const submissionPatch: Record<string, unknown> = {
       ref_member_id: refMemberId,
       status,
@@ -93,7 +131,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
       admin_notes: adminNotes,
       fix_required_steps: action === "approve" ? [] : fixRequiredSteps,
       updated_at: now,
-      // Any non-approve decision ends the prior approval cycle.
       resubmitted_at: null,
     };
 
@@ -126,7 +163,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         { onConflict: "ref_member_id" }
       );
     } else {
-      // Needs info: revoke prior clearance so they cannot apply until they fix + you re-approve.
       await admin.from("screening_checks").upsert(
         {
           ref_member_id: refMemberId,
@@ -142,6 +178,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
     let queuedActivated = 0;
 
     if (action === "approve") {
+      await schedulePayoutSetupNudge(admin, refMemberId);
       const flushed = await activateQueuedSignupRequests({
         admin,
         refMemberId,
@@ -152,12 +189,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
 
     let emailSent = false;
     try {
-      // Await so serverless runtimes don't drop the Resend call.
       emailSent = await notifyVerificationDecision({
         admin,
         refMemberId,
         approved: action === "approve",
-        // Needs info always; Reject with fix steps also emails “please make these changes.”
         changesRequested: action === "request_info" || (action === "reject" && fixRequiredSteps.length > 0),
         adminNotes,
         fixRequiredSteps: action === "approve" ? [] : fixRequiredSteps,

@@ -182,6 +182,8 @@ export async function POST(request: NextRequest) {
         await admin.from("ref_profiles").upsert(fallback, { onConflict: "member_id" });
       }
       await admin.from("screening_checks").upsert({ ref_member_id: user.id }, { onConflict: "ref_member_id" });
+      const { schedulePayoutSetupNudge } = await import("@/lib/stripe/payout-setup-nudge");
+      await schedulePayoutSetupNudge(admin, user.id);
     } else {
       await admin.from("organizer_profiles").upsert({ member_id: user.id }, { onConflict: "member_id" });
     }

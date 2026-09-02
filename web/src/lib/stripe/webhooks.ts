@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { upsertConnectAccountFromStripe } from "@/lib/stripe/connect";
 import { disbursePaymentToRefs, disburseVendorPayment, retryHeldPayoutsForMember } from "@/lib/stripe/payouts";
+import { saveOrganizerDefaultPaymentMethod } from "@/lib/stripe/organizer-payment-method";
 
 async function markWebhookProcessed(
   admin: SupabaseClient,
@@ -125,6 +126,26 @@ export async function handleStripeWebhookEvent(admin: SupabaseClient, event: Str
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.payment_status === "paid" || session.status === "complete") {
         await markPaymentPaidFromCheckout(admin, session);
+      }
+      break;
+    }
+    case "setup_intent.succeeded": {
+      const setupIntent = event.data.object as Stripe.SetupIntent;
+      const memberId = setupIntent.metadata?.member_id?.trim();
+      const customerId =
+        typeof setupIntent.customer === "string"
+          ? setupIntent.customer
+          : setupIntent.customer?.id ?? null;
+      const paymentMethodId =
+        typeof setupIntent.payment_method === "string"
+          ? setupIntent.payment_method
+          : setupIntent.payment_method?.id ?? null;
+      if (memberId && customerId && paymentMethodId) {
+        await saveOrganizerDefaultPaymentMethod(admin, {
+          memberId,
+          customerId,
+          paymentMethodId,
+        });
       }
       break;
     }

@@ -7,6 +7,7 @@ import {
   applyBlockedMessageForStep,
   refCanApplyToGames,
   refMissingApplyStep,
+  refVerificationApproved,
 } from "@/lib/ref-eligibility";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -60,14 +61,24 @@ export async function POST(request: Request) {
       .eq("member_id", user.id)
       .maybeSingle(),
     admin.from("ref_verification_submissions").select("status").eq("ref_member_id", user.id).maybeSingle(),
-    admin.from("screening_checks").select("status").eq("ref_member_id", user.id).maybeSingle(),
+    admin.from("screening_checks").select("status, summary").eq("ref_member_id", user.id).maybeSingle(),
   ]);
+
+  let submissionStatus = submission?.status ?? null;
+  if (
+    !refVerificationApproved(submissionStatus) &&
+    screening?.status === "clear" &&
+    /admin approved/i.test(screening.summary || "")
+  ) {
+    submissionStatus = "approved";
+  }
 
   const eligibilityArgs = {
     screeningStatus: screening?.status,
+    screeningSummary: screening?.summary,
     verificationMethod: profile?.verification_method,
     externalProofPath: profile?.external_verification_proof_path,
-    verificationSubmissionStatus: submission?.status,
+    verificationSubmissionStatus: submissionStatus,
     profile,
   };
   const eligible = refCanApplyToGames(eligibilityArgs);

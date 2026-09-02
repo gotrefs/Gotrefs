@@ -41,7 +41,7 @@ export async function PATCH(
 
   const { data: offer, error: oErr } = await supabase
     .from("assignment_offers")
-    .select("id, ref_member_id, status, event_id")
+    .select("id, ref_member_id, status, event_id, games_count, offered_pay, payment_status")
     .eq("id", id)
     .single();
 
@@ -149,6 +149,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    // Payment happens on organizer confirm-pay (ref pay + fee + deposit).
   }
 
   if (action === "decline" && !isRef) {

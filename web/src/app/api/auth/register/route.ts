@@ -15,6 +15,7 @@ import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
+import { schedulePayoutSetupNudge } from "@/lib/stripe/payout-setup-nudge";
 import { createRouteHandlerClient, jsonWithSessionCookies } from "@/lib/supabase/route-handler";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -156,6 +157,7 @@ async function setupSignupProfiles(
         );
       }
     }
+    await schedulePayoutSetupNudge(admin, userId);
   }
 
   return { ok: true };

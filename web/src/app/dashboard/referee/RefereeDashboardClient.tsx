@@ -338,12 +338,11 @@ export default function RefereeDashboardClient() {
     let { data: o, error: offersError } = await supabase
       .from("assignment_offers")
       .select(
-        "id, status, offered_pay, base_pay, boost_percent, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
+        "id, status, offered_pay, base_pay, boost_percent, games_count, message, scheduled_events ( title, sport, starts_at, zip_code, city, state, organizer_member_id )"
       )
       .eq("ref_member_id", user.id)
       .order("created_at", { ascending: false });
-    if (offersError) {
-      // Older databases may not have the boost columns yet.
+    if (offersError && /games_count|boost_percent|base_pay/.test(offersError.message ?? "")) {
       const retry = await supabase
         .from("assignment_offers")
         .select(
@@ -502,6 +501,39 @@ export default function RefereeDashboardClient() {
         .eq("ref_member_id", user.id)
         .maybeSingle();
       submission = fallback.data;
+    }
+
+    // Prefer service-role status so admin approval always unlocks booking.
+    try {
+      const meRes = await fetch("/api/verification/me");
+      if (meRes.ok) {
+        const meJson = (await meRes.json()) as {
+          status?: string;
+          adminNotes?: string | null;
+          updatedAt?: string | null;
+          reviewedAt?: string | null;
+          fixRequiredSteps?: RefVerificationStepKey[];
+          screeningStatus?: string | null;
+          screeningSummary?: string | null;
+        };
+        if (meJson.status) {
+          submission = {
+            status: meJson.status,
+            admin_notes: meJson.adminNotes,
+            updated_at: meJson.updatedAt,
+            reviewed_at: meJson.reviewedAt,
+            fix_required_steps: meJson.fixRequiredSteps,
+          };
+        }
+        if (meJson.screeningStatus) {
+          setScreening({
+            status: meJson.screeningStatus,
+            summary: meJson.screeningSummary ?? null,
+          });
+        }
+      }
+    } catch {
+      // Fall back to direct table read above.
     }
 
     setVerificationStatus(submission?.status || "draft");
@@ -866,6 +898,14 @@ export default function RefereeDashboardClient() {
     queueMicrotask(() => void load());
   }, [load]);
 
+  // Day-after-signup payout setup nudge (no-op if already sent / Connect ready / not due yet).
+  useEffect(() => {
+    if (loading || !memberId) return;
+    void fetch("/api/cron/payout-setup-nudges", { method: "POST" }).catch(() => {
+      // Best-effort; hourly cron also processes due nudges.
+    });
+  }, [loading, memberId]);
+
   const refreshVerificationStatus = useCallback(async () => {
     if (!memberId) return;
     const { data: vs, error: vsError } = await supabase
@@ -947,10 +987,19 @@ export default function RefereeDashboardClient() {
   useEffect(() => {
     const panel = searchParams.get("panel");
     if (!panel || loading) return;
-    if (panel === "offers" || panel === "my-work") {
+    if (panel === "offers" || panel === "my-work" || panel === "trips") {
       window.requestAnimationFrame(() => {
         marketplaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+      return;
+    }
+    if (panel === "payout" || panel === "payouts") {
+      window.requestAnimationFrame(() => {
+        document.getElementById("ref-payout-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("panel");
+      window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, [loading, searchParams]);
 
@@ -958,9 +1007,9 @@ export default function RefereeDashboardClient() {
     const connect = searchParams.get("connect");
     if (!connect) return;
     if (connect === "return") {
-      setMsg("You're all set — you can start getting paid instantly. Check Get paid below for bank & W-9 status.");
+      setMsg("You're all set — you can start getting paid. Check Payments for bank status.");
     } else if (connect === "refresh") {
-      setMsg("Stripe onboarding expired — open Get paid and continue setup.");
+      setMsg("Stripe onboarding expired — open Payments and continue setup.");
     }
     // Clear the query so a refresh doesn't re-trigger, and scroll to payout status.
     const url = new URL(window.location.href);
@@ -1127,6 +1176,7 @@ export default function RefereeDashboardClient() {
 
   const isVerified = refOfferEligible({
     screeningStatus: screening?.status,
+    screeningSummary: screening?.summary,
     verificationMethod,
     externalProofPath,
     verificationSubmissionStatus: verificationStatus,
@@ -1151,7 +1201,9 @@ export default function RefereeDashboardClient() {
   const profileReady = Boolean(bio.trim() && sport.trim() && cert.trim());
   const idReady = Boolean(govIdPath);
   const certificationReady = Boolean(certDocPath);
-  const verificationApproved = refVerificationApproved(verificationStatus);
+  const verificationApproved =
+    refVerificationApproved(verificationStatus) ||
+    (screening?.status === "clear" && /admin approved/i.test(screening.summary || ""));
   const verificationRejected = refVerificationRejected(verificationStatus);
   const verificationNeedsFix = refVerificationNeedsFix(verificationStatus, verificationFixRequiredSteps);
   const verificationPending = refVerificationPendingReview(verificationStatus) && !verificationNeedsFix;
@@ -1163,6 +1215,7 @@ export default function RefereeDashboardClient() {
     ? ("fix_required" as const)
     : refMissingApplyStep({
         screeningStatus: screening?.status,
+        screeningSummary: screening?.summary,
         verificationMethod,
         externalProofPath,
         verificationSubmissionStatus: verificationStatus,
@@ -1176,7 +1229,8 @@ export default function RefereeDashboardClient() {
         },
       });
   const applyBlockedLabel = applyBlockedMessageForStep(applyGateStep);
-  const canApplyToGames = canAcceptOffers && showApprovedHero;
+  // Eligibility alone unlocks booking once admin has approved (do not also require hero state).
+  const canApplyToGames = canAcceptOffers && !verificationNeedsFix && !verificationRejected;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
   const missingActions: {
     label: string;
@@ -1414,15 +1468,10 @@ export default function RefereeDashboardClient() {
             offers={offers}
             applications={applications}
             bookings={bookings}
+            payoutPanel={<RefPayoutPanel />}
           />
         </section>
       )}
-
-      {!profileWizard ? (
-        <div id="ref-payout-panel" className="mt-6">
-          <RefPayoutPanel />
-        </div>
-      ) : null}
 
       {!profileWizard && !showApprovedHero ? (
         <div

@@ -13,12 +13,16 @@ export function emailLayout(opts: {
   bodyHtml: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  /** Bigger Airbnb-style primary CTA button */
+  ctaLarge?: boolean;
 }) {
   const cta =
     opts.ctaLabel && opts.ctaUrl
       ? `<p style="margin:28px 0 8px;">
           <a href="${escapeHtml(opts.ctaUrl)}"
-             style="display:inline-block;background:#0D1B2A;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;">
+             style="display:inline-block;background:#0D1B2A;color:#ffffff;text-decoration:none;padding:${
+               opts.ctaLarge ? "16px 28px" : "12px 22px"
+             };border-radius:999px;font-weight:800;font-size:${opts.ctaLarge ? "16px" : "14px"};">
             ${escapeHtml(opts.ctaLabel)}
           </a>
         </p>`

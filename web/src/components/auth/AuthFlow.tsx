@@ -1378,9 +1378,8 @@ export function AuthFlow() {
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
-                  After you create your account, pay accepted refs from your organizer dashboard with Stripe Checkout
-                  (card or ACH). Refs receive ACH direct deposit through Stripe Connect; GotRefs handles 1099 reporting
-                  from paid transfers.
+                  After you create your account, add a payment method under Payments, then confirm pay when refs
+                  accept. Refs receive ACH direct deposit through Stripe Connect.
                 </p>
               </div>
             )}

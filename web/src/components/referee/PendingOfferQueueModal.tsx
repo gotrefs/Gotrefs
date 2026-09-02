@@ -6,6 +6,7 @@ import { formatEventLocation } from "@/data/sports";
 export type PendingOfferQueueItem = {
   id: string;
   offered_pay: number | null;
+  games_count?: number | null;
   message: string | null;
   scheduled_events:
     | {
@@ -114,7 +115,12 @@ export function PendingOfferQueueModal({
 
         {current.offered_pay != null && (
           <p className="mt-4 rounded-2xl bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-900">
-            Offered pay ${Number(current.offered_pay).toFixed(0)}
+            ${Number(current.offered_pay).toFixed(0)} ×{" "}
+            {Math.max(1, Number(current.games_count) || 1)} game
+            {Math.max(1, Number(current.games_count) || 1) === 1 ? "" : "s"} = $
+            {(
+              Number(current.offered_pay) * Math.max(1, Number(current.games_count) || 1)
+            ).toFixed(0)}
           </p>
         )}
         {current.message && (

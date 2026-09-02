@@ -1357,8 +1357,9 @@ export function OrganizerListingWizard({
             </p>
             <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
             <p className="mt-2 text-center text-sm text-neutral-500">
-              When you staff a game, you’ll pay through Stripe Checkout (card or ACH). GotRefs then deposits each
-              official by ACH after they connect their bank.
+              Save a card or bank with Stripe. After refs accept, you’ll confirm payment: referee pay, a
+              20% GotRefs fee on that pay only, and a refundable deposit (1 extra game per hired ref).
+              Unused deposit is returned after the event.
             </p>
             <button
               type="button"

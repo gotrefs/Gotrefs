@@ -14,6 +14,7 @@ export type RefWorkOffer = {
   offered_pay: number | null;
   base_pay?: number | null;
   boost_percent?: number | null;
+  games_count?: number | null;
   message: string | null;
   organizer?: {
     displayName: string | null;
@@ -244,7 +245,11 @@ export function RefMyWorkPanel({
                       .filter(Boolean)
                       .join(" · "),
                     offer.offered_pay != null
-                      ? `Offered pay $${offer.offered_pay}${
+                      ? `$${Number(offer.offered_pay).toFixed(0)} × ${Math.max(1, Number(offer.games_count) || 1)} game${
+                          Math.max(1, Number(offer.games_count) || 1) === 1 ? "" : "s"
+                        } = $${(
+                          Number(offer.offered_pay) * Math.max(1, Number(offer.games_count) || 1)
+                        ).toFixed(0)}${
                           (offer.boost_percent ?? 0) > 0
                             ? ` · includes ${offer.boost_percent}% boost${
                                 offer.base_pay != null ? ` (base $${offer.base_pay})` : ""

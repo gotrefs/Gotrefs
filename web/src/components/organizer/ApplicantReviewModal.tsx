@@ -35,18 +35,19 @@ export function ApplicantReviewModal({
 }: {
   applicant: ApplicantReviewData;
   onClose: () => void;
-  onDecide: (action: "accept" | "withdraw") => Promise<boolean | string>;
+  onDecide: (action: "accept" | "withdraw", gamesCount?: number) => Promise<boolean | string>;
 }) {
   const [busy, setBusy] = useState<"accept" | "withdraw" | null>(null);
   const [done, setDone] = useState<"accept" | "withdraw" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDeny, setConfirmDeny] = useState(false);
+  const [gamesCount, setGamesCount] = useState(1);
 
   async function decide(action: "accept" | "withdraw") {
     setBusy(action);
     setError(null);
     try {
-      const result = await onDecide(action);
+      const result = await onDecide(action, action === "accept" ? gamesCount : undefined);
       if (result !== true) {
         setError(
           typeof result === "string"
@@ -199,6 +200,26 @@ export function ApplicantReviewModal({
 
             {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
 
+            <label className="mt-5 block rounded-2xl border border-neutral-200 bg-white px-4 py-3">
+              <span className="text-xs font-black uppercase tracking-wide text-neutral-500">
+                Number of games (you set this — ref cannot change it)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={gamesCount}
+                onChange={(event) =>
+                  setGamesCount(Math.max(1, Math.min(99, Number(event.target.value) || 1)))
+                }
+                className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm font-semibold"
+              />
+              <span className="mt-1 block text-xs text-neutral-500">
+                You’ll confirm payment after they accept: games × rate, a 20% GotRefs fee on that pay
+                only, and a refundable deposit (1 game rate × each ref).
+              </span>
+            </label>
+
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -217,7 +238,7 @@ export function ApplicantReviewModal({
                 onClick={() => void decide("accept")}
                 className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
               >
-                {busy === "accept" ? "Approving…" : "Approve"}
+                {busy === "accept" ? "Hiring…" : `Hire · ${gamesCount} game${gamesCount === 1 ? "" : "s"}`}
               </button>
             </div>
           </>

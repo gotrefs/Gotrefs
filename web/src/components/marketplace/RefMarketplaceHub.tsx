@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { RefEventCalendar } from "@/components/RefEventCalendar";
 import { OpenGamesList } from "@/components/marketplace/OpenGamesList";
@@ -11,7 +11,7 @@ import {
   type RefWorkOffer,
 } from "@/components/marketplace/RefMyWorkPanel";
 
-type HubTab = "find-games" | "my-work";
+type HubTab = "find-games" | "my-work" | "payments";
 type FindView = "list" | "map" | "calendar";
 
 export function RefMarketplaceHub({
@@ -24,6 +24,7 @@ export function RefMarketplaceHub({
   offers,
   applications,
   bookings,
+  payoutPanel,
 }: {
   canApplyToEvents: boolean;
   applyBlockedLabel?: string;
@@ -34,15 +35,25 @@ export function RefMarketplaceHub({
   offers: RefWorkOffer[];
   applications: RefWorkApplication[];
   bookings: RefWorkBooking[];
+  payoutPanel?: ReactNode;
 }) {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "my-work" ? "my-work" : "find-games";
+  const initialTab =
+    searchParams.get("panel") === "payout" ||
+    searchParams.get("panel") === "payouts" ||
+    searchParams.get("tab") === "payments"
+      ? "payments"
+      : searchParams.get("tab") === "my-work"
+        ? "my-work"
+        : "find-games";
   const [tab, setTab] = useState<HubTab>(initialTab);
   const [findView, setFindView] = useState<FindView>("map");
 
   useEffect(() => {
     const panel = searchParams.get("panel");
-    if (panel === "offers" || panel === "trips" || searchParams.get("tab") === "my-work") {
+    if (panel === "payout" || panel === "payouts" || searchParams.get("tab") === "payments") {
+      setTab("payments");
+    } else if (panel === "offers" || panel === "trips" || searchParams.get("tab") === "my-work") {
       setTab("my-work");
     }
   }, [searchParams]);
@@ -52,6 +63,7 @@ export function RefMarketplaceHub({
   const tabs: { id: HubTab; label: string; badge?: number }[] = [
     { id: "find-games", label: "Explore" },
     { id: "my-work", label: "Trips", badge: pendingInviteCount },
+    { id: "payments", label: "Payments" },
   ];
 
   return (
@@ -141,6 +153,12 @@ export function RefMarketplaceHub({
             bookings={bookings}
             onReload={onReload}
           />
+        </div>
+      )}
+
+      {tab === "payments" && (
+        <div id="ref-payout-panel" data-ref-payments>
+          {payoutPanel}
         </div>
       )}
     </div>

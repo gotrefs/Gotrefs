@@ -78,6 +78,8 @@ export function EventMatchingView({
   excludeRefIds,
   onBackToListings,
   onRequestRef,
+  hireGamesCount = 1,
+  onHireGamesCountChange,
 }: {
   event: MatchingEvent;
   refs: MatchingDirectoryRef[];
@@ -86,6 +88,8 @@ export function EventMatchingView({
   excludeRefIds?: Set<string>;
   onBackToListings: () => void;
   onRequestRef: (refId: string) => Promise<boolean>;
+  hireGamesCount?: number;
+  onHireGamesCountChange?: (value: number) => void;
 }) {
   const [eventCoords, setEventCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [matches, setMatches] = useState<MatchedRef<MatchingDirectoryRef>[]>([]);
@@ -167,13 +171,30 @@ export function EventMatchingView({
               {payLabel ? ` · ${payLabel}` : ""} · {statusLabel}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onBackToListings}
-            className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
-          >
-            ← Back to listings
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm">
+              <span className="font-semibold text-neutral-700">Games</span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={hireGamesCount}
+                onChange={(event) =>
+                  onHireGamesCountChange?.(
+                    Math.max(1, Math.min(99, Number(event.target.value) || 1))
+                  )
+                }
+                className="w-14 rounded-lg border border-neutral-200 bg-white px-2 py-1 text-center font-bold"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={onBackToListings}
+              className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
+            >
+              ← Back to listings
+            </button>
+          </div>
         </div>
       </header>
 
@@ -182,7 +203,8 @@ export function EventMatchingView({
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-neutral-900">Matching refs</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Verified officials whose travel radius reaches this event.
+              Verified officials whose travel radius reaches this event. You’ll confirm pay after they
+              accept (ref pay + 20% fee + refundable 1-game deposit per ref).
             </p>
           </div>
           {loadingMatches ? (

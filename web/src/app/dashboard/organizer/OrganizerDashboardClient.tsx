@@ -8,8 +8,8 @@ import {
   OrganizerEventComposer,
   type JustPublishedEvent,
 } from "@/components/marketplace/OrganizerEventComposer";
-import { OrganizerTaxDocsPanel } from "@/components/payments/OrganizerTaxDocsPanel";
-import { VendorPaymentsPanel } from "@/components/payments/VendorPaymentsPanel";
+import { OrganizerPaymentMethodPanel } from "@/components/payments/OrganizerPaymentMethodPanel";
+import { OrganizerConfirmPayPanel } from "@/components/payments/OrganizerConfirmPayPanel";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventMatchingView } from "@/components/organizer/EventMatchingView";
 import {
@@ -181,6 +181,8 @@ type OrganizerOfferRow = {
   offered_pay: number | null;
   base_pay?: number | null;
   boost_percent?: number | null;
+  games_count?: number | null;
+  payment_status?: string | null;
   status: string;
   message: string | null;
   created_at: string;
@@ -235,7 +237,7 @@ export default function OrganizerDashboardClient() {
   const [activeTab, setActiveTab] = useState<
     "today" | "calendar" | "listings" | "payments" | "messages"
   >("today");
-  const [highlightPaymentId, setHighlightPaymentId] = useState<string | null>(null);
+  const [confirmPayEventId, setConfirmPayEventId] = useState<string | null>(null);
   const [todayFilter, setTodayFilter] = useState<"today" | "upcoming">("today");
   const [displayName, setDisplayName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -293,7 +295,7 @@ export default function OrganizerDashboardClient() {
   const [offerEvent, setOfferEvent] = useState("");
   const [offerRef, setOfferRef] = useState("");
   const [offerSending, setOfferSending] = useState(false);
-  const [checkoutEventId, setCheckoutEventId] = useState<string | null>(null);
+  const [hireGamesCount, setHireGamesCount] = useState(1);
   const [staffingEventId, setStaffingEventId] = useState<string | null>(null);
   const [attendingEventId, setAttendingEventId] = useState<string | null>(null);
   const [attendingFocusOfferId, setAttendingFocusOfferId] = useState<string | null>(null);
@@ -405,7 +407,7 @@ export default function OrganizerDashboardClient() {
     let { data: offers, error: offersError } = await supabase
       .from("assignment_offers")
       .select(
-        "id, event_id, ref_member_id, offered_pay, base_pay, boost_percent, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
+        "id, event_id, ref_member_id, offered_pay, base_pay, boost_percent, games_count, payment_status, status, message, created_at, members ( display_name ), scheduled_events!inner ( title, sport, starts_at, ends_at, pay_offer, organizer_member_id )"
       )
       .eq("scheduled_events.organizer_member_id", user.id)
       .order("created_at", { ascending: false });
@@ -533,13 +535,17 @@ export default function OrganizerDashboardClient() {
 
   async function decideApplicant(
     applicantId: string,
-    action: "accept" | "decline" | "withdraw"
+    action: "accept" | "decline" | "withdraw",
+    gamesCount = hireGamesCount
   ): Promise<boolean | string> {
     try {
       const res = await fetch(`/api/organizer/applicants/${applicantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({
+          action,
+          gamesCount: action === "accept" ? gamesCount : undefined,
+        }),
       });
       const j = (await res.json()) as { error?: string; status?: string };
       if (!res.ok) {
@@ -549,7 +555,7 @@ export default function OrganizerDashboardClient() {
       }
       setMsg(
         action === "accept"
-          ? "Ref approved for this game. They’ll see it under Upcoming and get an email."
+          ? "Ref hired. Your saved payment method was charged (rate × games + fee)."
           : action === "withdraw"
             ? "Request removed. The ref was notified and can request again if the game is still open."
             : "Request denied. The ref was emailed and won’t see this game anymore."
@@ -561,6 +567,8 @@ export default function OrganizerDashboardClient() {
       setReviewApplicant(null);
       await load();
       if (acceptedEventId) {
+        setConfirmPayEventId(acceptedEventId);
+        setActiveTab("payments");
         setAttendingFocusOfferId(null);
         setAttendingEventId(acceptedEventId);
       }
@@ -579,20 +587,15 @@ export default function OrganizerDashboardClient() {
     if (tab === "tax" || tab === "payments" || paymentId) {
       setActiveTab("payments");
     }
-    if (paymentId) setHighlightPaymentId(paymentId);
 
     const message =
       checkout === "success"
-        ? paymentId
-          ? "Payment received. Your receipt is ready below — GotRefs will ACH-deposit each ref once their bank and W-9 are on file."
-          : "Payment received. GotRefs will ACH-deposit each ref once their Stripe Connect bank and W-9 are on file. Open Payments for receipts."
+        ? "Payment received. Refs are paid out once their bank is connected under Payments."
         : checkout === "cancelled"
-          ? "Stripe checkout was cancelled. You can restart payment from the event card."
-          : searchParams.get("vendorPay") === "success"
-            ? "Vendor payment received. Funds transfer to their Connect account for ACH deposit when onboarding is complete. Receipts are under Payments."
-            : searchParams.get("vendorPay") === "cancelled"
-              ? "Vendor checkout was cancelled."
-              : null;
+          ? "Checkout was cancelled."
+          : searchParams.get("pm") === "return"
+            ? "Payment method setup finished. Confirm it saved under Payments."
+            : null;
     if (!message) return;
     const frame = window.requestAnimationFrame(() => setMsg(message));
     return () => window.cancelAnimationFrame(frame);
@@ -1048,13 +1051,14 @@ export default function OrganizerDashboardClient() {
           eventId,
           refMemberId,
           offeredPay: event?.pay_offer ?? null,
+          gamesCount: hireGamesCount,
           message: "We'd love for you to ref for our upcoming event.",
         }),
       });
       const j = (await res.json()) as { error?: string };
       setMsg(
         res.ok
-          ? "Request sent. The ref gets a dashboard invite and email to accept or decline."
+          ? `Request sent for ${hireGamesCount} game${hireGamesCount === 1 ? "" : "s"}. When they accept, your saved payment method is charged automatically.`
           : j.error || "Could not send request."
       );
       if (res.ok) {
@@ -1068,28 +1072,6 @@ export default function OrganizerDashboardClient() {
       return false;
     } finally {
       setOfferSending(false);
-    }
-  }
-
-  async function startStripeCheckout(eventId: string) {
-    setMsg(null);
-    setCheckoutEventId(eventId);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId }),
-      });
-      const json = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !json.url) {
-        setMsg(json.error || "Could not start Stripe checkout.");
-        return;
-      }
-      window.location.assign(json.url);
-    } catch {
-      setMsg("Could not reach Stripe checkout. Refresh and try again.");
-    } finally {
-      setCheckoutEventId(null);
     }
   }
 
@@ -1262,27 +1244,80 @@ export default function OrganizerDashboardClient() {
     return acc;
   }, {});
   const acceptedOfferPaymentsByEvent = sentOffers.reduce<
-    Record<string, { refSubtotalCents: number; platformFeeCents: number; totalCents: number; boostCents: number }>
+    Record<
+      string,
+      {
+        refSubtotalCents: number;
+        platformFeeCents: number;
+        depositCents: number;
+        totalCents: number;
+        boostCents: number;
+        unpaidCount: number;
+      }
+    >
   >((acc, offer) => {
     if (offer.status !== "accepted") return acc;
+    if (offer.payment_status === "paid") return acc;
     const event = Array.isArray(offer.scheduled_events) ? offer.scheduled_events[0] : offer.scheduled_events;
-    const refSubtotalCents = dollarsToCents(offer.offered_pay ?? event?.pay_offer);
+    const games = Math.max(1, Number(offer.games_count) || 1);
+    const rateCents = dollarsToCents(offer.offered_pay ?? event?.pay_offer);
+    const refSubtotalCents = rateCents * games;
     const boostCents =
       offer.base_pay != null && offer.offered_pay != null
         ? Math.max(0, dollarsToCents(offer.offered_pay) - dollarsToCents(offer.base_pay))
         : 0;
     const current =
-      acc[offer.event_id] ?? { refSubtotalCents: 0, platformFeeCents: 0, totalCents: 0, boostCents: 0 };
+      acc[offer.event_id] ?? {
+        refSubtotalCents: 0,
+        platformFeeCents: 0,
+        depositCents: 0,
+        totalCents: 0,
+        boostCents: 0,
+        unpaidCount: 0,
+      };
     const nextRefSubtotalCents = current.refSubtotalCents + refSubtotalCents;
     const nextPlatformFeeCents = calcPlatformFeeCents(nextRefSubtotalCents);
+    const nextDepositCents = current.depositCents + rateCents;
     acc[offer.event_id] = {
       refSubtotalCents: nextRefSubtotalCents,
       platformFeeCents: nextPlatformFeeCents,
-      totalCents: nextRefSubtotalCents + nextPlatformFeeCents,
+      depositCents: nextDepositCents,
+      totalCents: nextRefSubtotalCents + nextPlatformFeeCents + nextDepositCents,
       boostCents: current.boostCents + boostCents,
+      unpaidCount: current.unpaidCount + 1,
     };
     return acc;
   }, {});
+  const confirmPayEvents = (() => {
+    const byId = new Map<
+      string,
+      { eventId: string; title: string; unpaidCount: number }
+    >();
+    for (const [eventId, payment] of Object.entries(acceptedOfferPaymentsByEvent)) {
+      const event = events.find((e) => e.id === eventId);
+      byId.set(eventId, {
+        eventId,
+        title: event?.title ?? "Event",
+        unpaidCount: payment.unpaidCount,
+      });
+    }
+    for (const event of events) {
+      if (byId.has(event.id)) continue;
+      const hasPaid = sentOffers.some(
+        (offer) =>
+          offer.event_id === event.id &&
+          offer.status === "accepted" &&
+          offer.payment_status === "paid"
+      );
+      if (!hasPaid) continue;
+      byId.set(event.id, {
+        eventId: event.id,
+        title: event.title,
+        unpaidCount: 0,
+      });
+    }
+    return [...byId.values()].sort((a, b) => b.unpaidCount - a.unpaidCount);
+  })();
   const submittedRatingKeys = new Set(
     submittedRatings.map((rating) => ratingKey(rating.event_id, rating.ref_member_id))
   );
@@ -1955,9 +1990,18 @@ export default function OrganizerDashboardClient() {
               const hiredCount = acceptedOffersByEvent[e.id] || 0;
               const pendingCount = pendingOffersByEvent[e.id] || 0;
               const payment = acceptedOfferPaymentsByEvent[e.id];
+              const unpaidCount = payment?.unpaidCount ?? 0;
+              const offerPaid = sentOffers.some(
+                (offer) =>
+                  offer.event_id === e.id &&
+                  offer.status === "accepted" &&
+                  offer.payment_status === "paid"
+              );
               const filled = hiredCount >= e.officials_needed;
               const payLabel = formatPayOffer(e.pay_offer);
-              const status = filled
+              const status = unpaidCount > 0
+                ? { className: "bg-amber-50 text-amber-900", label: "Payment due" }
+                : filled
                 ? { className: "bg-emerald-50 text-emerald-800", label: "Fully staffed" }
                 : applicantCount > 0
                   ? { className: "bg-amber-50 text-amber-900", label: `${applicantCount} applicant${applicantCount === 1 ? "" : "s"}` }
@@ -1994,9 +2038,13 @@ export default function OrganizerDashboardClient() {
                           {payLabel ? ` · ${payLabel}` : ""}
                         </span>
                         {payment && payment.totalCents > 0 ? (
+                          <span className="mt-1 block text-xs font-semibold text-amber-800">
+                            Confirm pay {formatCents(payment.totalCents)} (refs + {PLATFORM_FEE_PERCENT_LABEL} fee
+                            + deposit)
+                          </span>
+                        ) : offerPaid ? (
                           <span className="mt-1 block text-xs font-semibold text-neutral-500">
-                            Checkout total {formatCents(payment.totalCents)} (includes{" "}
-                            {PLATFORM_FEE_PERCENT_LABEL} GotRefs fee)
+                            Refs paid for this event
                           </span>
                         ) : null}
                       </span>
@@ -2005,6 +2053,18 @@ export default function OrganizerDashboardClient() {
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}>
                         {status.label}
                       </span>
+                      {unpaidCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmPayEventId(e.id);
+                            setActiveTab("payments");
+                          }}
+                          className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-amber-700"
+                        >
+                          Pay now
+                        </button>
+                      ) : null}
                       {hiredCount > 0 ? (
                         <button
                           type="button"
@@ -2021,16 +2081,6 @@ export default function OrganizerDashboardClient() {
                           {hiredCount}/{e.officials_needed} hired
                         </span>
                       )}
-                      {payment && payment.totalCents > 0 ? (
-                        <button
-                          type="button"
-                          disabled={checkoutEventId === e.id}
-                          onClick={() => void startStripeCheckout(e.id)}
-                          className="rounded-full bg-[var(--navy)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--blue)] disabled:opacity-60"
-                        >
-                          {checkoutEventId === e.id ? "Opening Stripe..." : `Pay ${formatCents(payment.totalCents)}`}
-                        </button>
-                      ) : null}
                       <button
                         type="button"
                         onClick={() => openStaffingForEvent(e.id)}
@@ -2048,15 +2098,16 @@ export default function OrganizerDashboardClient() {
       </section>
       )}
 
-      {activeTab === "listings" ? (
-        <div className="mt-6">
-          <VendorPaymentsPanel />
-        </div>
-      ) : null}
-
       {activeTab === "payments" ? (
-        <div className="mt-6">
-          <OrganizerTaxDocsPanel highlightPaymentId={highlightPaymentId} />
+        <div className="mt-6 space-y-6">
+          <OrganizerConfirmPayPanel
+            events={confirmPayEvents}
+            initialEventId={confirmPayEventId}
+            onPaid={() => {
+              void load();
+            }}
+          />
+          <OrganizerPaymentMethodPanel />
         </div>
       ) : null}
 
@@ -2364,6 +2415,8 @@ export default function OrganizerDashboardClient() {
             setStaffingEventId(null);
             setActiveTab("listings");
           }}
+          hireGamesCount={hireGamesCount}
+          onHireGamesCountChange={setHireGamesCount}
           onRequestRef={async (refId) => Boolean(await sendOffer(refId, staffingEvent.id))}
         />
       )}
@@ -2372,7 +2425,9 @@ export default function OrganizerDashboardClient() {
         <ApplicantReviewModal
           applicant={reviewApplicant}
           onClose={() => setReviewApplicant(null)}
-          onDecide={(action) => decideApplicant(reviewApplicant.id, action)}
+          onDecide={(action, gamesCount) =>
+            decideApplicant(reviewApplicant.id, action, gamesCount ?? hireGamesCount)
+          }
         />
       )}
 

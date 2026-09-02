@@ -35,7 +35,7 @@ function statusLabel(status: string) {
     case "pending_onboarding":
       return "Waiting for bank setup";
     case "pending_tax":
-      return "Waiting for W-9 / tax ID";
+      return "Waiting for tax details in Stripe";
     case "processing":
       return "Processing";
     case "failed":
@@ -143,15 +143,11 @@ export function RefPayoutPanel() {
   return (
     <div className="space-y-4 rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm lg:p-6">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--red)]">Get paid</p>
-        <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">
-          ACH direct deposit & 1099
-        </h2>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--red)]">Payments</p>
+        <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">Get paid with Stripe</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
-          Connect your bank with Stripe Express. After an organizer pays for your game, GotRefs
-          transfers your pay and Stripe deposits it by ACH. Your GotRefs earnings show in{" "}
-          <strong>Recent payouts</strong> below. Stripe&apos;s Express dashboard is only for managing
-          your bank account and tax details on Stripe.
+          Connect your bank once with Stripe. When organizers confirm pay for your games, GotRefs deposits
+          your officiating pay by ACH.
         </p>
       </div>
 
@@ -169,7 +165,7 @@ export function RefPayoutPanel() {
       )}
 
       <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-        <p className="text-sm font-bold text-neutral-900">Bank & tax status</p>
+        <p className="text-sm font-bold text-neutral-900">Stripe payout status</p>
         {statusLoading ? (
           <p className="mt-2 text-sm text-neutral-500">Refreshing Stripe status…</p>
         ) : (
@@ -192,14 +188,6 @@ export function RefPayoutPanel() {
                 "No"
               )}
             </li>
-            <li>
-              W-9 / tax ID on file:{" "}
-              {connect?.tax_id_provided ? (
-                <span className="font-semibold text-emerald-700">Yes</span>
-              ) : (
-                "No — required before payouts"
-              )}
-            </li>
           </ul>
         )}
         {connect?.requirements_due && connect.requirements_due.length > 0 ? (
@@ -212,12 +200,11 @@ export function RefPayoutPanel() {
         {connect?.onboarding_complete && !statusLoading ? (
           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
             <p className="text-sm font-semibold text-emerald-800">
-              You&apos;re all set — you can start getting paid instantly.
+              You&apos;re all set — you can start getting paid.
             </p>
             <p className="mt-1 text-xs leading-5 text-emerald-700">
-              {connect.tax_id_provided
-                ? "When an organizer pays for your game, GotRefs transfers your pay and Stripe deposits it by ACH."
-                : "Finish adding your W-9 / tax ID above if Stripe still asks for it, then payouts can deposit by ACH as soon as organizers pay."}
+              When an organizer confirms pay for your game, GotRefs transfers your pay and Stripe deposits
+              it by ACH.
             </p>
           </div>
         ) : null}
@@ -232,7 +219,7 @@ export function RefPayoutPanel() {
             {loading
               ? "Opening Stripe…"
               : connect?.onboarding_complete
-                ? "Update bank / tax info"
+                ? "Update bank in Stripe"
                 : "Set up ACH direct deposit"}
           </button>
           {connect?.onboarding_complete ? (
@@ -242,14 +229,13 @@ export function RefPayoutPanel() {
               onClick={() => void startOnboarding("login")}
               className="rounded-full border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-900 disabled:opacity-50"
             >
-              Manage bank &amp; tax in Stripe
+              Manage bank in Stripe
             </button>
           ) : null}
         </div>
         {connect?.onboarding_complete ? (
           <p className="mt-2 text-xs text-neutral-500">
-            That button opens Stripe&apos;s Express site (bank + tax settings). To see what you&apos;ve earned on
-            GotRefs, use <span className="font-semibold">Recent payouts</span> below.
+            That opens Stripe Express for your bank settings. Recent payouts from GotRefs show below.
           </p>
         ) : null}
         {mfaRequired && (!mfaEnrolled || !mfaAal2) ? (
@@ -264,11 +250,11 @@ export function RefPayoutPanel() {
 
       <div>
         <p className="text-sm font-bold text-neutral-900">Recent payouts</p>
-        <p className="mt-1 text-xs text-neutral-500">
-          Your GotRefs earnings from games and transfers — this is the pay history for your taxes and 1099.
-        </p>
+        <p className="mt-1 text-xs text-neutral-500">Earnings transferred to your bank after organizers pay.</p>
         {payouts.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-500">No payouts yet. After organizers pay for your games, amounts will show here.</p>
+          <p className="mt-2 text-sm text-neutral-500">
+            No payouts yet. After organizers confirm pay for your games, amounts will show here.
+          </p>
         ) : (
           <ul className="mt-2 divide-y divide-neutral-100 rounded-xl border border-neutral-200">
             {payouts.map((p) => (
@@ -276,7 +262,7 @@ export function RefPayoutPanel() {
                 <div>
                   <p className="font-semibold text-neutral-900">{formatMoney(p.gross_cents)}</p>
                   <p className="text-xs text-neutral-500">
-                    {statusLabel(p.status)} · tax year {p.tax_year}
+                    {statusLabel(p.status)}
                     {p.failure_reason ? ` · ${p.failure_reason}` : ""}
                   </p>
                 </div>

@@ -26,6 +26,7 @@ export type VerificationQueueEntry = {
   docs_from_storage?: boolean;
   screening_status: string | null;
   screening_summary: string | null;
+  admin_queue_hidden_at: string | null;
 };
 
 type MemberRow = {
@@ -155,17 +156,24 @@ async function loadProfiles(admin: SupabaseClient, memberIds: string[]) {
     government_id_path?: string | null;
     verification_doc_path?: string | null;
     certification_document_path?: string | null;
+    admin_queue_hidden_at?: string | null;
   };
   const rows: ProfileRow[] = [];
   const selectFull =
-    "member_id, primary_sport, additional_sports, certification_level, government_id_path, verification_doc_path, certification_document_path";
+    "member_id, primary_sport, additional_sports, certification_level, government_id_path, verification_doc_path, certification_document_path, admin_queue_hidden_at";
   const selectBasic =
-    "member_id, primary_sport, certification_level, government_id_path, verification_doc_path, certification_document_path";
+    "member_id, primary_sport, certification_level, government_id_path, verification_doc_path, certification_document_path, admin_queue_hidden_at";
 
   for (const chunk of chunkIds(memberIds)) {
     let result = await admin.from("ref_profiles").select(selectFull).in("member_id", chunk);
-    if (result.error && missingColumn(result.error, "additional_sports")) {
-      result = await admin.from("ref_profiles").select(selectBasic).in("member_id", chunk) as typeof result;
+    if (
+      result.error &&
+      (missingColumn(result.error, "additional_sports") || missingColumn(result.error, "admin_queue_hidden_at"))
+    ) {
+      const fallbackSelect = missingColumn(result.error, "additional_sports")
+        ? "member_id, primary_sport, certification_level, government_id_path, verification_doc_path, certification_document_path"
+        : selectBasic;
+      result = await admin.from("ref_profiles").select(fallbackSelect).in("member_id", chunk) as typeof result;
     }
     if (result.error) {
       console.error("[verification-queue] ref_profiles:", result.error.message);
@@ -252,6 +260,7 @@ export async function loadVerificationReviewQueue(
       certification_document_path: profile?.certification_document_path ?? null,
       screening_status: screening?.status ?? null,
       screening_summary: screening?.summary ?? null,
+      admin_queue_hidden_at: profile?.admin_queue_hidden_at ?? null,
     };
   });
 

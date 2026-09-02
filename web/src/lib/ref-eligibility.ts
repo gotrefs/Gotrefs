@@ -13,6 +13,7 @@ export type RefProfileForEligibility = {
 
 export type RefEligibilityArgs = {
   screeningStatus?: string | null;
+  screeningSummary?: string | null;
   verificationMethod?: string | null;
   externalProofPath?: string | null;
   verificationSubmissionStatus?: string | null;
@@ -125,6 +126,11 @@ export function refOfferEligible(args: RefEligibilityArgs): boolean {
   }
 
   if (refVerificationApproved(status)) return true;
+
+  // Admin clearance on screening (approve path) unlocks apply even if submission read is stale.
+  if (args.screeningStatus === "clear" && /admin approved/i.test(args.screeningSummary || "")) {
+    return true;
+  }
 
   // Legacy path: clear screening only when there is no verification decision yet.
   if (args.screeningStatus === "clear" && (!status || status === "draft" || status === "not_submitted")) {

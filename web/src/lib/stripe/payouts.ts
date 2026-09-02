@@ -1,11 +1,17 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { emailSiteUrl } from "@/lib/email/resend";
+import { notifyInBackground, notifyPayoutMethodNeeded } from "@/lib/email/notifications";
 import {
   connectReadyForPayout,
   type ConnectAccountRow,
 } from "@/lib/stripe/connect";
 import { getStripe, taxYearForDate } from "@/lib/stripe/client";
+import {
+  resolveOfferGamesWorked,
+  resolveOfferRateCents,
+} from "@/lib/stripe/offer-checkout-amount";
 
 type PaymentRow = {
   id: string;
@@ -143,14 +149,38 @@ export async function disbursePaymentToRefs(admin: SupabaseClient, paymentId: st
 
   const { data: offers, error: offersError } = await admin
     .from("assignment_offers")
-    .select("id, ref_member_id, offered_pay, event_id")
+    .select("id, ref_member_id, offered_pay, event_id, games_count")
     .in("id", offerIds);
   if (offersError) throw new Error(offersError.message);
 
+  const offerRows = offers ?? [];
+  const refIds = [...new Set(offerRows.map((o) => o.ref_member_id))];
+  const eventIds = [...new Set(offerRows.map((o) => o.event_id).filter(Boolean))] as string[];
+
+  const [{ data: profiles }, { data: events }] = await Promise.all([
+    refIds.length
+      ? admin.from("ref_profiles").select("member_id, rate_per_game, rate_min").in("member_id", refIds)
+      : Promise.resolve({ data: [] as Array<{ member_id: string; rate_per_game: number | null; rate_min: number | null }> }),
+    eventIds.length
+      ? admin.from("scheduled_events").select("id, pay_offer").in("id", eventIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; pay_offer: number | null }> }),
+  ]);
+
+  const profileById = new Map((profiles ?? []).map((row) => [row.member_id, row]));
+  const eventById = new Map((events ?? []).map((row) => [row.id, row]));
+
   const results: Array<{ offerId: string; status: string }> = [];
 
-  for (const offer of offers ?? []) {
-    const amountCents = Math.round(Number(offer.offered_pay || 0) * 100);
+  for (const offer of offerRows) {
+    const profile = profileById.get(offer.ref_member_id);
+    const event = offer.event_id ? eventById.get(offer.event_id) : null;
+    const rateCents = resolveOfferRateCents({
+      offeredPay: offer.offered_pay,
+      refRatePerGame: profile?.rate_per_game ?? profile?.rate_min,
+      eventPayOffer: event?.pay_offer,
+    });
+    const gamesWorked = resolveOfferGamesWorked(offer);
+    const amountCents = rateCents * gamesWorked;
     if (amountCents <= 0) {
       results.push({ offerId: offer.id, status: "skipped_zero" });
       continue;
@@ -179,6 +209,22 @@ export async function disbursePaymentToRefs(admin: SupabaseClient, paymentId: st
             ? "Tax ID (W-9) required before ACH payout."
             : "Complete Stripe Connect bank onboarding to receive ACH direct deposit.",
       });
+      const holdReason =
+        ready.reason === "pending_tax"
+          ? ("pending_tax" as const)
+          : ready.reason === "missing_account"
+            ? ("missing_account" as const)
+            : ("pending_onboarding" as const);
+      notifyInBackground(() =>
+        notifyPayoutMethodNeeded({
+          admin,
+          refMemberId: offer.ref_member_id,
+          amountCents,
+          eventId: pay.event_id,
+          reason: holdReason,
+          siteUrl: emailSiteUrl(),
+        })
+      );
       results.push({ offerId: offer.id, status });
       continue;
     }

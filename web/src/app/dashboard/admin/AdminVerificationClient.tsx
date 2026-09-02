@@ -28,9 +28,14 @@ type VerificationEntry = {
   docs_from_storage?: boolean;
   screening_status: string | null;
   screening_summary: string | null;
+  admin_queue_hidden_at: string | null;
 };
 
-type QueueFilter = "pending" | "resubmitted" | "all" | "approved" | "rejected" | "incomplete";
+type QueueFilter = "pending" | "resubmitted" | "all" | "approved" | "rejected" | "incomplete" | "removed";
+
+function isHiddenFromQueue(entry: VerificationEntry) {
+  return Boolean(entry.admin_queue_hidden_at);
+}
 
 function formatWhen(value: string | null) {
   if (!value) return "—";
@@ -67,6 +72,9 @@ export default function AdminVerificationClient() {
     Partial<Record<"approve" | "reject" | "request_info", boolean>>
   >({});
   const [search, setSearch] = useState("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [queueActionId, setQueueActionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,19 +100,42 @@ export default function AdminVerificationClient() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!menuOpenId && !confirmRemoveId) return;
+    const close = () => {
+      setMenuOpenId(null);
+      setConfirmRemoveId(null);
+    };
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuOpenId, confirmRemoveId]);
+
+  const visibleEntries = useMemo(
+    () => entries.filter((entry) => !isHiddenFromQueue(entry)),
+    [entries]
+  );
+
+  const removedEntries = useMemo(
+    () => entries.filter((entry) => isHiddenFromQueue(entry)),
+    [entries]
+  );
+
   const counts = useMemo(() => {
-    const all = entries.length;
-    const pending = entries.filter((entry) => isPendingStatus(entry.status)).length;
-    const resubmitted = entries.filter((entry) => isResubmitted(entry)).length;
-    const approved = entries.filter((entry) => entry.status === "approved").length;
-    const rejected = entries.filter((entry) => entry.status === "rejected").length;
-    const incomplete = entries.filter((entry) => isIncompleteStatus(entry.status)).length;
-    return { all, pending, resubmitted, approved, rejected, incomplete };
-  }, [entries]);
+    const all = visibleEntries.length;
+    const pending = visibleEntries.filter((entry) => isPendingStatus(entry.status)).length;
+    const resubmitted = visibleEntries.filter((entry) => isResubmitted(entry)).length;
+    const approved = visibleEntries.filter((entry) => entry.status === "approved").length;
+    const rejected = visibleEntries.filter((entry) => entry.status === "rejected").length;
+    const incomplete = visibleEntries.filter((entry) => isIncompleteStatus(entry.status)).length;
+    const removed = removedEntries.length;
+    return { all, pending, resubmitted, approved, rejected, incomplete, removed };
+  }, [visibleEntries, removedEntries]);
 
   const filteredEntries = useMemo(() => {
+    const source = filter === "removed" ? removedEntries : visibleEntries;
     const needle = search.trim().toLowerCase();
-    const byFilter = entries.filter((entry) => {
+    const byFilter = source.filter((entry) => {
+      if (filter === "removed") return true;
       if (filter === "approved") return entry.status === "approved";
       if (filter === "rejected") return entry.status === "rejected";
       if (filter === "pending") return isPendingStatus(entry.status);
@@ -127,12 +158,57 @@ export default function AdminVerificationClient() {
         .toLowerCase();
       return haystack.includes(needle);
     });
-  }, [entries, filter, search]);
+  }, [visibleEntries, removedEntries, filter, search]);
 
-  const selected = useMemo(
-    () => entries.find((entry) => entry.ref_member_id === selectedId) ?? null,
-    [entries, selectedId]
-  );
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    const entry = entries.find((row) => row.ref_member_id === selectedId) ?? null;
+    if (!entry) return null;
+    if (filter !== "removed" && isHiddenFromQueue(entry)) return null;
+    return entry;
+  }, [entries, selectedId, filter]);
+
+  async function setQueueVisibility(
+    entry: VerificationEntry,
+    action: "remove" | "restore"
+  ) {
+    setQueueActionId(entry.ref_member_id);
+    setMsg(null);
+    setMenuOpenId(null);
+    setConfirmRemoveId(null);
+    try {
+      const res = await fetch(`/api/admin/verification/${entry.ref_member_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const json = (await res.json()) as { error?: string; adminQueueHiddenAt?: string | null };
+      if (!res.ok) {
+        setMsg(json.error || "Could not update the queue.");
+        return;
+      }
+      const name = entry.display_name || entry.email || "Referee";
+      const hiddenAt = action === "remove" ? json.adminQueueHiddenAt ?? new Date().toISOString() : null;
+      setEntries((current) =>
+        current.map((row) =>
+          row.ref_member_id === entry.ref_member_id
+            ? { ...row, admin_queue_hidden_at: hiddenAt }
+            : row
+        )
+      );
+      if (action === "remove") {
+        if (selectedId === entry.ref_member_id) setSelectedId(null);
+        setMsg(`Removed ${name} from the queue. Find them under Removed.`);
+      } else {
+        setMsg(`Restored ${name} to the queue.`);
+      }
+      void load();
+    } catch {
+      setMsg("Could not reach the admin verification API.");
+    } finally {
+      setQueueActionId(null);
+    }
+  }
 
   useEffect(() => {
     setAdminNotes(selected?.admin_notes ?? "");
@@ -259,6 +335,7 @@ export default function AdminVerificationClient() {
               ["incomplete", "Not submitted", counts.incomplete],
               ["approved", "Approved", counts.approved],
               ["rejected", "Rejected", counts.rejected],
+              ["removed", "Removed", counts.removed],
             ] as const
           ).map(([value, label, count]) => (
             <button
@@ -292,7 +369,13 @@ export default function AdminVerificationClient() {
           <div className="border-b border-[var(--border)] px-4 py-3">
             <h2 className="font-display text-lg font-black text-[var(--navy)]">
               Queue · {filteredEntries.length} shown
-              {entries.length !== filteredEntries.length ? ` of ${entries.length}` : ""}
+              {filter === "removed"
+                ? counts.removed !== filteredEntries.length
+                  ? ` of ${counts.removed} removed`
+                  : ""
+                : visibleEntries.length !== filteredEntries.length
+                  ? ` of ${visibleEntries.length}`
+                  : ""}
             </h2>
           </div>
           {loading ? (
@@ -304,57 +387,154 @@ export default function AdminVerificationClient() {
               {filteredEntries.map((entry) => {
                 const active = selected?.ref_member_id === entry.ref_member_id;
                 const resubmitted = isResubmitted(entry);
+                const hidden = isHiddenFromQueue(entry);
+                const menuOpen = menuOpenId === entry.ref_member_id;
+                const confirmRemove = confirmRemoveId === entry.ref_member_id;
+                const queueBusy = queueActionId === entry.ref_member_id;
+                const displayName =
+                  entry.display_name ||
+                  `${entry.first_name ?? ""} ${entry.last_name ?? ""}`.trim() ||
+                  "Unnamed referee";
                 return (
-                  <li key={entry.ref_member_id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(entry.ref_member_id)}
-                      className={`w-full px-4 py-4 text-left transition ${
+                  <li key={entry.ref_member_id} className="relative">
+                    <div
+                      className={`flex items-stretch ${
                         active
                           ? "bg-[var(--blue)]/5"
                           : resubmitted
-                            ? "bg-amber-50/80 hover:bg-amber-50"
-                            : "hover:bg-slate-50"
+                            ? "bg-amber-50/80"
+                            : hidden
+                              ? "bg-slate-50"
+                              : ""
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-bold text-[var(--navy)]">
-                            {entry.display_name ||
-                              `${entry.first_name ?? ""} ${entry.last_name ?? ""}`.trim() ||
-                              "Unnamed referee"}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--muted)]">{entry.email}</p>
-                          <p className="mt-1 text-xs text-[var(--muted)]">
-                            {entry.primary_sport} · {entry.certification_level}
-                          </p>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(entry.ref_member_id)}
+                        className={`min-w-0 flex-1 px-4 py-4 text-left transition hover:bg-slate-50/80 ${
+                          active ? "hover:bg-[var(--blue)]/5" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-bold text-[var(--navy)]">{displayName}</p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">{entry.email}</p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              {entry.primary_sport} · {entry.certification_level}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${
+                              hidden
+                                ? "bg-slate-200 text-slate-700"
+                                : resubmitted
+                                  ? "bg-amber-200 text-amber-950"
+                                  : "bg-slate-100 text-[var(--navy)]"
+                            }`}
+                          >
+                            {hidden ? "Removed" : resubmitted ? "Resubmitted" : statusLabel(entry.status)}
+                          </span>
                         </div>
-                        <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${
-                            resubmitted
-                              ? "bg-amber-200 text-amber-950"
-                              : "bg-slate-100 text-[var(--navy)]"
-                          }`}
+                        <p className="mt-2 text-xs text-[var(--muted)]">
+                          {hidden
+                            ? `Removed ${formatWhen(entry.admin_queue_hidden_at)}`
+                            : entry.resubmitted_at
+                              ? `Resubmitted ${formatWhen(entry.resubmitted_at)}`
+                              : `Submitted ${formatWhen(entry.submitted_at)}`}
+                        </p>
+                        {entry.fix_required_steps.length > 0 &&
+                          !hidden &&
+                          ["rejected", "under_review"].includes(entry.status) && (
+                            <p className="mt-1 text-xs font-semibold text-amber-700">
+                              Waiting on steps:{" "}
+                              {entry.fix_required_steps
+                                .map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.number)
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
+                          )}
+                      </button>
+                      <div className="relative flex shrink-0 items-start px-2 py-3">
+                        <button
+                          type="button"
+                          disabled={queueBusy}
+                          aria-label={`Actions for ${displayName}`}
+                          aria-expanded={menuOpen || confirmRemove}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (confirmRemove) {
+                              setConfirmRemoveId(null);
+                              setMenuOpenId(null);
+                              return;
+                            }
+                            setConfirmRemoveId(null);
+                            setMenuOpenId((current) =>
+                              current === entry.ref_member_id ? null : entry.ref_member_id
+                            );
+                          }}
+                          className="rounded-full border border-slate-200 px-3 py-2 text-sm font-black text-[var(--navy)] transition hover:border-[var(--navy)] disabled:opacity-50"
                         >
-                          {resubmitted ? "Resubmitted" : statusLabel(entry.status)}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-[var(--muted)]">
-                        {entry.resubmitted_at
-                          ? `Resubmitted ${formatWhen(entry.resubmitted_at)}`
-                          : `Submitted ${formatWhen(entry.submitted_at)}`}
-                      </p>
-                      {entry.fix_required_steps.length > 0 &&
-                        ["rejected", "under_review"].includes(entry.status) && (
-                          <p className="mt-1 text-xs font-semibold text-amber-700">
-                            Waiting on steps:{" "}
-                            {entry.fix_required_steps
-                              .map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.number)
-                              .filter(Boolean)
-                              .join(", ")}
-                          </p>
+                          ⋯
+                        </button>
+                        {(menuOpen || confirmRemove) && (
+                          <div
+                            className="absolute right-2 top-12 z-20 min-w-[11rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {confirmRemove ? (
+                              <div className="p-3">
+                                <p className="text-xs font-semibold text-[var(--navy)]">
+                                  Remove {displayName} from this list?
+                                </p>
+                                <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
+                                  Their account stays active. You can restore them from Removed.
+                                </p>
+                                <div className="mt-3 flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={queueBusy}
+                                    onClick={() => void setQueueVisibility(entry, "remove")}
+                                    className="rounded-full bg-[var(--red)] px-3 py-1.5 text-xs font-black text-white disabled:opacity-60"
+                                  >
+                                    Remove
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmRemoveId(null);
+                                      setMenuOpenId(null);
+                                    }}
+                                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-[var(--navy)]"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : hidden ? (
+                              <button
+                                type="button"
+                                disabled={queueBusy}
+                                onClick={() => void setQueueVisibility(entry, "restore")}
+                                className="block w-full px-4 py-3 text-left text-sm font-bold text-[var(--navy)] hover:bg-slate-50 disabled:opacity-60"
+                              >
+                                Restore to queue
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuOpenId(null);
+                                  setConfirmRemoveId(entry.ref_member_id);
+                                }}
+                                className="block w-full px-4 py-3 text-left text-sm font-bold text-[var(--red)] hover:bg-red-50"
+                              >
+                                Remove…
+                              </button>
+                            )}
+                          </div>
                         )}
-                    </button>
+                      </div>
+                    </div>
                   </li>
                 );
               })}
@@ -373,6 +553,21 @@ export default function AdminVerificationClient() {
                     "Unnamed referee"}
                 </h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">{selected.email}</p>
+                {isHiddenFromQueue(selected) && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm text-[var(--muted)]">
+                      Removed from queue {formatWhen(selected.admin_queue_hidden_at)}.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={queueActionId === selected.ref_member_id}
+                      onClick={() => void setQueueVisibility(selected, "restore")}
+                      className="rounded-full border border-[var(--navy)] px-4 py-2 text-sm font-bold text-[var(--navy)] disabled:opacity-60"
+                    >
+                      Restore to queue
+                    </button>
+                  </div>
+                )}
               </div>
 
               <dl className="mt-5 grid gap-3 text-sm">
