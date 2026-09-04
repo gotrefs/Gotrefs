@@ -198,18 +198,18 @@ export async function notifyApplicationDecision(opts: {
       : "";
     return sendEmail({
       to: ref.email,
-      subject: `${BRAND_NAME}: You've been confirmed for ${event.title}`,
+      subject: `${BRAND_NAME}: You're approved for ${event.title}`,
       html: emailLayout({
-        title: "You're confirmed",
+        title: "You're approved",
         bodyHtml: `
           <p>Hi ${escapeHtml(ref.displayName)},</p>
-          <p>You've been confirmed for <strong>${escapeHtml(event.title)}</strong>.</p>
+          <p>Great news — you've been <strong>approved</strong> for <strong>${escapeHtml(event.title)}</strong>.</p>
           <ul>
             <li><strong>When:</strong> ${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
             <li><strong>Address:</strong> ${escapeHtml(event.address)}</li>
           </ul>
           ${notesBlock}
-          <p>These details are also saved under Upcoming games in your dashboard. Organizer names, emails, and phone numbers are never shared.</p>
+          <p>These details are also saved under Upcoming / Trips in your dashboard. Organizer names, emails, and phone numbers are never shared.</p>
         `,
         ctaLabel: "View your approval",
         ctaUrl: decisionUrl,

@@ -9,6 +9,10 @@ import { emailSiteUrl } from "@/lib/email/resend";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
+import {
+  chargeOrganizerForOffer,
+  OrganizerChargeError,
+} from "@/lib/stripe/charge-organizer-for-offer";
 
 type Action = "accept" | "decline" | "cancel";
 
@@ -149,7 +153,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    // Payment happens on organizer confirm-pay (ref pay + fee + deposit).
   }
 
   if (action === "decline" && !isRef) {
@@ -172,8 +175,14 @@ export async function PATCH(
   }
 
   if (action === "accept" && isRef) {
+    let admin;
     try {
-      const admin = createServiceClient();
+      admin = createServiceClient();
+    } catch {
+      return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+    }
+
+    try {
       await admin
         .from("event_signup_requests")
         .update({ status: "accepted" })
@@ -181,6 +190,22 @@ export async function PATCH(
         .eq("ref_member_id", user.id);
     } catch {
       // Non-fatal if application row cannot be updated.
+    }
+
+    // Charge after accept so the offer is billable; roll back if the card fails.
+    try {
+      await chargeOrganizerForOffer(admin, { offerId: offer.id });
+    } catch (err) {
+      await admin.from("assignment_offers").update({ status: "pending" }).eq("id", offer.id);
+      await admin.from("bookings").delete().eq("offer_id", offer.id);
+      if (err instanceof OrganizerChargeError) {
+        return NextResponse.json(
+          { error: err.message, code: err.code },
+          { status: err.status }
+        );
+      }
+      const message = err instanceof Error ? err.message : "Could not charge the organizer.";
+      return NextResponse.json({ error: message }, { status: 402 });
     }
   }
 

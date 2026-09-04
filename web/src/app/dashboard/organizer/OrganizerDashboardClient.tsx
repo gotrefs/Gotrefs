@@ -10,6 +10,7 @@ import {
 } from "@/components/marketplace/OrganizerEventComposer";
 import { OrganizerPaymentMethodPanel } from "@/components/payments/OrganizerPaymentMethodPanel";
 import { OrganizerConfirmPayPanel } from "@/components/payments/OrganizerConfirmPayPanel";
+import { OrganizerCardRequiredModal } from "@/components/payments/OrganizerCardRequiredModal";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventMatchingView } from "@/components/organizer/EventMatchingView";
 import {
@@ -222,6 +223,28 @@ function formatCents(cents: number) {
     style: "currency",
     currency: "USD",
   }).format(cents / 100);
+}
+
+function toApplicantReview(row: ApplicantRow): ApplicantReviewData {
+  return {
+    id: row.id,
+    eventId: row.eventId,
+    refMemberId: row.refMemberId,
+    gotrefsId: row.gotrefsId,
+    displayName: null,
+    primarySport: row.primarySport,
+    additionalSports: row.additionalSports,
+    certificationLevel: row.certificationLevel,
+    avatarUrl: row.avatarUrl,
+    eventTitle: row.eventTitle,
+    eventPlace: row.eventPlace,
+    eventWhen: row.eventWhen,
+    eventPayLabel: row.eventPayLabel,
+    refRateLabel: row.refRateLabel,
+    ratingAverage: row.ratingAverage,
+    ratingCount: row.ratingCount,
+    reviews: row.reviews,
+  };
 }
 
 export default function OrganizerDashboardClient() {
@@ -483,25 +506,7 @@ export default function OrganizerDashboardClient() {
       if (reviewApplicant?.id === requestId) return;
       const match = signupRequests.find((row) => row.id === requestId);
       if (match) {
-        setReviewApplicant({
-          id: match.id,
-          eventId: match.eventId,
-          refMemberId: match.refMemberId,
-          gotrefsId: match.gotrefsId,
-          displayName: null,
-          primarySport: match.primarySport,
-          additionalSports: match.additionalSports,
-          certificationLevel: match.certificationLevel,
-          avatarUrl: match.avatarUrl,
-          eventTitle: match.eventTitle,
-          eventPlace: match.eventPlace,
-          eventWhen: match.eventWhen,
-          eventPayLabel: match.eventPayLabel,
-          refRateLabel: match.refRateLabel,
-          ratingAverage: match.ratingAverage,
-          ratingCount: match.ratingCount,
-          reviews: match.reviews,
-        });
+        setReviewApplicant(toApplicantReview(match));
       }
       return;
     }
@@ -510,25 +515,7 @@ export default function OrganizerDashboardClient() {
     const seen = window.localStorage.getItem(seenKey) || "";
     const next = signupRequests.find((row) => !seen.split(",").includes(row.id));
     if (next) {
-      setReviewApplicant({
-        id: next.id,
-        eventId: next.eventId,
-        refMemberId: next.refMemberId,
-        gotrefsId: next.gotrefsId,
-        displayName: null,
-        primarySport: next.primarySport,
-        additionalSports: next.additionalSports,
-        certificationLevel: next.certificationLevel,
-        avatarUrl: next.avatarUrl,
-        eventTitle: next.eventTitle,
-        eventPlace: next.eventPlace,
-        eventWhen: next.eventWhen,
-        eventPayLabel: next.eventPayLabel,
-        refRateLabel: next.refRateLabel,
-        ratingAverage: next.ratingAverage,
-        ratingCount: next.ratingCount,
-        reviews: next.reviews,
-      });
+      setReviewApplicant(toApplicantReview(next));
       window.localStorage.setItem(seenKey, `${seen},${next.id}`.replace(/^,/, "").slice(-800));
     }
   }, [loading, signupRequests, searchParams, accountEmail, reviewApplicant]);
@@ -555,7 +542,7 @@ export default function OrganizerDashboardClient() {
       }
       setMsg(
         action === "accept"
-          ? "Ref hired. Your saved payment method was charged (rate × games + fee)."
+          ? "Ref approved and charged (ref pay + fee + deposit). Funds are held until the game ends, then paid to the ref."
           : action === "withdraw"
             ? "Request removed. The ref was notified and can request again if the game is still open."
             : "Request denied. The ref was emailed and won’t see this game anymore."
@@ -564,14 +551,12 @@ export default function OrganizerDashboardClient() {
         action === "accept"
           ? signupRequests.find((row) => row.id === applicantId)?.eventId ?? null
           : null;
-      setReviewApplicant(null);
-      await load();
       if (acceptedEventId) {
         setConfirmPayEventId(acceptedEventId);
-        setActiveTab("payments");
-        setAttendingFocusOfferId(null);
-        setAttendingEventId(acceptedEventId);
       }
+      // Keep the review modal open so it can advance to the next applicant.
+      setSignupRequests((prev) => prev.filter((row) => row.id !== applicantId));
+      void load();
       return true;
     } catch {
       const detail = "Could not reach the server.";
@@ -1200,6 +1185,15 @@ export default function OrganizerDashboardClient() {
           applyWizardDraft(draft);
           setMsg("Your event is posted. Staff it from Listings.");
           void load();
+        }}
+        onSetupStripePayments={() => {
+          setWizardOpen(false);
+          setPayoutWizardOpen(false);
+          setActiveTab("payments");
+          setMsg("Save your card or bank here. You’ll be charged when you approve a ref.");
+          if (forceWizard) {
+            window.history.replaceState({}, "", "/dashboard/organizer?tab=payments");
+          }
         }}
       />
     );
@@ -2218,27 +2212,7 @@ export default function OrganizerDashboardClient() {
                 ].filter(Boolean) as string[]}
                 primaryLabel="Review & decide"
                 secondaryLabel="Deny"
-                onPrimary={() =>
-                  setReviewApplicant({
-                    id: sr.id,
-                    eventId: sr.eventId,
-                    refMemberId: sr.refMemberId,
-                    gotrefsId: sr.gotrefsId,
-                    displayName: null,
-                    primarySport: sr.primarySport,
-                    additionalSports: sr.additionalSports,
-                    certificationLevel: sr.certificationLevel,
-                    avatarUrl: sr.avatarUrl,
-                    eventTitle: sr.eventTitle,
-                    eventPlace: sr.eventPlace,
-                    eventWhen: sr.eventWhen,
-                    eventPayLabel: sr.eventPayLabel,
-                    refRateLabel: sr.refRateLabel,
-                    ratingAverage: sr.ratingAverage,
-                    ratingCount: sr.ratingCount,
-                    reviews: sr.reviews,
-                  })
-                }
+                onPrimary={() => setReviewApplicant(toApplicantReview(sr))}
                 onSecondary={() => void declineApplicant(sr)}
               />
             ))}
@@ -2293,27 +2267,7 @@ export default function OrganizerDashboardClient() {
               <button
                 key={sr.id}
                 type="button"
-                onClick={() =>
-                  setReviewApplicant({
-                    id: sr.id,
-                    eventId: sr.eventId,
-                    refMemberId: sr.refMemberId,
-                    gotrefsId: sr.gotrefsId,
-                    displayName: null,
-                    primarySport: sr.primarySport,
-                    additionalSports: sr.additionalSports,
-                    certificationLevel: sr.certificationLevel,
-                    avatarUrl: sr.avatarUrl,
-                    eventTitle: sr.eventTitle,
-                    eventPlace: sr.eventPlace,
-                    eventWhen: sr.eventWhen,
-                    eventPayLabel: sr.eventPayLabel,
-                    refRateLabel: sr.refRateLabel,
-                    ratingAverage: sr.ratingAverage,
-                    ratingCount: sr.ratingCount,
-                    reviews: sr.reviews,
-                  })
-                }
+                onClick={() => setReviewApplicant(toApplicantReview(sr))}
                 className={`flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left transition hover:-translate-y-0.5 ${marketplaceCardShadow}`}
               >
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
@@ -2423,13 +2377,20 @@ export default function OrganizerDashboardClient() {
 
       {reviewApplicant && (
         <ApplicantReviewModal
-          applicant={reviewApplicant}
+          applicants={
+            signupRequests.some((row) => row.id === reviewApplicant.id)
+              ? signupRequests.map(toApplicantReview)
+              : [reviewApplicant, ...signupRequests.map(toApplicantReview)]
+          }
+          initialId={reviewApplicant.id}
           onClose={() => setReviewApplicant(null)}
-          onDecide={(action, gamesCount) =>
-            decideApplicant(reviewApplicant.id, action, gamesCount ?? hireGamesCount)
+          onDecide={(applicantId, action, gamesCount) =>
+            decideApplicant(applicantId, action, gamesCount ?? hireGamesCount)
           }
         />
       )}
+
+      <OrganizerCardRequiredModal />
 
       {attendingEventId &&
         (() => {

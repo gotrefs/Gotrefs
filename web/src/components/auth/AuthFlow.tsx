@@ -400,7 +400,7 @@ export function AuthFlow() {
       const destination =
         json.redirect ||
         (next && next !== "/dashboard" ? next : null) ||
-        (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
+        (json.role === "organizer" ? "/dashboard/organizer?tab=payments" : "/dashboard/referee");
       window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
@@ -785,7 +785,10 @@ export function AuthFlow() {
       }
 
       const next = searchParams.get("next");
-      const destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
+      let destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
+      if (role === "organizer" && destination.startsWith("/dashboard/organizer") && !destination.includes("tab=")) {
+        destination = `/dashboard/organizer?tab=payments`;
+      }
       if (docsUploaded || role !== "ref") {
         await clearRefSignupDraft();
         try {
@@ -1378,8 +1381,9 @@ export function AuthFlow() {
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
-                  After you create your account, add a payment method under Payments, then confirm pay when refs
-                  accept. Refs receive ACH direct deposit through Stripe Connect.
+                  After you create your account you’ll land on <strong>Payments</strong> to save a card or
+                  bank with Stripe. When you approve a ref, GotRefs charges that method (ref pay + 20% fee +
+                  refundable deposit). Funds are held until the game ends, then paid to the ref by ACH.
                 </p>
               </div>
             )}

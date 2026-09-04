@@ -177,11 +177,11 @@ export function OrganizerConfirmPayPanel({
   return (
     <section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm sm:p-8">
       <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Confirm payment</p>
-      <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Pay refs + refundable deposit</h2>
+      <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Unpaid accepted refs</h2>
       <p className="mt-2 text-sm text-neutral-600">
-        After a ref accepts, confirm here. You pay referee fees, a {PLATFORM_FEE_PERCENT_LABEL} GotRefs
-        fee on that pay only, and a refundable deposit equal to one extra game per hired ref. Unused
-        deposit is returned after the event.
+        Normally you’re charged when you approve a ref. Use this only if a charge was skipped. Total includes
+        referee pay, a {PLATFORM_FEE_PERCENT_LABEL} fee on that pay only, and a refundable deposit (1 game ×
+        each ref). Unused deposit is returned after the event.
       </p>
 
       {events.length > 0 ? (

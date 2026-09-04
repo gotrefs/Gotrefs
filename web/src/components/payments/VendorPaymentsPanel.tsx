@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * @deprecated Vendor payments are not shown on the organizer dashboard.
+ * Kept for possible future use; do not re-mount without product approval.
+ */
 import { useCallback, useEffect, useState } from "react";
 
 type Vendor = {

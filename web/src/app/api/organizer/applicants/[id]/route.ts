@@ -11,6 +11,10 @@ import { isOrganizerMember } from "@/lib/organizer-access";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { normalizeGamesCount } from "@/lib/stripe/offer-checkout-amount";
+import {
+  chargeOrganizerForOffer,
+  OrganizerChargeError,
+} from "@/lib/stripe/charge-organizer-for-offer";
 
 type Body = { action?: "accept" | "decline" | "withdraw"; gamesCount?: number | null };
 
@@ -287,7 +291,20 @@ export async function PATCH(
     }
   }
 
-  // Payment happens on organizer confirm-pay (ref pay + fee + deposit).
+  // Charge organizer now (ref pay + fee + deposit). Funds stay on GotRefs until the event ends.
+  if (offerId) {
+    try {
+      await chargeOrganizerForOffer(admin, { offerId });
+    } catch (err) {
+      await admin.from("assignment_offers").update({ status: "pending" }).eq("id", offerId);
+      await admin.from("bookings").delete().eq("offer_id", offerId);
+      if (err instanceof OrganizerChargeError) {
+        return NextResponse.json({ error: err.message, code: err.code }, { status: err.status });
+      }
+      const message = err instanceof Error ? err.message : "Could not charge your payment method.";
+      return NextResponse.json({ error: message }, { status: 402 });
+    }
+  }
 
   // Ensure a booking exists even if the DB trigger only runs on UPDATE and was skipped.
   if (offerId) {

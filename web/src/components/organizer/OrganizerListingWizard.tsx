@@ -332,6 +332,7 @@ export function OrganizerListingWizard({
   onCreateEvent,
   onSaveAndExit,
   onComplete,
+  onSetupStripePayments,
 }: {
   organizationName?: string;
   saving?: boolean;
@@ -345,6 +346,8 @@ export function OrganizerListingWizard({
   onCreateEvent?: (draft: OrganizerWizardDraft) => Promise<boolean>;
   onSaveAndExit?: (draft: OrganizerWizardDraft) => void;
   onComplete: (draft: OrganizerWizardDraft) => void;
+  /** Open real Stripe payment-method setup (Payments tab) instead of fake bank steps. */
+  onSetupStripePayments?: () => void;
 }) {
   const [screen, setScreen] = useState<WizardScreen>(payoutOnly ? "done" : "intro1");
   const [country] = useState("United States");
@@ -1357,13 +1360,16 @@ export function OrganizerListingWizard({
             </p>
             <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
             <p className="mt-2 text-center text-sm text-neutral-500">
-              Save a card or bank with Stripe. After refs accept, you’ll confirm payment: referee pay, a
-              20% GotRefs fee on that pay only, and a refundable deposit (1 extra game per hired ref).
-              Unused deposit is returned after the event.
+              Save a card or bank under Payments. When you approve a ref, GotRefs charges that method (ref
+              pay + 20% fee + refundable deposit). Unused deposit is returned after the event.
             </p>
             <button
               type="button"
               onClick={() => {
+                if (onSetupStripePayments) {
+                  onSetupStripePayments();
+                  return;
+                }
                 setPayoutMethod("bank");
                 void finishPayout(false, {
                   method: "bank",

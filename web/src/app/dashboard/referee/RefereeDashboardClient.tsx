@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AssignorRosterPanel, type AssignorRosterEntry } from "@/components/AssignorRosterPanel";
 import { RefPayoutPanel } from "@/components/payments/RefPayoutPanel";
+import { RefPayoutRequiredModal } from "@/components/payments/RefPayoutRequiredModal";
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
@@ -1283,6 +1284,7 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
+      <RefPayoutRequiredModal />
       {applicationDecisionNotice && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div

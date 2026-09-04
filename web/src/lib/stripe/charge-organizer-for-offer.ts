@@ -193,7 +193,13 @@ export async function previewConfirmEventPayment(
  */
 export async function confirmEventPayment(
   admin: SupabaseClient,
-  args: { eventId: string; organizerMemberId: string; offerIds?: string[] }
+  args: {
+    eventId: string;
+    organizerMemberId: string;
+    offerIds?: string[];
+    /** When false (default), money is held until the event ends; cron disburses to refs. */
+    disburseNow?: boolean;
+  }
 ): Promise<{ paymentId: string; breakdown: ConfirmPayBreakdown; alreadyPaid: boolean }> {
   const { event, lines } = await loadUnpaidAcceptedOfferLines(admin, {
     eventId: args.eventId,
@@ -251,6 +257,7 @@ export async function confirmEventPayment(
       metadata: {
         ...metadata,
         depositCents: breakdown.depositCents,
+        payoutHold: args.disburseNow ? "immediate" : "until_event_end",
       },
     })
     .select("id")
@@ -358,10 +365,12 @@ export async function confirmEventPayment(
         .eq("id", deposit.id);
     }
 
-    try {
-      await disbursePaymentToRefs(admin, payment.id);
-    } catch (err) {
-      console.error("[confirm-event-payment] disburse failed:", err);
+    if (args.disburseNow) {
+      try {
+        await disbursePaymentToRefs(admin, payment.id);
+      } catch (err) {
+        console.error("[confirm-event-payment] disburse failed:", err);
+      }
     }
 
     return { paymentId: payment.id, breakdown, alreadyPaid: false };

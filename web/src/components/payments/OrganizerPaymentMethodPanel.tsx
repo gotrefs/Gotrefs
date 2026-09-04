@@ -12,7 +12,7 @@ type PaymentMethodInfo = {
   updatedAt?: string | null;
 };
 
-type Stage = "intro" | "setup" | "ready" | "other";
+type Stage = "intro" | "setup" | "ready";
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -121,6 +121,13 @@ export function OrganizerPaymentMethodPanel() {
     void load();
   }, [load]);
 
+  // Skip intro screens — open the card form as soon as Payments loads without a method.
+  useEffect(() => {
+    if (loading || ready || clientSecret || starting || stage === "setup") return;
+    void continueWithStripe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when status settles not ready
+  }, [loading, ready]);
+
   async function continueWithStripe() {
     setMsg(null);
     setError(null);
@@ -178,9 +185,9 @@ export function OrganizerPaymentMethodPanel() {
           </button>
         </div>
         <p className="mt-3 text-sm text-neutral-500">
-          After a referee accepts, confirm pay under Payments. GotRefs charges referee pay, a 20% fee on
-          that pay only, and a refundable deposit (1 extra game per hired ref). Unused deposit is returned
-          after the event.
+          When you approve a ref (or they accept your invite), GotRefs charges this method: referee pay, a
+          20% fee on that pay only, and a refundable deposit (1 extra game per hired ref). Money is held
+          until the game ends, then paid to the ref by ACH. Unused deposit is returned after the event.
         </p>
         {clientSecret ? (
           <div className="mt-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
@@ -212,8 +219,7 @@ export function OrganizerPaymentMethodPanel() {
         <p className="text-sm text-neutral-500">Required to pay officials</p>
         <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Add card or bank</h2>
         <p className="mt-2 text-sm text-neutral-500">
-          Save a payment method with Stripe. You’ll confirm pay after refs accept (ref pay + 20% fee +
-          refundable deposit).
+          Save a card once. GotRefs charges it when you approve a ref.
         </p>
         {error ? <p className="mt-3 text-sm font-semibold text-red-600">{error}</p> : null}
         <div className="mt-5">
@@ -241,62 +247,23 @@ export function OrganizerPaymentMethodPanel() {
     );
   }
 
-  if (stage === "other") {
-    return (
-      <section className="mx-auto w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
-        <p className="text-sm text-neutral-500">Other funding preferences</p>
-        <h2 className="mt-4 text-2xl font-semibold text-neutral-900">Stripe is still required</h2>
-        <p className="mt-2 text-sm text-neutral-500">
-          Live hiring on GotRefs runs through Stripe (card or ACH). Preferences like Fast Pay vs bank
-          are chosen inside Stripe when you continue setup.
-        </p>
-        <button
-          type="button"
-          onClick={() => void continueWithStripe()}
-          disabled={starting}
-          className="mt-6 w-full rounded-lg bg-neutral-900 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
-        >
-          {starting ? "Opening Stripe…" : "Continue with Stripe"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setStage("intro")}
-          className="mt-3 w-full rounded-lg border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
-        >
-          Back
-        </button>
-      </section>
-    );
-  }
-
   return (
-    <section className="mx-auto w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
+    <section className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
       <p className="text-sm text-neutral-500">Required to pay officials</p>
-      <p className="mt-6 text-5xl" aria-hidden>
-        💳
-      </p>
-      <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
-      <p className="mt-2 text-center text-sm text-neutral-500">
-        Save a card or bank with Stripe. After refs accept, you’ll confirm payment: referee pay, a 20%
-        GotRefs fee on that pay only, and a refundable deposit equal to one extra game per hired ref.
-        Unused deposit is returned after the event.
+      <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Save a card to pay refs</h2>
+      <p className="mt-2 text-sm text-neutral-500">
+        One-time setup. You’ll be charged when you approve a referee.
       </p>
       {error ? <p className="mt-4 text-sm font-semibold text-red-600">{error}</p> : null}
       {msg ? <p className="mt-4 text-sm font-semibold text-emerald-700">{msg}</p> : null}
+      {starting ? <p className="mt-4 text-sm text-neutral-500">Opening secure card form…</p> : null}
       <button
         type="button"
         onClick={() => void continueWithStripe()}
         disabled={starting}
         className="mt-6 w-full rounded-lg bg-neutral-900 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
       >
-        {starting ? "Opening Stripe…" : "Continue with Stripe"}
-      </button>
-      <button
-        type="button"
-        onClick={() => setStage("other")}
-        className="mt-3 w-full rounded-lg border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
-      >
-        Other funding preferences
+        {starting ? "Opening…" : "Add card"}
       </button>
     </section>
   );
