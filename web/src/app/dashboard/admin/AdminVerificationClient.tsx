@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminTax1099Panel } from "@/components/admin/AdminTax1099Panel";
 import { AdminPendingDepositsPanel } from "@/components/admin/AdminPendingDepositsPanel";
+import { AdminPaymentsOpsPanel } from "@/components/admin/AdminPaymentsOpsPanel";
 import {
   REF_VERIFICATION_STEPS,
   type RefVerificationStepKey,
@@ -744,6 +745,7 @@ export default function AdminVerificationClient() {
         </section>
       </div>
 
+      <AdminPaymentsOpsPanel />
       <AdminPendingDepositsPanel />
       <AdminTax1099Panel />
     </div>

@@ -35,7 +35,9 @@ export function AdminPendingDepositsPanel() {
   const [rows, setRows] = useState<DepositRow[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busyEventId, setBusyEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +67,46 @@ export function AdminPendingDepositsPanel() {
     void load();
   }, [load]);
 
+  async function refundDeposit(row: DepositRow) {
+    const label = formatCents(row.refundableCents);
+    const ok = window.confirm(
+      `Refund ${label} deposit to ${row.organizerName} for “${row.eventTitle}”?${
+        row.eventEnded ? "" : "\n\nEvent has not ended yet — this is an admin override."
+      }`
+    );
+    if (!ok) return;
+
+    setBusyEventId(row.eventId);
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/deposits/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: row.eventId }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        refundedCents?: number;
+        alreadyRefunded?: boolean;
+      };
+      if (!res.ok) {
+        setError(json.error || "Deposit refund failed.");
+        return;
+      }
+      setMsg(
+        json.alreadyRefunded
+          ? "Deposit already refunded."
+          : `Refunded ${formatCents(json.refundedCents || 0)} deposit.`
+      );
+      await load();
+    } catch {
+      setError("Deposit refund failed.");
+    } finally {
+      setBusyEventId(null);
+    }
+  }
+
   const readyCount = rows.filter((r) => r.refundReady).length;
 
   return (
@@ -75,7 +117,7 @@ export function AdminPendingDepositsPanel() {
           <h2 className="mt-1 text-2xl font-black text-[var(--navy)]">Pending deposit refunds</h2>
           <p className="mt-2 max-w-2xl text-sm text-neutral-600">
             {note ||
-              "Organizers owed unused deposit back. Auto-refunds run daily after the event ends; this list is your ops view."}
+              "Organizers owed unused deposit back. Auto-refunds run daily after the event ends; use Refund to force a return now."}
           </p>
           {!loading && rows.length > 0 ? (
             <p className="mt-2 text-sm font-semibold text-neutral-800">
@@ -94,6 +136,7 @@ export function AdminPendingDepositsPanel() {
 
       {loading ? <p className="mt-4 text-sm text-neutral-500">Loading…</p> : null}
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      {msg ? <p className="mt-4 text-sm font-semibold text-emerald-700">{msg}</p> : null}
 
       {!loading && rows.length === 0 ? (
         <p className="mt-4 text-sm text-neutral-500">No held deposit balances right now.</p>
@@ -109,6 +152,7 @@ export function AdminPendingDepositsPanel() {
                 <th className="px-2 py-2">Refundable</th>
                 <th className="px-2 py-2">Status</th>
                 <th className="px-2 py-2">Event ends</th>
+                <th className="px-2 py-2">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +185,18 @@ export function AdminPendingDepositsPanel() {
                     </p>
                   </td>
                   <td className="px-2 py-2 text-neutral-700">{formatWhen(r.endsAt)}</td>
+                  <td className="px-2 py-2">
+                    <button
+                      type="button"
+                      disabled={busyEventId === r.eventId || r.refundableCents <= 0}
+                      onClick={() => void refundDeposit(r)}
+                      className="rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {busyEventId === r.eventId
+                        ? "Refunding…"
+                        : `Refund ${formatCents(r.refundableCents)}`}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

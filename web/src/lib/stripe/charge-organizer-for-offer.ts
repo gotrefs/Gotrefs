@@ -576,3 +576,163 @@ export async function refundEventDeposit(
 
   return { refundedCents: refunded, alreadyRefunded: false };
 }
+
+/**
+ * Full Stripe refund of an organizer event_refs charge + ledger sync.
+ * Blocks by default if Connect transfers already went out (unless allowTransferred).
+ */
+export async function refundOrganizerPayment(
+  admin: SupabaseClient,
+  args: { paymentId: string; allowTransferred?: boolean }
+): Promise<{
+  refundedCents: number;
+  alreadyRefunded: boolean;
+  transferredPayoutCount: number;
+}> {
+  const { data: payment, error } = await admin
+    .from("payments")
+    .select(
+      "id, status, purpose, event_id, amount_total_cents, stripe_payment_intent_id, accepted_offer_ids, metadata"
+    )
+    .eq("id", args.paymentId)
+    .maybeSingle();
+
+  if (error || !payment) {
+    throw new OrganizerChargeError("Payment not found.", 404, "payment_not_found");
+  }
+  if (payment.purpose !== "event_refs") {
+    throw new OrganizerChargeError("Only event ref payments can be refunded here.", 400, "wrong_purpose");
+  }
+  if (payment.status === "refunded" || payment.status === "canceled") {
+    return { refundedCents: 0, alreadyRefunded: true, transferredPayoutCount: 0 };
+  }
+  if (payment.status !== "paid" && payment.status !== "processing") {
+    throw new OrganizerChargeError(
+      `Payment status is ${payment.status}; only paid charges can be refunded.`,
+      400,
+      "not_refundable"
+    );
+  }
+  if (!payment.stripe_payment_intent_id) {
+    throw new OrganizerChargeError("Payment has no Stripe payment intent.", 400, "missing_pi");
+  }
+
+  const { data: payouts } = await admin
+    .from("payouts")
+    .select("id, status, stripe_transfer_id")
+    .eq("payment_id", payment.id);
+
+  const transferred = (payouts ?? []).filter((p) => Boolean(p.stripe_transfer_id) || p.status === "paid");
+  if (transferred.length > 0 && !args.allowTransferred) {
+    throw new OrganizerChargeError(
+      `Refs already have ${transferred.length} Connect transfer(s). Reverse those in Stripe first, or retry with allowTransferred.`,
+      409,
+      "has_transfers"
+    );
+  }
+
+  const stripe = getStripe();
+  const intent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent_id, {
+    expand: ["latest_charge"],
+  });
+  const latestCharge = intent.latest_charge;
+  const amountReceived = intent.amount_received ?? intent.amount ?? payment.amount_total_cents ?? 0;
+  const amountRefunded =
+    latestCharge && typeof latestCharge === "object" && "amount_refunded" in latestCharge
+      ? Number(latestCharge.amount_refunded) || 0
+      : 0;
+  const refundable = Math.max(0, amountReceived - amountRefunded);
+
+  let refundedCents = 0;
+  if (refundable > 0) {
+    const refund = await stripe.refunds.create({
+      payment_intent: payment.stripe_payment_intent_id,
+      amount: refundable,
+      reason: "requested_by_customer",
+      metadata: {
+        purpose: "admin_event_payment_refund",
+        paymentId: payment.id,
+        eventId: payment.event_id || "",
+      },
+    });
+    refundedCents = refund.amount ?? refundable;
+  }
+
+  const now = new Date().toISOString();
+  const meta = (payment.metadata && typeof payment.metadata === "object"
+    ? (payment.metadata as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+
+  await admin
+    .from("payments")
+    .update({
+      status: "refunded",
+      metadata: {
+        ...meta,
+        adminRefundedAt: now,
+        adminRefundedCents: refundedCents,
+      },
+      updated_at: now,
+    })
+    .eq("id", payment.id);
+
+  const offerIds = (payment.accepted_offer_ids as string[] | null) ?? [];
+  if (offerIds.length > 0) {
+    await admin.from("assignment_offers").update({ payment_status: "unpaid" }).in("id", offerIds);
+    await admin.from("bookings").update({ payment_status: "unpaid" }).in("offer_id", offerIds);
+  }
+
+  for (const payout of payouts ?? []) {
+    if (payout.stripe_transfer_id || payout.status === "paid") continue;
+    await admin
+      .from("payouts")
+      .update({
+        status: "failed",
+        failure_reason: "Organizer payment refunded before Connect transfer.",
+        updated_at: now,
+      })
+      .eq("id", payout.id);
+  }
+
+  if (payment.event_id) {
+    const deposit = await getEventDeposit(admin, payment.event_id);
+    if (deposit) {
+      const collections = parseCollections(deposit.collections);
+      const removed = collections.filter((c) => c.paymentId === payment.id);
+      if (removed.length > 0) {
+        const removedCents = removed.reduce((sum, c) => sum + c.amountCents, 0);
+        const nextCollections = collections.filter((c) => c.paymentId !== payment.id);
+        const nextCollected = Math.max(0, deposit.collected_cents - removedCents);
+        const nextRequired = Math.max(0, deposit.required_cents - removedCents);
+        const stillHeld = depositRefundableCents({
+          collected_cents: nextCollected,
+          applied_cents: deposit.applied_cents,
+          refunded_cents: deposit.refunded_cents,
+        });
+        await admin
+          .from("event_deposits")
+          .update({
+            collections: nextCollections,
+            collected_cents: nextCollected,
+            required_cents: nextRequired,
+            status:
+              nextCollected <= 0
+                ? "pending"
+                : stillHeld > 0
+                  ? deposit.applied_cents > 0
+                    ? "partially_used"
+                    : "held"
+                  : "refunded",
+            updated_at: now,
+          })
+          .eq("id", deposit.id);
+      }
+    }
+  }
+
+  return {
+    refundedCents,
+    alreadyRefunded: refundable <= 0,
+    transferredPayoutCount: transferred.length,
+  };
+}
