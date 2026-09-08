@@ -103,9 +103,14 @@ async function loadUnpaidAcceptedOfferLines(
     throw new OrganizerChargeError("Event not found.", 404, "event_not_found");
   }
 
+  const selectWithGames =
+    "id, ref_member_id, event_id, offered_pay, games_count, payment_status, status";
+  const selectWithoutGames =
+    "id, ref_member_id, event_id, offered_pay, payment_status, status";
+
   let query = admin
     .from("assignment_offers")
-    .select("id, ref_member_id, event_id, offered_pay, games_count, payment_status, status")
+    .select(selectWithGames)
     .eq("event_id", args.eventId)
     .eq("status", "accepted")
     .eq("payment_status", "unpaid");
@@ -114,7 +119,21 @@ async function loadUnpaidAcceptedOfferLines(
     query = query.in("id", args.offerIds);
   }
 
-  const { data: offers, error: offersError } = await query;
+  let { data: offers, error: offersError } = await query;
+  if (offersError && /games_count/i.test(offersError.message)) {
+    let retry = admin
+      .from("assignment_offers")
+      .select(selectWithoutGames)
+      .eq("event_id", args.eventId)
+      .eq("status", "accepted")
+      .eq("payment_status", "unpaid");
+    if (args.offerIds?.length) {
+      retry = retry.in("id", args.offerIds);
+    }
+    const fallback = await retry;
+    offers = fallback.data;
+    offersError = fallback.error;
+  }
   if (offersError) {
     throw new OrganizerChargeError(offersError.message, 500, "offers_load_failed");
   }
