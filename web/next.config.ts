@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// Production app config (Vercel root directory: web)
+// Production app config (Vercel root directory: web). Redeploy trigger.
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
