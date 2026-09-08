@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
 
   if (!termsAccepted) {
     return NextResponse.json(
-      { error: "You must accept the applicable GotRefs terms and policies before creating an account." },
+      { error: "You must accept the applicable GotREFS terms and policies before creating an account." },
       { status: 400 }
     );
   }
@@ -326,9 +326,9 @@ export async function POST(request: NextRequest) {
           {
             error: allProviders.includes("google")
               ? isOAuthProviderEnabled("google")
-                ? "That email already has a GotRefs account connected to Google. Use Continue with Google."
-                : "That email already has a GotRefs account connected to Google. Log in and use Forgot password to set an email password."
-              : "That email already has a GotRefs account. Log in instead, or use a different email.",
+                ? "That email already has a GotREFS account connected to Google. Use Continue with Google."
+                : "That email already has a GotREFS account connected to Google. Log in and use Forgot password to set an email password."
+              : "That email already has a GotREFS account. Log in instead, or use a different email.",
           },
           { status: 409 }
         );
@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "That email already has a GotRefs account. Log in instead, use Forgot password, or ask an admin to delete the auth user in Supabase.",
+          "That email already has a GotREFS account. Log in instead, use Forgot password, or ask an admin to delete the auth user in Supabase.",
       },
       { status: 409 }
     );

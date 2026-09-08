@@ -101,7 +101,7 @@ function DemoQr({ value }: { value: string }) {
     return <div className="flex h-full w-full items-center justify-center text-[9px] font-bold" style={{ color: C.navyMid }}>QR</div>;
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="GotRefs QR code" className="h-full w-full object-contain" />;
+  return <img src={src} alt="GotREFS QR code" className="h-full w-full object-contain" />;
 }
 
 function MarketingSignupQr() {
@@ -133,7 +133,7 @@ function CardFooter({ right }: { right?: string }) {
         Trusted. Verified. Game Ready.
       </p>
       <p className="shrink-0 text-[7px] font-semibold uppercase tracking-wide text-white/70 sm:text-[8px]">
-        {right ?? "Powered by GotRefs"}
+        {right ?? "Powered by GotREFS"}
       </p>
     </div>
   );
@@ -149,7 +149,7 @@ function MarketingRefIdPair() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/gotrefs-logo-blue-background.png"
-            alt="GotRefs"
+            alt="GotREFS"
             className="h-14 w-auto shrink-0 object-contain sm:h-[4.25rem]"
           />
           <div className="min-w-0 flex-1 pt-0.5 text-left">
@@ -161,7 +161,7 @@ function MarketingRefIdPair() {
             </p>
             <div className="mt-1 h-0.5 w-12" style={{ background: C.gold }} />
             <p className="mt-1 text-[9px] font-semibold text-white/85 sm:text-[10px]">
-              GotRefs ID: {DEMO.gotrefsId}
+              GotREFS ID: {DEMO.gotrefsId}
             </p>
           </div>
         </div>
@@ -219,7 +219,7 @@ function MarketingRefIdPair() {
 
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 bg-white px-2.5 py-2 text-left sm:px-3 sm:py-2">
           <p className="shrink-0 text-[8px] leading-snug sm:text-[9px]" style={{ color: C.ink }}>
-            GotRefs connects verified officials with organizations that need them. Professional. Reliable. Ready to
+            GotREFS connects verified officials with organizations that need them. Professional. Reliable. Ready to
             work.
           </p>
 
@@ -255,7 +255,7 @@ function MarketingRefIdPair() {
               style={{ border: `1.5px solid ${C.gold}`, background: C.white }}
             >
               <p className="mb-0.5 text-[6px] font-black uppercase tracking-wide" style={{ color: C.goldDark }}>
-                GotRefs QR
+                GotREFS QR
               </p>
               <div className="aspect-square w-full">
                 <MarketingSignupQr />

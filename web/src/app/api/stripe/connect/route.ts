@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 function stripeConnectMfaRequired(): boolean {
-  // Payout Connect opens on Stripe’s site; GotRefs no longer gates this behind 2FA.
+  // Payout Connect opens on Stripe’s site; GotREFS no longer gates this behind 2FA.
   return false;
 }
 

@@ -96,7 +96,7 @@ export function RefPayoutRequiredModal() {
             Save a card on file to get paid: Connect via Stripe
           </h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            Stripe protects your bank details. GotRefs never stores your full card or account numbers.
+            Stripe protects your bank details. GotREFS never stores your full card or account numbers.
           </p>
         </div>
 
@@ -119,7 +119,7 @@ export function RefPayoutRequiredModal() {
             {starting ? "Opening Stripe…" : "Connect with Stripe"}
           </button>
           <p className="mt-3 text-center text-xs text-neutral-500">
-            You’ll finish setup on Stripe’s secure site, then return to GotRefs.
+            You’ll finish setup on Stripe’s secure site, then return to GotREFS.
           </p>
         </div>
       </div>

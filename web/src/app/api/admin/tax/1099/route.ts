@@ -5,7 +5,7 @@ import { taxYearForDate } from "@/lib/stripe/client";
 
 /**
  * Admin YTD 1099 totals from the payouts ledger.
- * Stripe files/distributes 1099-NEC for Connect; this is GotRefs' audit export.
+ * Stripe files/distributes 1099-NEC for Connect; this is GotREFS' audit export.
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAdminApiUser();
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     year,
     thresholdCents: 600_00,
     filingNote:
-      "Stripe Tax Reporting for Connect files and distributes 1099-NEC. This export is GotRefs’ audit ledger.",
+      "Stripe Tax Reporting for Connect files and distributes 1099-NEC. This export is GotREFS’ audit ledger.",
     totals: report,
   });
 }

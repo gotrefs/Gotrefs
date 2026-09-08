@@ -321,7 +321,7 @@ export function ApplicantReviewModal({
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-2 text-sm text-neutral-500">New on GotRefs — no host reviews yet.</p>
+                  <p className="mt-2 text-sm text-neutral-500">New on GotREFS — no host reviews yet.</p>
                 )}
               </div>
 
@@ -342,7 +342,7 @@ export function ApplicantReviewModal({
                   className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm font-semibold"
                 />
                   <span className="mt-1 block text-xs text-neutral-500">
-                  Approving charges your saved payment method now (games × rate + 20% fee + refundable
+                  Approving charges your saved payment method now (games × rate + GotREFS fee + refundable
                   1-game deposit per ref). Funds are held until the game ends.
                 </span>
               </label>

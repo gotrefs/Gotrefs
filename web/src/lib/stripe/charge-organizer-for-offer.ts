@@ -108,6 +108,16 @@ async function loadUnpaidAcceptedOfferLines(
   const selectWithoutGames =
     "id, ref_member_id, event_id, offered_pay, payment_status, status";
 
+  type OfferRow = {
+    id: string;
+    ref_member_id: string;
+    event_id: string;
+    offered_pay: number | null;
+    games_count?: number | null;
+    payment_status: string | null;
+    status: string | null;
+  };
+
   let query = admin
     .from("assignment_offers")
     .select(selectWithGames)
@@ -119,7 +129,13 @@ async function loadUnpaidAcceptedOfferLines(
     query = query.in("id", args.offerIds);
   }
 
-  let { data: offers, error: offersError } = await query;
+  let offers: OfferRow[] | null = null;
+  let offersError: { message: string } | null = null;
+  {
+    const first = await query;
+    offers = (first.data as OfferRow[] | null) ?? null;
+    offersError = first.error;
+  }
   if (offersError && /games_count/i.test(offersError.message)) {
     let retry = admin
       .from("assignment_offers")
@@ -131,7 +147,7 @@ async function loadUnpaidAcceptedOfferLines(
       retry = retry.in("id", args.offerIds);
     }
     const fallback = await retry;
-    offers = fallback.data;
+    offers = (fallback.data as OfferRow[] | null) ?? null;
     offersError = fallback.error;
   }
   if (offersError) {
@@ -304,7 +320,7 @@ export async function confirmEventPayment(
         ...metadata,
         paymentId: payment.id,
       },
-      description: `${event.title || "GotRefs event"} · ${breakdown.refCount} ref${breakdown.refCount === 1 ? "" : "s"} + deposit`,
+      description: `${event.title || "GotREFS event"} · ${breakdown.refCount} ref${breakdown.refCount === 1 ? "" : "s"} + deposit`,
     });
 
     if (intent.status !== "succeeded" && intent.status !== "processing") {

@@ -265,7 +265,7 @@ export async function notifyOfferResponseToOrganizer(opts: {
         </ul>
         <p>${
           opts.accepted
-            ? "Confirm and pay in your dashboard to finish hiring. Total includes referee pay, a 20% GotRefs fee on that pay, and a refundable deposit (1 game rate × each ref)."
+            ? "Confirm and pay in your dashboard to finish hiring. Total includes referee pay, the GotREFS fee, and a refundable deposit (1 game rate × each ref)."
             : "You can invite another verified official from your dashboard."
         }</p>
       `,
@@ -455,7 +455,7 @@ export async function notifyOrganizerNewApplication(opts: {
           <li>${escapeHtml(event.place)}</li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
-        <p>Review their GotRefs ID card, ratings, and price — then approve or unrequest. Names, emails, and phone numbers are never shared.</p>
+        <p>Review their GotREFS ID card, ratings, and price — then approve or unrequest. Names, emails, and phone numbers are never shared.</p>
       `,
       ctaLabel: "Review this request",
       ctaUrl: reviewUrl,
@@ -522,7 +522,7 @@ export async function notifyVerificationDecision(opts: {
 
   const wantsChanges = Boolean(opts.changesRequested) || normalizeFixRequiredSteps(opts.fixRequiredSteps).length > 0;
   const notes = opts.adminNotes?.trim()
-    ? `<p><strong>Message from GotRefs:</strong> ${escapeHtml(opts.adminNotes.trim())}</p>`
+    ? `<p><strong>Message from GotREFS:</strong> ${escapeHtml(opts.adminNotes.trim())}</p>`
     : "";
   const stepKeys = normalizeFixRequiredSteps(opts.fixRequiredSteps);
   const stepLabels = REF_VERIFICATION_STEPS.filter((step) => stepKeys.includes(step.key)).map(
@@ -554,7 +554,7 @@ export async function notifyVerificationDecision(opts: {
         <p>${
           wantsChanges
             ? "Sign in to your referee dashboard, update the items listed above, and resubmit for review. We’ll email you again once we’ve reviewed your updates."
-            : "If you have questions, reply to this email or contact GotRefs support."
+            : "If you have questions, reply to this email or contact GotREFS support."
         }</p>
       `,
       ctaLabel: wantsChanges ? "Fix & resubmit now" : "Open referee dashboard",
@@ -630,14 +630,14 @@ export async function notifyPayoutMethodNeeded(opts: {
         ${eventLine}
         <p>Or you can visit your referee dashboard and update your payout method under <strong>Payments</strong>.</p>
         <p style="margin-top:24px;font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#7B8FA0;">Frequently asked questions</p>
-        <p style="margin:12px 0 4px;"><strong>Where do I find my payout information?</strong><br/>Open your GotRefs referee dashboard → <em>Payments</em>.</p>
+        <p style="margin:12px 0 4px;"><strong>Where do I find my payout information?</strong><br/>Open your GotREFS referee dashboard → <em>Payments</em>.</p>
         <p style="margin:12px 0 4px;"><strong>How do I set up a way to get paid?</strong><br/>Tap <em>Add payout method</em> below. Stripe Express will walk you through connecting your bank${
           needsTax ? " and tax details" : ""
         } for ACH direct deposit.</p>
         <p style="margin:12px 0 4px;"><strong>How do I calculate my payout?</strong><br/>${
           isSetupNudge
-            ? "Your payout matches the pay you accept for each game. GotRefs transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
-            : "Your payout matches the pay you accepted for the game. GotRefs transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
+            ? "Your payout matches the pay you accept for each game. GotREFS transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
+            : "Your payout matches the pay you accepted for the game. GotREFS transfers it after the organizer pays; once your bank is linked, Stripe deposits it by ACH."
         }</p>
       `,
       ctaLabel: "Add payout method",

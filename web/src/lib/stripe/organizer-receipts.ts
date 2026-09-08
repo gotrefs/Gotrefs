@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PLATFORM_FEE_PERCENT_LABEL } from "@/lib/platform-fee";
 import { taxYearForDate } from "@/lib/stripe/client";
 
 export type PaymentLineItem = {
@@ -291,7 +290,7 @@ export function receiptToHtml(payment: OrganizerPaymentDetail): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>GotRefs payment receipt</title>
+  <title>GotREFS payment receipt</title>
   <style>
     body { font-family: Georgia, serif; color: #0f172a; margin: 40px; }
     h1 { font-size: 28px; margin: 0; }
@@ -307,7 +306,7 @@ export function receiptToHtml(payment: OrganizerPaymentDetail): string {
 </head>
 <body>
   <button onclick="window.print()">Print / Save PDF</button>
-  <h1>GotRefs</h1>
+  <h1>GotREFS</h1>
   <p class="muted">Payment receipt for organizer tax records</p>
   <p><strong>Receipt ID:</strong> ${escapeHtml(payment.id)}</p>
   <p><strong>Status:</strong> ${escapeHtml(payment.status)}</p>
@@ -322,11 +321,11 @@ export function receiptToHtml(payment: OrganizerPaymentDetail): string {
   </table>
   <div class="totals">
     <div><span>Officials / payees</span><span>$${money(payment.amountSubtotalCents)}</span></div>
-    <div><span>GotRefs fee (${PLATFORM_FEE_PERCENT_LABEL})</span><span>$${money(payment.platformFeeCents)}</span></div>
+    <div><span>GotREFS fee</span><span>$${money(payment.platformFeeCents)}</span></div>
     <div class="grand"><span>Total charged</span><span>$${money(payment.amountTotalCents)}</span></div>
   </div>
   <p class="muted" style="margin-top:32px">
-    This document is an expense receipt for amounts you paid through GotRefs. It is not a 1099.
+    This document is an expense receipt for amounts you paid through GotREFS. It is not a 1099.
     Officials who received payouts may receive 1099-NEC forms from Stripe Tax Reporting when thresholds are met.
   </p>
 </body>

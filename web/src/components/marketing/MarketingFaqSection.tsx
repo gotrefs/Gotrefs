@@ -47,7 +47,7 @@ function tabIndexForChip(chip: string): number {
 function questionForChip(chip: string): string {
   if (chip === "Is it free for referees?") return "Is there a cost to join?";
   if (chip === "How do organizers find officials?") {
-    return "How does GotRefs help me find officials?";
+    return "How does GotREFS help me find officials?";
   }
   return chip;
 }

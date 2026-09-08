@@ -23,7 +23,7 @@ export async function resolveProfilePhotoUrl(
   return data.signedUrl;
 }
 
-/** True when the value is a GotRefs storage path (uploaded face photo), not an OAuth URL. */
+/** True when the value is a GotREFS storage path (uploaded face photo), not an OAuth URL. */
 export function isUploadedProfilePhotoPath(value: string | null | undefined): boolean {
   const v = (value ?? "").trim();
   if (!v || /^https?:\/\//i.test(v) || v.startsWith("blob:")) return false;
@@ -50,7 +50,7 @@ export async function findStoredProfilePhotoPath(
 
 /**
  * Choose the best profile photo source for a member.
- * Uploaded GotRefs face photos (storage) always beat OAuth/provider image URLs.
+ * Uploaded GotREFS face photos (storage) always beat OAuth/provider image URLs.
  */
 export async function pickProfilePhotoSource(
   supabase: SupabaseClient,

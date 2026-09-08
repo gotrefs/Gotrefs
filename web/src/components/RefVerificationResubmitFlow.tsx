@@ -358,7 +358,7 @@ export function RefVerificationResubmitFlow({
         <p className="mt-2 text-sm leading-6 text-[var(--slate)]">
           {isEditMode
             ? "Your ref ID card reflects the updates you made."
-            : "Your fixes were sent back to GotRefs for review. We'll notify you when your verification is updated."}
+            : "Your fixes were sent back to GotREFS for review. We'll notify you when your verification is updated."}
         </p>
         <button
           type="button"
@@ -392,7 +392,7 @@ export function RefVerificationResubmitFlow({
       </h2>
       {!isEditMode && adminMessage && (
         <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <span className="font-bold">From GotRefs: </span>
+          <span className="font-bold">From GotREFS: </span>
           {adminMessage}
         </p>
       )}
@@ -402,7 +402,7 @@ export function RefVerificationResubmitFlow({
         </p>
       ) : (
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Complete only the items GotRefs requested:{" "}
+          Complete only the items GotREFS requested:{" "}
           {orderedSteps
             .map((key) => REF_VERIFICATION_STEPS.find((step) => step.key === key)?.shortLabel)
             .filter(Boolean)
@@ -435,8 +435,8 @@ export function RefVerificationResubmitFlow({
             </label>
             <p className="text-sm font-semibold text-[var(--muted)]">
               {existingAvatarUrl && !photoFile
-                ? "Your signup photo is already on your GotRefs ID card. Replace it only if you want a new one."
-                : "Upload a clear face photo — it updates your GotRefs ID card immediately."}
+                ? "Your signup photo is already on your GotREFS ID card. Replace it only if you want a new one."
+                : "Upload a clear face photo — it updates your GotREFS ID card immediately."}
             </p>
             <label
               className={`relative block cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
@@ -475,7 +475,7 @@ export function RefVerificationResubmitFlow({
             </label>
             <div className="mx-auto w-full max-w-[360px] pt-2">
               <p className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                Your GotRefs ID card
+                Your GotREFS ID card
               </p>
               <RefereeIdCard
                 fullName={fullName}

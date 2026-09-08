@@ -31,7 +31,7 @@ function isCooldownError(message: string) {
 async function sendRecoveryEmail(to: string, resetUrl: string) {
   const apiKey = serverEnv.resendApiKey();
   const from =
-    serverEnv.resendFromEmail() || "GotRefs <onboarding@resend.dev>";
+    serverEnv.resendFromEmail() || "GotREFS <onboarding@resend.dev>";
   if (!apiKey) return false;
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -43,10 +43,10 @@ async function sendRecoveryEmail(to: string, resetUrl: string) {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: "Reset your GotRefs password",
+      subject: "Reset your GotREFS password",
       html: `
         <h2>Reset your password</h2>
-        <p>We received a request to set or reset your GotRefs password.</p>
+        <p>We received a request to set or reset your GotREFS password.</p>
         <p><a href="${resetUrl}">Set your password</a></p>
         <p>This link works on any device and expires shortly. If you didn’t ask for this, you can ignore this email.</p>
       `,

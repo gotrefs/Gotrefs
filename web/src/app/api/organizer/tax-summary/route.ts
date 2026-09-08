@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...summary,
-      note: "Year-end expense summary of amounts you paid through GotRefs. This is not a 1099.",
+      note: "Year-end expense summary of amounts you paid through GotREFS. This is not a 1099.",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not build tax summary.";

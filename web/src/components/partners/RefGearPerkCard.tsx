@@ -52,7 +52,7 @@ export function RefGearPerkCard({
           {!compact && <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{partner.blurb}</p>}
           {!unlocked && (
             <p className="mt-1 text-xs font-semibold text-amber-800">
-              Unlock this discount after you finish creating your GotRefs account.
+              Unlock this discount after you finish creating your GotREFS account.
             </p>
           )}
           {unlocked && showCoupon && partner.couponCode && (

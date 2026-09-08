@@ -204,7 +204,7 @@ export function EventMatchingView({
             <h2 className="text-lg font-semibold text-neutral-900">Matching refs</h2>
             <p className="mt-1 text-sm text-neutral-500">
               Verified officials whose travel radius reaches this event. You’ll confirm pay after they
-              accept (ref pay + 20% fee + refundable 1-game deposit per ref).
+              accept (ref pay + GotREFS fee + refundable 1-game deposit per ref).
             </p>
           </div>
           {loadingMatches ? (

@@ -564,7 +564,7 @@ export function AuthFlow() {
       return;
     }
     if (role === "ref" && !photoFile) {
-      setError("Upload a clear photo of your face for your GotRefs profile.");
+      setError("Upload a clear photo of your face for your GotREFS profile.");
       return;
     }
     if (role === "ref" && (!govIdFrontFile || !govIdBackFile)) {
@@ -572,7 +572,7 @@ export function AuthFlow() {
       return;
     }
     if (!termsAccepted) {
-      setError("Please confirm that you accept the GotRefs terms and policies to create your account.");
+      setError("Please confirm that you accept the GotREFS terms and policies to create your account.");
       return;
     }
 
@@ -921,7 +921,7 @@ export function AuthFlow() {
           </h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
             {step === "role"
-              ? "Choose how you’ll use GotRefs. If you already started signup on this device, we’ll pick up where you left off."
+              ? "Choose how you’ll use GotREFS. If you already started signup on this device, we’ll pick up where you left off."
               : "One clean entry point for referees, organizers, and assignors."}
           </p>
           {notice ? (
@@ -1265,7 +1265,7 @@ export function AuthFlow() {
                     <span className="block text-xs text-[var(--muted)]">
                       {photoFile
                         ? "Green check means you’re set — tap to replace anytime."
-                        : "Clear face photo required for your GotRefs ID card."}
+                        : "Clear face photo required for your GotREFS ID card."}
                     </span>
                   </span>
                   <input
@@ -1382,7 +1382,7 @@ export function AuthFlow() {
                 <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
                   After you create your account you’ll land on <strong>Payments</strong> to save a card or
-                  bank with Stripe. When you approve a ref, GotRefs charges that method (ref pay + 20% fee +
+                  bank with Stripe. When you approve a ref, GotREFS charges that method (ref pay + GotREFS fee +
                   refundable deposit). Funds are held until the game ends, then paid to the ref by ACH.
                 </p>
               </div>
@@ -1654,7 +1654,7 @@ function SportsAndCerts({
         <p className="text-sm font-bold text-[var(--navy)]">Your hourly rate range</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
           Drag both ends of the slider. The left handle starts at ${SIGNUP_HOURLY_RATE_FLOOR}/hr.
-          Event organizers only see your GotRefs ID until you accept a game.
+          Event organizers only see your GotREFS ID until you accept a game.
         </p>
         <p className="mt-3 text-lg font-black text-[var(--navy)]">
           {formatHourlyRateRange(minVal, maxVal)}

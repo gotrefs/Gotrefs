@@ -35,7 +35,7 @@ import {
   sanitizeNotesForStorage,
   textContainsOrganizerContact,
 } from "@/lib/marketplace/notes-for-ref";
-import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
+import { platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
 import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 
 type RefReview = {
@@ -751,7 +751,7 @@ export default function OrganizerDashboardClient() {
     await supabase.from("organizer_profiles").update({ logo_path: path }).eq("member_id", user.id);
     setLogoPath(path);
     setLogoUrl(await resolveProfilePhotoUrl(supabase, path));
-    setMsg("Organization logo uploaded — it will show on your GotRefs ID card.");
+    setMsg("Organization logo uploaded — it will show on your GotREFS ID card.");
   }
 
   async function savePayoutMethod(payload: PayoutMethodPayload): Promise<boolean> {
@@ -1559,7 +1559,7 @@ export default function OrganizerDashboardClient() {
               <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5">
                 <p className="text-lg font-semibold text-neutral-900">Organization logo</p>
                 <p className="mt-1 text-sm text-neutral-500">
-                  PNG, JPG, SVG, or WEBP — this photo appears on your GotRefs ID card
+                  PNG, JPG, SVG, or WEBP — this photo appears on your GotREFS ID card
                 </p>
                 <input
                   type="file"
@@ -2033,8 +2033,7 @@ export default function OrganizerDashboardClient() {
                         </span>
                         {payment && payment.totalCents > 0 ? (
                           <span className="mt-1 block text-xs font-semibold text-amber-800">
-                            Confirm pay {formatCents(payment.totalCents)} (refs + {PLATFORM_FEE_PERCENT_LABEL} fee
-                            + deposit)
+                            Confirm pay {formatCents(payment.totalCents)} (refs + GotREFS fee + deposit)
                           </span>
                         ) : offerPaid ? (
                           <span className="mt-1 block text-xs font-semibold text-neutral-500">
@@ -2206,7 +2205,7 @@ export default function OrganizerDashboardClient() {
                   authorLabel: "Host",
                 }))}
                 metaRows={[
-                  sr.gotrefsId ? `GotRefs ID ${sr.gotrefsId}` : null,
+                  sr.gotrefsId ? `GotREFS ID ${sr.gotrefsId}` : null,
                   sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}

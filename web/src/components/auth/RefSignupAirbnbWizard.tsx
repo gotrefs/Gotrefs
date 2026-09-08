@@ -385,7 +385,7 @@ export function RefSignupAirbnbWizard({
       else if (screen === "account") {
         if (!email.trim() || !email.includes("@")) setLocalError("Enter a valid email address.");
         else if (!oauthMode && password.trim().length < 8) setLocalError("Create a password with at least 8 characters.");
-        else if (!termsAccepted) setLocalError("Please accept the GotRefs terms to continue.");
+        else if (!termsAccepted) setLocalError("Please accept the GotREFS terms to continue.");
       }
       return;
     }
@@ -499,7 +499,7 @@ export function RefSignupAirbnbWizard({
                 Add a profile photo of your face
               </h1>
               <p className="mt-2 text-neutral-500">
-                Required for your GotRefs ID card. Use a clear, forward-facing photo of yourself — it appears on
+                Required for your GotREFS ID card. Use a clear, forward-facing photo of yourself — it appears on
                 your card as soon as you upload it.
               </p>
               <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
@@ -557,7 +557,7 @@ export function RefSignupAirbnbWizard({
                 </label>
 
                 <div className="mx-auto w-full max-w-[400px]">
-                  <p className="mb-3 text-center text-sm font-semibold text-neutral-600">Your GotRefs ID card</p>
+                  <p className="mb-3 text-center text-sm font-semibold text-neutral-600">Your GotREFS ID card</p>
                   <RefereeIdCard
                     fullName={fullName}
                     gotrefsId={gotrefsId}
@@ -704,7 +704,7 @@ export function RefSignupAirbnbWizard({
                 Where were you certified?
               </h1>
               <p className="mt-2 text-neutral-500">
-                Add every certification level and association that applies. These show on your GotRefs ID for
+                Add every certification level and association that applies. These show on your GotREFS ID for
                 organizers.
               </p>
               <CertificationFields
@@ -725,7 +725,7 @@ export function RefSignupAirbnbWizard({
                 Now, set your hourly rate range
               </h1>
               <p className="mt-2 text-neutral-500">
-                Drag both ends of the slider. Event organizers only see your GotRefs ID until you accept a game.
+                Drag both ends of the slider. Event organizers only see your GotREFS ID until you accept a game.
               </p>
               <div className="mt-8 rounded-2xl border border-neutral-300 bg-neutral-50 p-5">
                 <p className="text-xl font-semibold text-neutral-900">{formatHourlyRateRange(minVal, maxVal)}</p>
@@ -983,7 +983,7 @@ export function RefSignupAirbnbWizard({
           {screen === "account" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Create your GotRefs account
+                Create your GotREFS account
               </h1>
               <p className="mt-2 text-neutral-500">Confirm your email, set a password, and agree to the terms.</p>
               <div className="mt-8 space-y-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PLATFORM_FEE_PERCENT_LABEL } from "@/lib/platform-fee";
+import { InfoTip } from "@/components/ui/InfoTip";
 
 type OfferLine = {
   offerId: string;
@@ -180,8 +180,7 @@ export function OrganizerConfirmPayPanel({
       <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Unpaid accepted refs</h2>
       <p className="mt-2 text-sm text-neutral-600">
         Normally you’re charged when you approve a ref. Use this only if a charge was skipped. Total includes
-        referee pay, a {PLATFORM_FEE_PERCENT_LABEL} fee on that pay only, and a refundable deposit (1 game ×
-        each ref). Unused deposit is returned after the event.
+        referee pay, the GotREFS fee, and a refundable deposit.
       </p>
 
       {events.length > 0 ? (
@@ -222,14 +221,26 @@ export function OrganizerConfirmPayPanel({
             <span className="font-semibold">{formatCents(breakdown.refSubtotalCents)}</span>
           </div>
           <div className="flex justify-between gap-3 text-neutral-700">
-            <span>GotRefs fee ({PLATFORM_FEE_PERCENT_LABEL} on ref pay)</span>
+            <span className="inline-flex items-center">
+              GotREFS fee
+              <InfoTip label="About the GotREFS fee">
+                This is the GotREFS processing fee for running payments, holding funds, and paying refs after
+                the event.
+              </InfoTip>
+            </span>
             <span className="font-semibold">{formatCents(breakdown.platformFeeCents)}</span>
           </div>
           <div className="flex justify-between gap-3 text-neutral-700">
-            <span>
-              Refundable deposit (1 game × {breakdown.refCount} ref
-              {breakdown.refCount === 1 ? "" : "s"}
-              {breakdown.depositAlreadyHeldCents > 0 ? ", top-up" : ""})
+            <span className="inline-flex max-w-[70%] items-center">
+              <span>
+                Refundable deposit (1 game × {breakdown.refCount} ref
+                {breakdown.refCount === 1 ? "" : "s"}
+                {breakdown.depositAlreadyHeldCents > 0 ? ", top-up" : ""})
+              </span>
+              <InfoTip label="About the refundable deposit">
+                This deposit covers refs if they work extra games. If they don’t, it’s returned to you right
+                after the event.
+              </InfoTip>
             </span>
             <span className="font-semibold">{formatCents(breakdown.depositCents)}</span>
           </div>

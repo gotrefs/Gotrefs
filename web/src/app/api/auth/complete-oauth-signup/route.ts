@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   if (lnErr) return NextResponse.json({ error: lnErr }, { status: 400 });
   if (!termsAccepted) {
     return NextResponse.json(
-      { error: "You must accept the applicable GotRefs terms and policies before continuing." },
+      { error: "You must accept the applicable GotREFS terms and policies before continuing." },
       { status: 400 }
     );
   }

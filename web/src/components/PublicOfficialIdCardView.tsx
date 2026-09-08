@@ -45,7 +45,7 @@ export function PublicOfficialIdNotFound({ id }: { id: string }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-neutral-950 px-6 text-center text-white">
       <div>
-        <p className="text-sm font-bold tracking-[0.12em] text-amber-300">GotRefs</p>
+        <p className="text-sm font-bold tracking-[0.12em] text-amber-300">GotREFS</p>
         <h1 className="mt-3 text-2xl font-black">Official ID not found</h1>
         <p className="mt-2 text-sm text-white/70">
           No public ID card matches <span className="font-semibold text-white">{id}</span>.

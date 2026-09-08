@@ -112,7 +112,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
         </section>
 
         <p className="text-center text-xs text-white/50">
-          No GotRefs login required — this page is for organizers scanning a referee QR.
+          No GotREFS login required — this page is for organizers scanning a referee QR.
         </p>
       </div>
     </main>

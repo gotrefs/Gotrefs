@@ -106,7 +106,7 @@ export async function PATCH(
     (row.status === "queued" || isQueuedSignupHold(row))
   ) {
     return NextResponse.json(
-      { error: "This request is still awaiting GotRefs verification." },
+      { error: "This request is still awaiting GotREFS verification." },
       { status: 400 }
     );
   }
@@ -291,7 +291,7 @@ export async function PATCH(
     }
   }
 
-  // Charge organizer now (ref pay + fee + deposit). Funds stay on GotRefs until the event ends.
+  // Charge organizer now (ref pay + fee + deposit). Funds stay on GotREFS until the event ends.
   if (offerId) {
     try {
       await chargeOrganizerForOffer(admin, { offerId });

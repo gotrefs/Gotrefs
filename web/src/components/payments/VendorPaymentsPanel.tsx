@@ -113,7 +113,7 @@ export function VendorPaymentsPanel() {
 
   async function linkPayee() {
     if (!selectedVendorId || !payeeMemberId.trim()) {
-      setError("Select a vendor and enter the payee member id (GotRefs user id).");
+      setError("Select a vendor and enter the payee member id (GotREFS user id).");
       return;
     }
     setLoading(true);
@@ -171,7 +171,7 @@ export function VendorPaymentsPanel() {
           <input
             value={payeeMemberId}
             onChange={(e) => setPayeeMemberId(e.target.value)}
-            placeholder="Payee GotRefs member id (optional)"
+            placeholder="Payee GotREFS member id (optional)"
             className="w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm"
           />
           <button

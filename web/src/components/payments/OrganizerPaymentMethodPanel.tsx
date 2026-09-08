@@ -126,9 +126,9 @@ export function OrganizerPaymentMethodPanel() {
             </button>
           </div>
           <p className="mt-3 text-sm text-neutral-500">
-            When you approve a ref (or they accept your invite), GotRefs charges this method: referee pay, a
-            20% fee on that pay only, and a refundable deposit (1 extra game per hired ref). Money is held
-            until the game ends, then paid to the ref by ACH. Unused deposit is returned after the event.
+            When you approve a ref (or they accept your invite), GotREFS charges this method: referee pay, the
+            GotREFS fee, and a refundable deposit (1 extra game per hired ref). Money is held until the game
+            ends, then paid to the ref by ACH. Unused deposit is returned after the event.
           </p>
         </div>
       </section>
@@ -163,7 +163,7 @@ export function OrganizerPaymentMethodPanel() {
           {starting ? "Opening Stripe…" : "Connect with Stripe"}
         </button>
         <p className="mt-3 text-center text-xs text-neutral-500">
-          You’ll finish setup on Stripe’s secure site, then return to GotRefs.
+          You’ll finish setup on Stripe’s secure site, then return to GotREFS.
         </p>
       </div>
     </section>

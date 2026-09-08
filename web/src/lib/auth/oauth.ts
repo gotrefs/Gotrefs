@@ -142,7 +142,7 @@ async function updateMemberOAuthMetadata(
     .eq("id", userId)
     .maybeSingle();
   const existingPhoto = String(existing?.profile_picture_url ?? "").trim();
-  // Never wipe a GotRefs-uploaded face photo with a provider avatar (or null).
+  // Never wipe a GotREFS-uploaded face photo with a provider avatar (or null).
   const existingIsUploaded =
     Boolean(existingPhoto) && !/^https?:\/\//i.test(existingPhoto) && !existingPhoto.startsWith("blob:");
 

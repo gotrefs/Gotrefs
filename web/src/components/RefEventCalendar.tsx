@@ -444,7 +444,7 @@ export function RefEventCalendar({
               {formatEventPay(selected)} per official
             </p>
             <p className="mt-3 text-sm">Officials needed: {selected.officials_needed}</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotRefs event organizer</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">Organizer: GotREFS event organizer</p>
             {(() => {
               const notes = notesForRefDisplay(selected.notes);
               return notes ? <p className="mt-2 text-sm text-[var(--slate)]">{notes}</p> : null;
@@ -486,7 +486,7 @@ export function RefEventCalendar({
                       ? "✓ Confirmed"
                       : !canApplyToEvents
                         ? applicationPending
-                          ? "Awaiting GotRefs approval"
+                          ? "Awaiting GotREFS approval"
                           : applyBlockedLabel
                         : submitting
                           ? "Submitting…"

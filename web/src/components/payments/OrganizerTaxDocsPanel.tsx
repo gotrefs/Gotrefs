@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PLATFORM_FEE_PERCENT_LABEL } from "@/lib/platform-fee";
 
 type LineItem = {
   payeeName: string;
@@ -111,7 +110,7 @@ export function OrganizerTaxDocsPanel({ highlightPaymentId }: { highlightPayment
           <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Tax docs</p>
           <h2 className="mt-1 text-2xl font-black text-[var(--navy)]">Payments &amp; receipts</h2>
           <p className="mt-2 max-w-2xl text-sm text-neutral-600">
-            Download receipts and a year-end CSV of what you paid refs through GotRefs. This is expense
+            Download receipts and a year-end CSV of what you paid refs through GotREFS. This is expense
             documentation for your books — not a 1099. Officials get 1099-NEC via Stripe when required.
           </p>
         </div>
@@ -150,9 +149,7 @@ export function OrganizerTaxDocsPanel({ highlightPaymentId }: { highlightPayment
             <p className="mt-1 text-lg font-bold text-neutral-900">{formatCents(summary.amountSubtotalCents)}</p>
           </div>
           <div className="rounded-xl bg-neutral-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              GotRefs fee ({PLATFORM_FEE_PERCENT_LABEL})
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">GotREFS fee</p>
             <p className="mt-1 text-lg font-bold text-neutral-900">{formatCents(summary.platformFeeCents)}</p>
           </div>
           <div className="rounded-xl bg-neutral-50 px-4 py-3">
@@ -201,7 +198,7 @@ export function OrganizerTaxDocsPanel({ highlightPaymentId }: { highlightPayment
                     </ul>
                   ) : null}
                   <p className="mt-2 text-xs text-neutral-500">
-                    Includes {formatCents(payment.platformFeeCents)} GotRefs fee
+                    Includes {formatCents(payment.platformFeeCents)} GotREFS fee
                   </p>
                 </div>
                 <button

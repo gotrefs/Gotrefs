@@ -50,7 +50,7 @@ async function urlToPdfImage(url: string | null | undefined): Promise<{ dataUrl:
 }
 
 /**
- * Build an organizer-friendly GotRefs ID PDF (no legal name).
+ * Build an organizer-friendly GotREFS ID PDF (no legal name).
  * Returned as ArrayBuffer for an inline PDF response.
  */
 export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<ArrayBuffer> {
@@ -226,7 +226,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("Scan-verified GotRefs official ID · Photo on file", W / 2, H - 18, {
+  doc.text("Scan-verified GotREFS official ID · Photo on file", W / 2, H - 18, {
     align: "center",
   });
 

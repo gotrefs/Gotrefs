@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({
-      brand: "GotRefs",
+      brand: "GotREFS",
       documentType: "organizer_expense_receipt",
       note: "Expense receipt for organizer tax records. Not a 1099.",
       receipt: payment,

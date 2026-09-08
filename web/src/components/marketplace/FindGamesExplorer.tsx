@@ -290,7 +290,7 @@ export function FindGamesExplorer({
           : prev
       );
       setMsg({
-        text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotRefs ID.`,
+        text: `Requested to work “${json.eventTitle ?? event.title}”. The organizer will review your GotREFS ID.`,
         tone: "ok",
       });
       onApplied?.();
@@ -578,7 +578,7 @@ export function FindGamesExplorer({
                 requestingId={submittingId}
                 canApply={canApplyToEvents}
                 applyBlockedLabel={
-                  applicationPending ? "Awaiting GotRefs approval" : applyBlockedLabel
+                  applicationPending ? "Awaiting GotREFS approval" : applyBlockedLabel
                 }
                 onRequest={(event) => void applyToEvent(event)}
               />
@@ -597,7 +597,7 @@ export function FindGamesExplorer({
         canApply={canApplyToEvents}
         applyBlockedLabel={
           applicationPending
-            ? "Awaiting GotRefs approval"
+            ? "Awaiting GotREFS approval"
             : applicationRejected
               ? applyBlockedLabel
               : applyBlockedLabel

@@ -104,7 +104,7 @@ async function loadProfileByMemberId(
   return (base.data as ProfileRow | null) ?? null;
 }
 
-/** Load public ID card fields by GotRefs ID (no legal name/email/phone). */
+/** Load public ID card fields by GotREFS ID (no legal name/email/phone). */
 export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCard | null> {
   const gotrefsId = normalizeGotrefsId(rawId || "");
   if (!gotrefsId || gotrefsId.length < 4) return null;

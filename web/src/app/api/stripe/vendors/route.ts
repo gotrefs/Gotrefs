@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { requireAal2ForSensitiveAction } from "@/lib/auth/mfa";
 import { resolveSiteUrlFromRequest } from "@/lib/env/server";
-import { PLATFORM_FEE_PERCENT_LABEL, platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
+import { platformFeeCents as calcPlatformFeeCents } from "@/lib/platform-fee";
 import {
   createConnectOnboardingLink,
   ensureExpressConnectAccount,
@@ -187,8 +187,8 @@ export async function POST(request: Request) {
             currency: "usd",
             unit_amount: fee,
             product_data: {
-              name: "GotRefs platform fee",
-              description: `${PLATFORM_FEE_PERCENT_LABEL} marketplace service fee`,
+              name: "GotREFS platform fee",
+              description: `GotREFS marketplace processing fee`,
             },
           },
         },
@@ -224,8 +224,8 @@ export async function POST(request: Request) {
               currency: "usd",
               unit_amount: fee,
               product_data: {
-                name: "GotRefs platform fee",
-                description: `${PLATFORM_FEE_PERCENT_LABEL} marketplace service fee`,
+                name: "GotREFS platform fee",
+                description: `GotREFS marketplace processing fee`,
               },
             },
           },

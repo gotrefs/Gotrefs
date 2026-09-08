@@ -240,7 +240,7 @@ export default function RefereeDashboardClient() {
       .select("profile_picture_url")
       .eq("id", user.id)
       .maybeSingle();
-    // Prefer uploaded GotRefs face photos over OAuth avatars — once uploaded, keep it.
+    // Prefer uploaded GotREFS face photos over OAuth avatars — once uploaded, keep it.
     const resolvedAvatar = await loadMemberProfilePhotoUrl(supabase, user.id, [
       memberRow?.profile_picture_url,
       typeof meta.profile_picture_url === "string" ? meta.profile_picture_url : null,
@@ -636,7 +636,7 @@ export default function RefereeDashboardClient() {
           title: `Resubmit ${formatFixRequiredStepLabels(verificationFixRequiredSteps)}`,
           message:
             verificationAdminNotes ||
-            "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
+            "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
           items: REF_VERIFICATION_STEPS.filter((step) =>
             verificationFixRequiredSteps.includes(step.key)
           ).map((step) => `${step.number}. ${step.shortLabel}`),
@@ -650,7 +650,7 @@ export default function RefereeDashboardClient() {
         steps: verificationFixRequiredSteps,
         adminMessage:
           verificationAdminNotes ||
-          "GotRefs needs you to update part of your application. Complete the steps we flagged and resubmit.",
+          "GotREFS needs you to update part of your application. Complete the steps we flagged and resubmit.",
       });
       return;
     }
@@ -665,7 +665,7 @@ export default function RefereeDashboardClient() {
         title: "You've been approved",
         message:
           verificationAdminNotes ||
-          "Your GotRefs verification is approved. You can now request to work games and receive invites from organizers.",
+          "Your GotREFS verification is approved. You can now request to work games and receive invites from organizers.",
       });
       return;
     }
@@ -676,7 +676,7 @@ export default function RefereeDashboardClient() {
         title: "Approval removed",
         message:
           verificationAdminNotes ||
-          "Your verification is not approved, so you cannot request to work games right now. Contact GotRefs if you have questions.",
+          "Your verification is not approved, so you cannot request to work games right now. Contact GotREFS if you have questions.",
       });
     }
   }, [
@@ -869,7 +869,7 @@ export default function RefereeDashboardClient() {
         });
       }
       // If signed URL fails, keep the local preview on the card until the next successful load.
-      setMsg("Profile photo added to your GotRefs ID card.");
+      setMsg("Profile photo added to your GotREFS ID card.");
       window.setTimeout(() => {
         void publishIdCardPhoto();
       }, 600);
@@ -890,8 +890,8 @@ export default function RefereeDashboardClient() {
       adminMessage:
         verificationAdminNotes ||
         (verificationRejected
-          ? "Upload updated documents so GotRefs can review your application again."
-          : "GotRefs requested updates to your application."),
+          ? "Upload updated documents so GotREFS can review your application again."
+          : "GotREFS requested updates to your application."),
     });
   }
 
@@ -1367,7 +1367,7 @@ export default function RefereeDashboardClient() {
             </h2>
             {verificationNotice.type === "fix_required" && (
               <p className="mt-2 text-sm font-semibold text-amber-900">
-                From GotRefs review:
+                From GotREFS review:
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-[var(--slate)]">{verificationNotice.message}</p>
@@ -1496,7 +1496,7 @@ export default function RefereeDashboardClient() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--slate)]">
             {verificationNeedsFix
-              ? "GotRefs flagged part of your application. Complete only the steps we listed, then resubmit for review. You can browse open games, but you cannot request to work until you're approved again."
+              ? "GotREFS flagged part of your application. Complete only the steps we listed, then resubmit for review. You can browse open games, but you cannot request to work until you're approved again."
               : verificationRejected
                 ? "You can still browse open games on the map, but you cannot request to work until verification is resolved. Upload updated docs and resubmit if you have new materials for review."
                 : !certificationReady

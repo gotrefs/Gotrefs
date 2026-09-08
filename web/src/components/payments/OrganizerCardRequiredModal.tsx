@@ -98,7 +98,7 @@ export function OrganizerCardRequiredModal() {
             Save a card on file to pay out refs: Connect via Stripe
           </h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            Stripe protects your card details. GotRefs never stores your full card number.
+            Stripe protects your card details. GotREFS never stores your full card number.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export function OrganizerCardRequiredModal() {
             {starting ? "Opening Stripe…" : "Connect with Stripe"}
           </button>
           <p className="mt-3 text-center text-xs text-neutral-500">
-            You’ll finish setup on Stripe’s secure site, then return to GotRefs.
+            You’ll finish setup on Stripe’s secure site, then return to GotREFS.
           </p>
         </div>
       </div>

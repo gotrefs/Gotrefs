@@ -218,7 +218,7 @@ export function RefereeIdCard({
       setPublicIdUrl(null);
       return;
     }
-    // Only ever encode a real http(s) card URL — never the bare GotRefs ID text.
+    // Only ever encode a real http(s) card URL — never the bare GotREFS ID text.
     const url = publicRefIdCardUrl(id);
     setPublicIdUrl(url.startsWith("http") ? url : null);
   }, [id, hideQr]);

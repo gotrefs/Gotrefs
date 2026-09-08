@@ -17,7 +17,7 @@ type ApplyBody = {
 };
 
 export const APPLY_REQUIRES_APPROVAL_MESSAGE =
-  "GotRefs must approve your verification before you can request to work games.";
+  "GotREFS must approve your verification before you can request to work games.";
 
 export async function POST(request: Request) {
   const supabase = await createClient();

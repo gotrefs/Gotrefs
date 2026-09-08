@@ -21,7 +21,7 @@ export function buildApplePassBuffers(card: PublicRefIdCard) {
   const passTypeIdentifier =
     process.env.APPLE_PASS_TYPE_IDENTIFIER?.trim() || "pass.org.gotrefs.official";
   const teamIdentifier = process.env.APPLE_TEAM_ID?.trim() || "TEAMID";
-  const organizationName = process.env.APPLE_PASS_ORG_NAME?.trim() || "GotRefs";
+  const organizationName = process.env.APPLE_PASS_ORG_NAME?.trim() || "GotREFS";
 
   const passJson = {
     formatVersion: 1,
@@ -29,8 +29,8 @@ export function buildApplePassBuffers(card: PublicRefIdCard) {
     serialNumber: card.gotrefsId,
     teamIdentifier,
     organizationName,
-    description: "GotRefs Official ID Card",
-    logoText: "GotRefs",
+    description: "GotREFS Official ID Card",
+    logoText: "GotREFS",
     foregroundColor: "rgb(255, 255, 255)",
     backgroundColor: "rgb(38, 33, 62)",
     labelColor: "rgb(201, 162, 39)",

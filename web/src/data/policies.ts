@@ -16,31 +16,31 @@ export type PolicyDocument = {
 export const POLICY_DOCUMENTS: PolicyDocument[] = [
   {
     slug: "background-check-verification",
-    title: "GotRefs Background Check & Verification Policy",
+    title: "GotREFS Background Check & Verification Policy",
     effectiveDate: "Effective Date: To be updated",
     summary:
-      "Standards and procedures for verifying the qualifications of officials who use the GotRefs platform.",
-    contactEmail: "verification@GotRefs.org",
+      "Standards and procedures for verifying the qualifications of officials who use the GotREFS platform.",
+    contactEmail: "verification@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          'At GotRefs, the safety, integrity, and professionalism of youth and amateur sports are fundamental to our mission. This Background Check & Verification Policy ("Policy") establishes the standards and procedures for verifying the qualifications of officials who use the GotRefs platform.',
-          'This Policy applies to all referees, umpires, officials, judges, scorekeepers, and other sports professionals ("Officials") who create an account on GotRefs.org.',
+          'At GotREFS, the safety, integrity, and professionalism of youth and amateur sports are fundamental to our mission. This Background Check & Verification Policy ("Policy") establishes the standards and procedures for verifying the qualifications of officials who use the GotREFS platform.',
+          'This Policy applies to all referees, umpires, officials, judges, scorekeepers, and other sports professionals ("Officials") who create an account on GotREFS.org.',
           "By using the platform, Officials acknowledge and agree to comply with this Policy.",
         ],
       },
       {
         title: "1. Purpose",
         body: [
-          "Verification by GotRefs is intended to assist Event Organizers in evaluating Officials. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability, and does not imply that any Official is “safe” or “guaranteed.”",
+          "Verification by GotREFS is intended to assist Event Organizers in evaluating Officials. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability, and does not imply that any Official is “safe” or “guaranteed.”",
         ],
         bullets: [
           "Promote safe sporting environments.",
           "Increase confidence among Event Organizers.",
           "Verify officiating credentials.",
           "Help protect athletes, participants, and spectators.",
-          "Maintain the integrity of the GotRefs community.",
+          "Maintain the integrity of the GotREFS community.",
         ],
       },
       {
@@ -62,8 +62,8 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "3. NSID Background Verification",
         body: [
-          "Where required by an Organizer or governing body, Officials may be required to complete a background screening through National SportsID (NSID), GotRefs’ verification partner, or another approved provider.",
-          "Completion of a background check does not guarantee assignment eligibility, nor does it constitute an endorsement by GotRefs. Organizers may establish additional screening requirements beyond those required by GotRefs. GotRefs still reviews submitted credentials before approving an official to request games.",
+          "Where required by an Organizer or governing body, Officials may be required to complete a background screening through National SportsID (NSID), GotREFS’ verification partner, or another approved provider.",
+          "Completion of a background check does not guarantee assignment eligibility, nor does it constitute an endorsement by GotREFS. Organizers may establish additional screening requirements beyond those required by GotREFS. GotREFS still reviews submitted credentials before approving an official to request games.",
         ],
         bullets: [
           "Criminal history review, where permitted by law.",
@@ -84,7 +84,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "5. Sport-Specific Certifications",
         body: [
-          "Officials are responsible for maintaining all certifications required by the governing organizations for the sports they officiate. Officials must promptly update their GotRefs profile whenever certifications are renewed, suspended, or expire.",
+          "Officials are responsible for maintaining all certifications required by the governing organizations for the sports they officiate. Officials must promptly update their GotREFS profile whenever certifications are renewed, suspended, or expire.",
         ],
         bullets: [
           "State high school athletic associations.",
@@ -111,7 +111,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "7. Verification Badges",
         body: [
-          "GotRefs may display verification badges on Official profiles to assist Organizers in evaluating qualifications. Verification badges indicate only that the stated credential has been verified by GotRefs or an approved provider as of a specific date. They do not represent a guarantee of honesty, professionalism, future conduct, performance, competence, or suitability, and do not imply that any Official is “safe” or “guaranteed.”",
+          "GotREFS may display verification badges on Official profiles to assist Organizers in evaluating qualifications. Verification badges indicate only that the stated credential has been verified by GotREFS or an approved provider as of a specific date. They do not represent a guarantee of honesty, professionalism, future conduct, performance, competence, or suitability, and do not imply that any Official is “safe” or “guaranteed.”",
         ],
         bullets: [
           "Identity Verified.",
@@ -126,7 +126,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "8. Credential Accuracy",
         body: [
-          "Officials certify that all information submitted to GotRefs is truthful, complete, and accurate. Providing false information may result in immediate suspension or permanent removal from the platform.",
+          "Officials certify that all information submitted to GotREFS is truthful, complete, and accurate. Providing false information may result in immediate suspension or permanent removal from the platform.",
         ],
         bullets: [
           "Do not submit altered or fraudulent documents.",
@@ -138,7 +138,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "9. Organizer Requirements",
         body: [
-          "Event Organizers may establish additional eligibility requirements beyond those required by GotRefs. Officials are responsible for reviewing assignment requirements before accepting an assignment.",
+          "Event Organizers may establish additional eligibility requirements beyond those required by GotREFS. Officials are responsible for reviewing assignment requirements before accepting an assignment.",
         ],
         bullets: [
           "Minimum years of experience.",
@@ -152,14 +152,14 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "10. Suspension of Verification Status",
         body: [
-          "GotRefs may suspend an Official's verification status if required credentials expire, required documentation cannot be verified, fraudulent documentation is suspected, the Official becomes ineligible under applicable governing body rules, or credible evidence of serious misconduct is received.",
+          "GotREFS may suspend an Official's verification status if required credentials expire, required documentation cannot be verified, fraudulent documentation is suspected, the Official becomes ineligible under applicable governing body rules, or credible evidence of serious misconduct is received.",
           "Suspension of verification status may also result in temporary removal from assignments requiring verified credentials.",
         ],
       },
       {
         title: "11. Permanent Removal",
         body: [
-          "GotRefs reserves the right to determine, in its sole discretion, whether removal is appropriate based on the facts and applicable law.",
+          "GotREFS reserves the right to determine, in its sole discretion, whether removal is appropriate based on the facts and applicable law.",
         ],
         bullets: [
           "Falsifying credentials.",
@@ -168,13 +168,13 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
           "Permanent suspension by a governing body for misconduct.",
           "Sexual misconduct.",
           "Violence or threats of violence.",
-          "Repeated violations of GotRefs Terms & Conditions or Community Standards.",
+          "Repeated violations of GotREFS Terms & Conditions or Community Standards.",
         ],
       },
       {
         title: "12. Appeals Process",
         body: [
-          "Officials who believe a verification decision or suspension was made in error may submit a written appeal within 14 days of notification. GotRefs will review the information submitted and notify the Official of its decision. Decisions made following the appeal process are final.",
+          "Officials who believe a verification decision or suspension was made in error may submit a written appeal within 14 days of notification. GotREFS will review the information submitted and notify the Official of its decision. Decisions made following the appeal process are final.",
         ],
         bullets: [
           "The reason for the appeal.",
@@ -185,7 +185,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "13. Privacy of Verification Information",
         body: [
-          "Verification records and supporting documents are handled in accordance with the GotRefs Privacy Policy. GotRefs does not publicly display confidential background screening reports.",
+          "Verification records and supporting documents are handled in accordance with the GotREFS Privacy Policy. GotREFS does not publicly display confidential background screening reports.",
         ],
         bullets: [
           "Sensitive information may be shared with authorized service providers performing verification services.",
@@ -196,60 +196,60 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "14. No Employment Relationship",
         body: [
-          "Verification by GotRefs does not create an employment relationship between GotRefs and any Official. Officials remain independent contractors responsible for maintaining their own qualifications and complying with applicable laws and governing body requirements.",
+          "Verification by GotREFS does not create an employment relationship between GotREFS and any Official. Officials remain independent contractors responsible for maintaining their own qualifications and complying with applicable laws and governing body requirements.",
         ],
       },
       {
         title: "15. Limitation of Responsibility",
         body: [
-          "While GotRefs strives to verify credentials accurately, verification is based on information provided by Officials, Organizers, governing bodies, and third-party verification providers. Organizers remain responsible for determining whether an Official meets the specific requirements of their event.",
+          "While GotREFS strives to verify credentials accurately, verification is based on information provided by Officials, Organizers, governing bodies, and third-party verification providers. Organizers remain responsible for determining whether an Official meets the specific requirements of their event.",
         ],
         bullets: [
-          "GotRefs does not guarantee the accuracy of third-party records.",
-          "GotRefs does not guarantee future eligibility of an Official.",
-          "GotRefs does not guarantee the quality of officiating performance.",
-          "GotRefs does not guarantee assignment suitability.",
-          "GotRefs does not guarantee continued certification after verification.",
+          "GotREFS does not guarantee the accuracy of third-party records.",
+          "GotREFS does not guarantee future eligibility of an Official.",
+          "GotREFS does not guarantee the quality of officiating performance.",
+          "GotREFS does not guarantee assignment suitability.",
+          "GotREFS does not guarantee continued certification after verification.",
         ],
       },
       {
         title: "16. Policy Changes",
         body: [
-          "GotRefs reserves the right to modify this Policy at any time. Updated versions will be posted on GotRefs.org, and continued use of the platform constitutes acceptance of any revisions.",
+          "GotREFS reserves the right to modify this Policy at any time. Updated versions will be posted on GotREFS.org, and continued use of the platform constitutes acceptance of any revisions.",
         ],
       },
       {
         title: "Contact Information",
         body: [
-          "Questions regarding this Policy or verification requirements may be directed to GotRefs at verification@GotRefs.org.",
+          "Questions regarding this Policy or verification requirements may be directed to GotREFS at verification@GotREFS.org.",
         ],
       },
       {
         title: "Acknowledgement",
         body: [
-          "By creating an account, submitting credentials, accepting assignments, or participating on the GotRefs platform, you acknowledge that you have read, understood, and agree to comply with this Background Check & Verification Policy.",
+          "By creating an account, submitting credentials, accepting assignments, or participating on the GotREFS platform, you acknowledge that you have read, understood, and agree to comply with this Background Check & Verification Policy.",
         ],
       },
     ],
   },
   {
     slug: "community-standards",
-    title: "GotRefs Community Standards & Code of Conduct",
+    title: "GotREFS Community Standards & Code of Conduct",
     effectiveDate: "Effective Date: To be updated",
     summary:
-      "Expectations for professional, respectful conduct across the GotRefs community and events coordinated through the platform.",
-    contactEmail: "conduct@GotRefs.org",
+      "Expectations for professional, respectful conduct across the GotREFS community and events coordinated through the platform.",
+    contactEmail: "conduct@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          'At GotRefs, our mission is to create a trusted, professional, and respectful environment for everyone involved in amateur and youth sports. These Community Standards & Code of Conduct ("Code") establish the expectations for all users of the GotRefs platform, including Event Organizers, Officials, Coaches, Players, Parents, Spectators, Volunteers, and Staff.',
-          "By using GotRefs.org, participating in events coordinated through the platform, or interacting with members of the GotRefs community, you agree to abide by these standards.",
+          'At GotREFS, our mission is to create a trusted, professional, and respectful environment for everyone involved in amateur and youth sports. These Community Standards & Code of Conduct ("Code") establish the expectations for all users of the GotREFS platform, including Event Organizers, Officials, Coaches, Players, Parents, Spectators, Volunteers, and Staff.',
+          "By using GotREFS.org, participating in events coordinated through the platform, or interacting with members of the GotREFS community, you agree to abide by these standards.",
         ],
       },
       {
         title: "Our Core Values",
-        body: ["Every member of the GotRefs community is expected to uphold these principles."],
+        body: ["Every member of the GotREFS community is expected to uphold these principles."],
         bullets: [
           "Integrity - Be honest, fair, and ethical in every interaction.",
           "Respect - Treat everyone with dignity and professionalism.",
@@ -330,7 +330,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "6. Harassment & Discrimination",
         body: [
-          "GotRefs maintains zero tolerance for harassment, bullying, threats, intimidation, sexual harassment, hate speech, and discrimination based on protected characteristics under applicable law.",
+          "GotREFS maintains zero tolerance for harassment, bullying, threats, intimidation, sexual harassment, hate speech, and discrimination based on protected characteristics under applicable law.",
           "Violations may result in immediate removal from the platform and referral to appropriate authorities when warranted.",
         ],
       },
@@ -363,7 +363,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "9. Reporting Misconduct",
         body: [
-          "Anyone may report conduct that violates this Code. Reports may be submitted through the GotRefs platform or by contacting support. GotRefs may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotRefs is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
+          "Anyone may report conduct that violates this Code. Reports may be submitted through the GotREFS platform or by contacting support. GotREFS may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotREFS is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
         ],
         bullets: [
           "Date and time of the incident.",
@@ -375,7 +375,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       },
       {
         title: "10. Investigation Process",
-        body: ["When a complaint is received, GotRefs may take investigative steps and temporary action while an investigation is pending, when appropriate. Participation in an investigation is expected from all users."],
+        body: ["When a complaint is received, GotREFS may take investigative steps and temporary action while an investigation is pending, when appropriate. Participation in an investigation is expected from all users."],
         bullets: [
           "Review available evidence.",
           "Contact the parties involved.",
@@ -387,7 +387,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "11. Enforcement",
         body: [
-          "GotRefs reserves the right to determine the appropriate response based on the facts and circumstances of each case.",
+          "GotREFS reserves the right to determine the appropriate response based on the facts and circumstances of each case.",
         ],
         bullets: [
           "Educational warning.",
@@ -402,7 +402,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "12. Appeals",
         body: [
-          "Users who believe enforcement action was taken in error may submit a written appeal within 14 days of receiving notice. GotRefs will review the appeal and issue a final decision.",
+          "Users who believe enforcement action was taken in error may submit a written appeal within 14 days of receiving notice. GotREFS will review the appeal and issue a final decision.",
         ],
         bullets: [
           "The reason for the appeal.",
@@ -419,69 +419,69 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "14. Commitment to Youth Sports",
         body: [
-          "GotRefs believes youth and amateur sports should provide a safe, positive, and enjoyable experience for everyone. Every member of the community shares responsibility for creating an environment built on respect, fairness, professionalism, integrity, inclusion, and sportsmanship.",
+          "GotREFS believes youth and amateur sports should provide a safe, positive, and enjoyable experience for everyone. Every member of the community shares responsibility for creating an environment built on respect, fairness, professionalism, integrity, inclusion, and sportsmanship.",
         ],
       },
       {
         title: "15. Changes to this Code",
         body: [
-          "GotRefs may update these Community Standards & Code of Conduct from time to time. Updated versions will be posted on GotRefs.org, and continued use of the platform constitutes acceptance of any revisions.",
+          "GotREFS may update these Community Standards & Code of Conduct from time to time. Updated versions will be posted on GotREFS.org, and continued use of the platform constitutes acceptance of any revisions.",
         ],
       },
       {
         title: "Contact Us",
         body: [
-          "Questions or reports regarding this Code may be submitted to GotRefs at conduct@GotRefs.org.",
+          "Questions or reports regarding this Code may be submitted to GotREFS at conduct@GotREFS.org.",
         ],
       },
       {
         title: "Acknowledgement",
         body: [
-          "By creating an account, using the GotRefs platform, attending an event, accepting assignments, organizing events, coaching, participating, or spectating at an event coordinated through GotRefs, you acknowledge that you have read, understood, and agree to comply with these Community Standards & Code of Conduct.",
+          "By creating an account, using the GotREFS platform, attending an event, accepting assignments, organizing events, coaching, participating, or spectating at an event coordinated through GotREFS, you acknowledge that you have read, understood, and agree to comply with these Community Standards & Code of Conduct.",
         ],
       },
     ],
   },
   {
     slug: "payment-fee-policy",
-    title: "GotRefs Payment & Fee Policy",
+    title: "GotREFS Payment & Fee Policy",
     effectiveDate: "Effective Date: To be updated",
     summary: "Rules for platform fees, payment processing, refunds, chargebacks, taxes, invoices, and payment disputes.",
-    contactEmail: "billing@GotRefs.org",
+    contactEmail: "billing@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          'This Payment & Fee Policy ("Policy") governs all payments processed through GotRefs.org. By using the GotRefs platform, Event Organizers and Referees/Officials agree to comply with this Policy.',
+          'This Payment & Fee Policy ("Policy") governs all payments processed through GotREFS.org. By using the GotREFS platform, Event Organizers and Referees/Officials agree to comply with this Policy.',
         ],
       },
       {
         title: "1. Purpose",
         body: [
-          "GotRefs is a technology platform that connects Event Organizers with qualified sports officials. Depending on the services selected, GotRefs may facilitate payments between Organizers and Officials or provide scheduling services only.",
+          "GotREFS is a technology platform that connects Event Organizers with qualified sports officials. Depending on the services selected, GotREFS may facilitate payments between Organizers and Officials or provide scheduling services only.",
         ],
       },
       {
         title: "2. Payment Responsibility",
         bullets: [
-          "Organizers are responsible for paying agreed officiating fees, GotRefs platform or service fees, maintaining a valid payment method when required, and paying invoices by the stated due date.",
+          "Organizers are responsible for paying agreed officiating fees, GotREFS platform or service fees, maintaining a valid payment method when required, and paying invoices by the stated due date.",
           "Officials are responsible for providing accurate payment information, maintaining tax information when required, reviewing assignment compensation, and reporting discrepancies promptly.",
           "Failure to make timely payments may result in suspension or termination of an Organizer account.",
         ],
       },
       {
         title: "3. Platform Fees",
-        body: ["GotRefs may charge platform access fees, scheduling service fees, assignment fees, verification fees, background check fees, subscription or membership fees, premium feature fees, and payment processing fees."],
+        body: ["GotREFS may charge platform access fees, scheduling service fees, assignment fees, verification fees, background check fees, subscription or membership fees, premium feature fees, and payment processing fees."],
       },
       {
         title: "4. Payment Processing",
-        body: ["Payments made through GotRefs are processed by secure third-party payment providers. GotRefs does not store full payment card information."],
+        body: ["Payments made through GotREFS are processed by secure third-party payment providers. GotREFS does not store full payment card information."],
         bullets: ["Credit cards.", "Debit cards.", "ACH bank transfers.", "Digital wallets.", "Other approved electronic payment methods."],
       },
       {
         title: "5. Official Payments",
         body: [
-          "Officials will be paid according to the payment terms established by the Organizer or through the GotRefs payment system. Payment timing may vary by payment method. GotRefs is not responsible for delays caused by banks, payment processors, incorrect information, or government processing delays.",
+          "Officials will be paid according to the payment terms established by the Organizer or through the GotREFS payment system. Payment timing may vary by payment method. GotREFS is not responsible for delays caused by banks, payment processors, incorrect information, or government processing delays.",
         ],
       },
       {
@@ -495,44 +495,44 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "7. Refunds and Chargebacks",
         body: [
-          "Unless otherwise stated, fees paid to GotRefs for platform services, subscriptions, verification, or processing are non-refundable. Refund requests may be evaluated case by case for duplicate payments, billing errors, unauthorized transactions verified by investigation, or platform-caused technical errors.",
+          "Unless otherwise stated, fees paid to GotREFS for platform services, subscriptions, verification, or processing are non-refundable. Refund requests may be evaluated case by case for duplicate payments, billing errors, unauthorized transactions verified by investigation, or platform-caused technical errors.",
           "Chargebacks or payment reversals may result in account suspension during investigation. Users remain responsible for legitimate charges, and fraudulent or abusive chargebacks may result in removal from the platform and legal action.",
         ],
       },
       {
         title: "8. Taxes and Payment Errors",
         body: [
-          "Officials are independent contractors solely responsible for reporting income, paying taxes, self-employment taxes where applicable, and maintaining required business licenses. GotRefs may request tax documentation, including IRS Form W-9, when required.",
-          "If an overpayment or underpayment occurs, users agree to promptly notify GotRefs. GotRefs may correct payment errors, including recovering funds paid in error or issuing additional payments when appropriate.",
+          "Officials are independent contractors solely responsible for reporting income, paying taxes, self-employment taxes where applicable, and maintaining required business licenses. GotREFS may request tax documentation, including IRS Form W-9, when required.",
+          "If an overpayment or underpayment occurs, users agree to promptly notify GotREFS. GotREFS may correct payment errors, including recovering funds paid in error or issuing additional payments when appropriate.",
         ],
       },
       {
         title: "9. Fraud Prevention and Account Suspension",
         body: [
-          "GotRefs may verify payment information, delay processing while investigating suspicious activity, request identity verification, and decline or cancel transactions believed to be fraudulent or unauthorized.",
-          "GotRefs may suspend or terminate accounts for non-payment, excessive disputes, fraudulent transactions, repeated chargebacks, or violation of this Policy. Termination does not relieve outstanding financial obligations.",
+          "GotREFS may verify payment information, delay processing while investigating suspicious activity, request identity verification, and decline or cancel transactions believed to be fraudulent or unauthorized.",
+          "GotREFS may suspend or terminate accounts for non-payment, excessive disputes, fraudulent transactions, repeated chargebacks, or violation of this Policy. Termination does not relieve outstanding financial obligations.",
         ],
       },
       {
         title: "10. Limitation of Liability and Changes",
         body: [
-          "GotRefs is not responsible for bank processing delays, processor outages, currency conversion fees, returned payments due to incorrect account information, lost profits from delayed payments, or financial losses from disputes between Organizers and Officials except where GotRefs is directly responsible for processing payment.",
-          "GotRefs may modify this Policy at any time. Material updates will be posted on the platform with an updated Effective Date.",
+          "GotREFS is not responsible for bank processing delays, processor outages, currency conversion fees, returned payments due to incorrect account information, lost profits from delayed payments, or financial losses from disputes between Organizers and Officials except where GotREFS is directly responsible for processing payment.",
+          "GotREFS may modify this Policy at any time. Material updates will be posted on the platform with an updated Effective Date.",
         ],
       },
     ],
   },
   {
     slug: "privacy-policy",
-    title: "GotRefs Privacy Policy",
+    title: "GotREFS Privacy Policy",
     effectiveDate: "Effective Date: To be updated",
-    summary: "How GotRefs collects, uses, stores, shares, and protects user information across the platform.",
-    contactEmail: "privacy@GotRefs.org",
+    summary: "How GotREFS collects, uses, stores, shares, and protects user information across the platform.",
+    contactEmail: "privacy@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          'Your privacy is important to us. This Privacy Policy explains how GotRefs collects, uses, stores, shares, and protects your information when you use our website, mobile applications, and related services (the "Platform").',
+          'Your privacy is important to us. This Privacy Policy explains how GotREFS collects, uses, stores, shares, and protects your information when you use our website, mobile applications, and related services (the "Platform").',
           "By accessing or using the platform, you acknowledge that you have read and understand this Privacy Policy.",
         ],
       },
@@ -559,18 +559,18 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       },
       {
         title: "3. How We Share Information",
-        body: ["GotRefs does not sell personal information."],
+        body: ["GotREFS does not sell personal information."],
         bullets: [
           "Event Organizers may receive information necessary for assignments, including name, contact information, certifications, ratings, availability, and verification status.",
           "Officials may receive Organizer information needed for assignments, including event details, contact information, location, compensation, and scheduling information.",
           "Trusted service providers may process payment, background verification, hosting, email, SMS, support, analytics, and security services under contractual privacy obligations.",
-          "Information may be disclosed to comply with law, respond to legal process, protect user safety, investigate fraud or illegal activity, or protect GotRefs rights.",
+          "Information may be disclosed to comply with law, respond to legal process, protect user safety, investigate fraud or illegal activity, or protect GotREFS rights.",
         ],
       },
       {
         title: "4. Data Security and Retention",
         body: [
-          "GotRefs uses commercially reasonable administrative, technical, and physical safeguards such as SSL/TLS, password encryption, role-based access controls, secure cloud infrastructure, firewall protection, monitoring, and regular updates. No electronic transmission or storage method is completely secure.",
+          "GotREFS uses commercially reasonable administrative, technical, and physical safeguards such as SSL/TLS, password encryption, role-based access controls, secure cloud infrastructure, firewall protection, monitoring, and regular updates. No electronic transmission or storage method is completely secure.",
           "We retain personal information only as long as reasonably necessary to provide services, maintain records, resolve disputes, comply with legal obligations, and enforce agreements.",
         ],
       },
@@ -578,50 +578,50 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
         title: "5. Privacy Rights",
         body: [
           "Subject to applicable law, users may request access, correction, profile updates, account deletion, deletion of personal information subject to legal exceptions, copies of information where applicable, marketing opt-out, and notification preference management.",
-          "California residents may have additional rights under CCPA/CPRA, including requests to know, delete, correct, limit certain sensitive information where applicable, and exercise rights without discrimination. GotRefs does not sell or share personal information for cross-context behavioral advertising as defined by California law.",
+          "California residents may have additional rights under CCPA/CPRA, including requests to know, delete, correct, limit certain sensitive information where applicable, and exercise rights without discrimination. GotREFS does not sell or share personal information for cross-context behavioral advertising as defined by California law.",
         ],
       },
       {
         title: "6. Children, Third-Party Links, Account Security, and International Users",
         body: [
-          "GotRefs is not intended for children under 13 and does not knowingly collect information from children under 13 without appropriate consent where required.",
-          "The platform may link to third-party services. GotRefs is not responsible for their privacy practices.",
-          "Users are responsible for protecting login credentials and notifying GotRefs of suspected unauthorized access.",
-          "GotRefs is operated from the United States, and international users understand their information may be transferred to and processed in the United States.",
+          "GotREFS is not intended for children under 13 and does not knowingly collect information from children under 13 without appropriate consent where required.",
+          "The platform may link to third-party services. GotREFS is not responsible for their privacy practices.",
+          "Users are responsible for protecting login credentials and notifying GotREFS of suspected unauthorized access.",
+          "GotREFS is operated from the United States, and international users understand their information may be transferred to and processed in the United States.",
         ],
       },
       {
         title: "7. Policy Changes and Contact",
         body: [
-          "GotRefs may update this Privacy Policy periodically. Material changes will be posted on the platform with an updated Effective Date.",
-          "Questions or privacy rights requests may be sent to privacy@GotRefs.org.",
+          "GotREFS may update this Privacy Policy periodically. Material changes will be posted on the platform with an updated Effective Date.",
+          "Questions or privacy rights requests may be sent to privacy@GotREFS.org.",
         ],
       },
     ],
   },
   {
     slug: "event-organizer-terms",
-    title: "GotRefs Event Organizer Terms & Conditions",
+    title: "GotREFS Event Organizer Terms & Conditions",
     effectiveDate: "Effective Date: To be updated",
     summary: "Terms governing organizer accounts, event postings, payments, conduct, cancellations, and platform use.",
-    contactEmail: "support@GotRefs.org",
+    contactEmail: "support@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          "These Terms & Conditions govern the use of GotRefs.org by any organization, league, tournament, school, club, or individual utilizing the platform to locate, assign, and manage sports officials. By creating an account, posting assignments, or otherwise using GotRefs.org, the Organizer agrees to these Terms.",
+          "These Terms & Conditions govern the use of GotREFS.org by any organization, league, tournament, school, club, or individual utilizing the platform to locate, assign, and manage sports officials. By creating an account, posting assignments, or otherwise using GotREFS.org, the Organizer agrees to these Terms.",
         ],
       },
       {
-        title: "1. Role of GotRefs",
+        title: "1. Role of GotREFS",
         body: [
-          "GotRefs is an online marketplace that connects sports officials and event organizers. GotRefs does not employ, supervise, direct, train, or control officials or event organizers, and is not responsible for the conduct, statements, decisions, or actions of either party.",
+          "GotREFS is an online marketplace that connects sports officials and event organizers. GotREFS does not employ, supervise, direct, train, or control officials or event organizers, and is not responsible for the conduct, statements, decisions, or actions of either party.",
         ],
       },
       {
         title: "2. Organizer Responsibilities",
         body: [
-          "Organizers agree that they are solely responsible for hiring decisions, supervision of events and officials on site, field and facility safety, spectator safety, payment to officials (unless payment is processed through GotRefs), insurance, and compliance with applicable local, state, and federal laws.",
+          "Organizers agree that they are solely responsible for hiring decisions, supervision of events and officials on site, field and facility safety, spectator safety, payment to officials (unless payment is processed through GotREFS), insurance, and compliance with applicable local, state, and federal laws.",
         ],
         bullets: [
           "Provide complete and accurate event information.",
@@ -635,14 +635,14 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "3. Independent Contractor Relationship",
         body: [
-          "Officials using GotRefs are independent contractors. Officials are not employees or agents of GotRefs. Nothing in these Terms creates an employer-employee, partnership, joint venture, or agency relationship between GotRefs and any official. Organizers acknowledge that officials are not employees or agents of GotRefs and remain responsible for selecting assignments, supervising events, paying officials unless payment is processed through GotRefs, and complying with tax and labor laws.",
+          "Officials using GotREFS are independent contractors. Officials are not employees or agents of GotREFS. Nothing in these Terms creates an employer-employee, partnership, joint venture, or agency relationship between GotREFS and any official. Organizers acknowledge that officials are not employees or agents of GotREFS and remain responsible for selecting assignments, supervising events, paying officials unless payment is processed through GotREFS, and complying with tax and labor laws.",
         ],
       },
       {
         title: "4. Truthfulness of Information",
         body: [
-          "Users represent and warrant that all information submitted to GotRefs is true, complete, and accurate. All information submitted must be truthful and accurate. Users are solely responsible for the accuracy of all information they provide. GotRefs has no obligation to independently verify every representation made by a user.",
-          "Any false, misleading, deceptive, or fraudulent information—including regarding certifications, experience, insurance, availability, criminal history, identity, events, or payment—may result in immediate suspension or permanent removal from the platform. Users are solely responsible for any damages arising from false statements or misrepresentations. GotRefs does not independently verify every statement made by users and is not liable for reliance on inaccurate information provided by users.",
+          "Users represent and warrant that all information submitted to GotREFS is true, complete, and accurate. All information submitted must be truthful and accurate. Users are solely responsible for the accuracy of all information they provide. GotREFS has no obligation to independently verify every representation made by a user.",
+          "Any false, misleading, deceptive, or fraudulent information—including regarding certifications, experience, insurance, availability, criminal history, identity, events, or payment—may result in immediate suspension or permanent removal from the platform. Users are solely responsible for any damages arising from false statements or misrepresentations. GotREFS does not independently verify every statement made by users and is not liable for reliance on inaccurate information provided by users.",
         ],
       },
       {
@@ -655,14 +655,14 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "6. Verification — No Guarantee of Character or Performance",
         body: [
-          "GotRefs may display verification, certifications, experience, ratings, and sport-specific qualifications. The Organizer remains responsible for determining whether an official meets event requirements.",
-          "Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Even where an official is background checked or verified, GotRefs does not imply that the official is “safe” or “guaranteed.”",
+          "GotREFS may display verification, certifications, experience, ratings, and sport-specific qualifications. The Organizer remains responsible for determining whether an official meets event requirements.",
+          "Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Even where an official is background checked or verified, GotREFS does not imply that the official is “safe” or “guaranteed.”",
         ],
       },
       {
         title: "7. Conduct Disclaimer",
         body: [
-          "GotRefs is not responsible for fraud, misrepresentation, assault, harassment, theft, negligence, rule disputes, officiating decisions, scheduling disputes, payment disputes between parties, defamation, false statements, or any illegal or inappropriate conduct by officials, organizers, or other users.",
+          "GotREFS is not responsible for fraud, misrepresentation, assault, harassment, theft, negligence, rule disputes, officiating decisions, scheduling disputes, payment disputes between parties, defamation, false statements, or any illegal or inappropriate conduct by officials, organizers, or other users.",
         ],
       },
       {
@@ -680,99 +680,99 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "10. No Circumvention",
         body: [
-          "Organizers agree not to intentionally circumvent GotRefs by directly hiring or soliciting officials first introduced through the platform to avoid GotRefs fees for 24 months following first assignment through GotRefs.",
+          "Organizers agree not to intentionally circumvent GotREFS by directly hiring or soliciting officials first introduced through the platform to avoid GotREFS fees for 24 months following first assignment through GotREFS.",
         ],
       },
       {
         title: "11. Insurance",
         body: [
-          "Organizers are encouraged to maintain general liability insurance, participant accident insurance, and event insurance as appropriate for their events. Organizers are responsible for maintaining all event insurance. GotRefs does not provide event insurance, general liability insurance, participant accident insurance, or any other insurance unless expressly stated in writing.",
+          "Organizers are encouraged to maintain general liability insurance, participant accident insurance, and event insurance as appropriate for their events. Organizers are responsible for maintaining all event insurance. GotREFS does not provide event insurance, general liability insurance, participant accident insurance, or any other insurance unless expressly stated in writing.",
         ],
       },
       {
         title: "12. Limitation of Liability",
         body: [
-          "GotRefs is a technology marketplace and does not supervise games or direct officials. To the fullest extent permitted by law, GotRefs shall not be liable for any indirect, incidental, consequential, punitive, or special damages arising out of the use of the platform, including without limitation game outcomes, judgment calls, injuries, property damage, cancellations, scheduling conflicts, acts or omissions of users, lost profits, or consequential damages.",
-          "GotRefs’s maximum liability shall not exceed the fees paid to GotRefs during the twelve (12) months preceding the claim.",
+          "GotREFS is a technology marketplace and does not supervise games or direct officials. To the fullest extent permitted by law, GotREFS shall not be liable for any indirect, incidental, consequential, punitive, or special damages arising out of the use of the platform, including without limitation game outcomes, judgment calls, injuries, property damage, cancellations, scheduling conflicts, acts or omissions of users, lost profits, or consequential damages.",
+          "GotREFS’s maximum liability shall not exceed the fees paid to GotREFS during the twelve (12) months preceding the claim.",
         ],
       },
       {
         title: "13. Indemnification",
         body: [
-          "You agree to defend, indemnify, and hold harmless GotRefs, its owners, employees, officers, affiliates, and partners from any claims, damages, liabilities, judgments, losses, costs, and attorneys’ fees arising from your conduct, representations, negligence, events, breach, injuries, or violation of these Terms or applicable law.",
+          "You agree to defend, indemnify, and hold harmless GotREFS, its owners, employees, officers, affiliates, and partners from any claims, damages, liabilities, judgments, losses, costs, and attorneys’ fees arising from your conduct, representations, negligence, events, breach, injuries, or violation of these Terms or applicable law.",
         ],
       },
       {
         title: "14. Right to Suspend or Remove Users",
         body: [
-          "GotRefs may suspend or permanently remove any user at any time, with or without notice, for any reason it determines appropriate, including without limitation non-payment, fraud, chargebacks, misrepresentation, harassment, repeated cancellations, circumvention, or violations of these Terms or Community Standards.",
+          "GotREFS may suspend or permanently remove any user at any time, with or without notice, for any reason it determines appropriate, including without limitation non-payment, fraud, chargebacks, misrepresentation, harassment, repeated cancellations, circumvention, or violations of these Terms or Community Standards.",
         ],
       },
       {
-        title: "15. Disputes Between Parties; Dispute Resolution with GotRefs",
+        title: "15. Disputes Between Parties; Dispute Resolution with GotREFS",
         body: [
-          "Any dispute between an official and an event organizer is solely between those parties. GotRefs may investigate complaints but is not obligated to resolve disputes or determine fault.",
-          "Disputes between you and GotRefs first proceed through good-faith negotiation, then confidential mediation, then binding arbitration in Orange County, California unless prohibited by law. California law governs these Terms.",
+          "Any dispute between an official and an event organizer is solely between those parties. GotREFS may investigate complaints but is not obligated to resolve disputes or determine fault.",
+          "Disputes between you and GotREFS first proceed through good-faith negotiation, then confidential mediation, then binding arbitration in Orange County, California unless prohibited by law. California law governs these Terms.",
         ],
       },
       {
         title: "16. No Warranty",
         body: [
-          "The platform is provided AS IS and AS AVAILABLE. GotRefs makes no warranty regarding the honesty of users, availability of officials, qualifications, event quality, payments, outcomes, or officiating performance.",
+          "The platform is provided AS IS and AS AVAILABLE. GotREFS makes no warranty regarding the honesty of users, availability of officials, qualifications, event quality, payments, outcomes, or officiating performance.",
         ],
       },
       {
         title: "17. Reporting Misconduct",
         body: [
-          "GotRefs may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotRefs is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
+          "GotREFS may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotREFS is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
         ],
       },
       {
         title: "18. Privacy, Intellectual Property, and Changes",
         body: [
-          "Organizer information is used under the GotRefs Privacy Policy. GotRefs intellectual property remains GotRefs property. GotRefs may modify these Terms, and continued use constitutes acceptance.",
+          "Organizer information is used under the GotREFS Privacy Policy. GotREFS intellectual property remains GotREFS property. GotREFS may modify these Terms, and continued use constitutes acceptance.",
         ],
       },
     ],
   },
   {
     slug: "referee-official-terms",
-    title: "GotRefs Referee & Official Terms & Conditions",
+    title: "GotREFS Referee & Official Terms & Conditions",
     effectiveDate: "Effective Date: To be updated",
     summary: "Terms governing official eligibility, assignments, conduct, compensation, cancellations, safety, and platform use.",
-    contactEmail: "support@GotRefs.org",
+    contactEmail: "support@GotREFS.org",
     sections: [
       {
         title: "Introduction",
         body: [
-          "These Terms & Conditions govern use of GotRefs.org by referees, umpires, officials, judges, scorekeepers, and other sports officials who use the platform to locate, accept, and manage officiating assignments. By creating an account or using GotRefs.org, Officials agree to these Terms.",
+          "These Terms & Conditions govern use of GotREFS.org by referees, umpires, officials, judges, scorekeepers, and other sports officials who use the platform to locate, accept, and manage officiating assignments. By creating an account or using GotREFS.org, Officials agree to these Terms.",
         ],
       },
       {
-        title: "1. Role of GotRefs",
+        title: "1. Role of GotREFS",
         body: [
-          "GotRefs is an online marketplace that connects sports officials and event organizers. GotRefs does not employ, supervise, direct, train, or control officials or event organizers, and is not responsible for the conduct, statements, decisions, or actions of either party.",
+          "GotREFS is an online marketplace that connects sports officials and event organizers. GotREFS does not employ, supervise, direct, train, or control officials or event organizers, and is not responsible for the conduct, statements, decisions, or actions of either party.",
         ],
       },
       {
         title: "2. Eligibility and Independent Contractor Status",
         body: [
           "Officials represent that they are at least 18 or have parental/legal guardian consent where permitted, are legally authorized to work, will provide accurate information, and will maintain required licenses, certifications, and registrations.",
-          "I am an independent contractor. Officials are independent contractors, not employees, partners, joint venturers, or agents of GotRefs. Officials acknowledge they are solely responsible for maintaining certifications, following league and governing-body rules, professional conduct, truthful profile information, their own taxes, insurance (if required), compliance with applicable laws, assignments, uniforms, equipment, and transportation.",
+          "I am an independent contractor. Officials are independent contractors, not employees, partners, joint venturers, or agents of GotREFS. Officials acknowledge they are solely responsible for maintaining certifications, following league and governing-body rules, professional conduct, truthful profile information, their own taxes, insurance (if required), compliance with applicable laws, assignments, uniforms, equipment, and transportation.",
         ],
       },
       {
         title: "3. Truthfulness of Information",
         body: [
-          "Users represent and warrant that all information submitted to GotRefs is true, complete, and accurate. All information submitted must be truthful and accurate. Users are solely responsible for the accuracy of all information they provide. GotRefs has no obligation to independently verify every representation made by a user.",
-          "Any false, misleading, deceptive, or fraudulent information—including regarding certifications, experience, insurance, availability, criminal history, identity, events, or payment—may result in immediate suspension or permanent removal from the platform. Users are solely responsible for any damages arising from false statements or misrepresentations. GotRefs does not independently verify every statement made by users and is not liable for reliance on inaccurate information provided by users.",
+          "Users represent and warrant that all information submitted to GotREFS is true, complete, and accurate. All information submitted must be truthful and accurate. Users are solely responsible for the accuracy of all information they provide. GotREFS has no obligation to independently verify every representation made by a user.",
+          "Any false, misleading, deceptive, or fraudulent information—including regarding certifications, experience, insurance, availability, criminal history, identity, events, or payment—may result in immediate suspension or permanent removal from the platform. Users are solely responsible for any damages arising from false statements or misrepresentations. GotREFS does not independently verify every statement made by users and is not liable for reliance on inaccurate information provided by users.",
         ],
       },
       {
         title: "4. Profile Accuracy and Background Verification",
         body: [
           "Officials must maintain accurate name, contact, sports, certifications, experience, availability, and background verification status. False or misleading information may result in suspension or termination.",
-          "Certain assignments may require criminal background screening, SafeSport certification, governing body certifications, or other verification. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Completion of a background check is not a guarantee or endorsement by GotRefs, and GotRefs does not imply that any official is “safe” or “guaranteed.”",
+          "Certain assignments may require criminal background screening, SafeSport certification, governing body certifications, or other verification. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Completion of a background check is not a guarantee or endorsement by GotREFS, and GotREFS does not imply that any official is “safe” or “guaranteed.”",
         ],
       },
       {
@@ -785,13 +785,13 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
         title: "6. Assignment Acceptance, Conduct, and Compensation",
         body: [
           "Officials may accept or decline assignments. Once accepted, Officials agree to arrive on time, be properly equipped and professionally dressed, officiate under applicable rules, and notify the Organizer immediately if an emergency prevents attendance.",
-          "Officials must act professionally, treat participants with respect, avoid abuse or discrimination, avoid drugs or alcohol before or during assignments, and avoid conflicts of interest. Compensation is determined by the Organizer, and GotRefs does not guarantee minimum earnings unless otherwise specified.",
+          "Officials must act professionally, treat participants with respect, avoid abuse or discrimination, avoid drugs or alcohol before or during assignments, and avoid conflicts of interest. Compensation is determined by the Organizer, and GotREFS does not guarantee minimum earnings unless otherwise specified.",
         ],
       },
       {
         title: "7. Conduct Disclaimer",
         body: [
-          "GotRefs is not responsible for fraud, misrepresentation, assault, harassment, theft, negligence, rule disputes, officiating decisions, scheduling disputes, payment disputes between parties, defamation, false statements, or any illegal or inappropriate conduct by organizers, officials, or other users.",
+          "GotREFS is not responsible for fraud, misrepresentation, assault, harassment, theft, negligence, rule disputes, officiating decisions, scheduling disputes, payment disputes between parties, defamation, false statements, or any illegal or inappropriate conduct by organizers, officials, or other users.",
         ],
       },
       {
@@ -799,7 +799,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
         body: [
           "Officials should provide cancellation notice as soon as possible. Repeated late cancellations or no-shows may affect ratings or result in suspension.",
           "Organizers may rate Officials, and Officials may rate Organizers. Reviews that are false, fraudulent, defamatory, offensive, or discriminatory may be removed.",
-          "Officials may not create multiple accounts, share credentials, misrepresent certifications, manipulate reviews, interfere with the platform, or intentionally bypass GotRefs to avoid applicable service fees for 24 months after an introduction through GotRefs.",
+          "Officials may not create multiple accounts, share credentials, misrepresent certifications, manipulate reviews, interfere with the platform, or intentionally bypass GotREFS to avoid applicable service fees for 24 months after an introduction through GotREFS.",
         ],
       },
       {
@@ -812,71 +812,71 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
         title: "10. Safety and Insurance",
         body: [
           "Officials should report unsafe playing conditions, threats, harassment, assault, and serious misconduct, and should leave an event if personal safety is reasonably at risk.",
-          "Officials are encouraged to carry professional liability insurance if appropriate and personal liability coverage if desired. Officials are responsible for any personal insurance they deem appropriate. GotRefs does not provide health insurance, workers’ compensation, disability insurance, liability insurance, vehicle insurance, or any other insurance unless expressly stated in writing.",
+          "Officials are encouraged to carry professional liability insurance if appropriate and personal liability coverage if desired. Officials are responsible for any personal insurance they deem appropriate. GotREFS does not provide health insurance, workers’ compensation, disability insurance, liability insurance, vehicle insurance, or any other insurance unless expressly stated in writing.",
         ],
       },
       {
         title: "11. Limitation of Liability",
         body: [
-          "GotRefs is a technology marketplace and does not supervise games or direct officials. To the fullest extent permitted by law, GotRefs shall not be liable for any indirect, incidental, consequential, punitive, or special damages arising out of the use of the platform, including without limitation payment disputes, cancellations, injuries, property damage, lost wages, transportation issues, scheduling conflicts, or actions of Organizers, coaches, players, or spectators.",
-          "GotRefs’s maximum liability shall not exceed the fees paid to GotRefs during the twelve (12) months preceding the claim.",
+          "GotREFS is a technology marketplace and does not supervise games or direct officials. To the fullest extent permitted by law, GotREFS shall not be liable for any indirect, incidental, consequential, punitive, or special damages arising out of the use of the platform, including without limitation payment disputes, cancellations, injuries, property damage, lost wages, transportation issues, scheduling conflicts, or actions of Organizers, coaches, players, or spectators.",
+          "GotREFS’s maximum liability shall not exceed the fees paid to GotREFS during the twelve (12) months preceding the claim.",
         ],
       },
       {
         title: "12. Indemnification",
         body: [
-          "You agree to defend, indemnify, and hold harmless GotRefs, its owners, employees, officers, affiliates, and partners from any claims, damages, liabilities, judgments, losses, costs, and attorneys’ fees arising from your conduct, representations, negligence, misconduct, or violation of these Terms or applicable law.",
+          "You agree to defend, indemnify, and hold harmless GotREFS, its owners, employees, officers, affiliates, and partners from any claims, damages, liabilities, judgments, losses, costs, and attorneys’ fees arising from your conduct, representations, negligence, misconduct, or violation of these Terms or applicable law.",
         ],
       },
       {
         title: "13. Right to Suspend or Remove Users",
         body: [
-          "GotRefs may suspend or permanently remove any user at any time, with or without notice, for any reason it determines appropriate, including without limitation fraud, falsified credentials, unsafe conduct, repeated no-shows, abuse, circumvention, or violation of these Terms or Community Standards.",
+          "GotREFS may suspend or permanently remove any user at any time, with or without notice, for any reason it determines appropriate, including without limitation fraud, falsified credentials, unsafe conduct, repeated no-shows, abuse, circumvention, or violation of these Terms or Community Standards.",
         ],
       },
       {
-        title: "14. Disputes Between Parties; Dispute Resolution with GotRefs",
+        title: "14. Disputes Between Parties; Dispute Resolution with GotREFS",
         body: [
-          "Any dispute between an official and an event organizer is solely between those parties. GotRefs may investigate complaints but is not obligated to resolve disputes or determine fault.",
-          "Disputes between you and GotRefs first proceed through good-faith negotiation, then confidential mediation, then binding arbitration in Orange County, California unless prohibited by law. California law governs these Terms.",
+          "Any dispute between an official and an event organizer is solely between those parties. GotREFS may investigate complaints but is not obligated to resolve disputes or determine fault.",
+          "Disputes between you and GotREFS first proceed through good-faith negotiation, then confidential mediation, then binding arbitration in Orange County, California unless prohibited by law. California law governs these Terms.",
         ],
       },
       {
         title: "15. No Warranty",
         body: [
-          "The platform is provided AS IS and AS AVAILABLE. GotRefs makes no warranty regarding the honesty of users, availability of officials or assignments, qualifications, event quality, payments, outcomes, or officiating performance.",
+          "The platform is provided AS IS and AS AVAILABLE. GotREFS makes no warranty regarding the honesty of users, availability of officials or assignments, qualifications, event quality, payments, outcomes, or officiating performance.",
         ],
       },
       {
         title: "16. Reporting Misconduct",
         body: [
-          "GotRefs may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotRefs is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
+          "GotREFS may investigate reports of misconduct in its sole discretion and may suspend or remove accounts based on available information. GotREFS is not required to investigate every complaint and does not guarantee any particular resolution. Filing a report does not guarantee any particular outcome.",
         ],
       },
       {
         title: "17. Intellectual Property, Privacy, and Changes",
         body: [
-          "GotRefs software, trademarks, logos, databases, ratings, verification systems, and content remain GotRefs property. Official information is handled under the Privacy Policy. GotRefs may modify these Terms, and continued use constitutes acceptance.",
+          "GotREFS software, trademarks, logos, databases, ratings, verification systems, and content remain GotREFS property. Official information is handled under the Privacy Policy. GotREFS may modify these Terms, and continued use constitutes acceptance.",
         ],
       },
     ],
   },
   {
     slug: "verified-program",
-    title: "GotRefs Verified Program",
+    title: "GotREFS Verified Program",
     effectiveDate: "Program information",
-    summary: "The GotRefs trust and credential verification program for officials across youth and amateur sports.",
-    contactEmail: "verification@GotRefs.org",
+    summary: "The GotREFS trust and credential verification program for officials across youth and amateur sports.",
+    contactEmail: "verification@GotREFS.org",
     sections: [
-      { title: "Program Overview", body: ["The GotRefs Verified Program is the official trust and credential verification program of GotRefs.org. It helps Event Organizers identify Officials who have completed identity verification and maintain credentials required to officiate youth and amateur sporting events. Being GotRefs Verified is a recognition of professionalism, not a guarantee of performance."] },
-      { title: "Mission", bullets: ["Increase trust between Organizers and Officials.", "Promote safer youth sports.", "Simplify the hiring process.", "Encourage professional development.", "Recognize Officials who maintain current credentials.", "Establish GotRefs as a premier officiating marketplace in North America."] },
-      { title: "Verification Levels", bullets: ["GotRefs Verified: identity, active account, email and mobile verification, profile photo, accepted terms, and Community Standards acknowledgement.", "GotRefs Certified: Verified plus governing body certifications, active credentials, rule certification where applicable, and expiration dates on file.", "GotRefs SafeSport Verified: current SafeSport certification and completion date verification.", "GotRefs Background Verified: current NSID or approved national screening and identity verification.", "GotRefs Elite: highest recognition for experienced, highly rated, reliable, professional Officials with no serious disciplinary actions."] },
+      { title: "Program Overview", body: ["The GotREFS Verified Program is the official trust and credential verification program of GotREFS.org. It helps Event Organizers identify Officials who have completed identity verification and maintain credentials required to officiate youth and amateur sporting events. Being GotREFS Verified is a recognition of professionalism, not a guarantee of performance."] },
+      { title: "Mission", bullets: ["Increase trust between Organizers and Officials.", "Promote safer youth sports.", "Simplify the hiring process.", "Encourage professional development.", "Recognize Officials who maintain current credentials.", "Establish GotREFS as a premier officiating marketplace in North America."] },
+      { title: "Verification Levels", bullets: ["GotREFS Verified: identity, active account, email and mobile verification, profile photo, accepted terms, and Community Standards acknowledgement.", "GotREFS Certified: Verified plus governing body certifications, active credentials, rule certification where applicable, and expiration dates on file.", "GotREFS SafeSport Verified: current SafeSport certification and completion date verification.", "GotREFS Background Verified: current NSID or approved national screening and identity verification.", "GotREFS Elite: highest recognition for experienced, highly rated, reliable, professional Officials with no serious disciplinary actions."] },
       { title: "Verification Categories", bullets: ["Identity Verified.", "Background Verified.", "SafeSport Verified.", "Certification Verified.", "Veteran Official.", "Elite Official.", "Tournament Certified.", "State Certified.", "NCAA Certified where applicable.", "NFHS Certified.", "USA Sport Certified."] },
       { title: "Benefits", bullets: ["Officials may receive higher visibility, increased credibility, priority consideration where applicable, profile badges, renewal reminders, digital certificates, and future professional development opportunities.", "Organizers can quickly identify Officials with verified identity, current certifications, background verification, SafeSport compliance, reliable assignment history, and strong community ratings."] },
       { title: "Maintaining Verification", body: ["Officials are responsible for maintaining current credentials. Verification may require periodic renewal of background checks, SafeSport certification, governing body memberships, rule examinations, professional certifications, and contact information. Expired credentials may temporarily remove badges or limit assignment eligibility until documentation is updated and approved."] },
       { title: "Suspension or Removal", body: ["Verification may be suspended if credentials expire, documents cannot be verified, fraudulent documents are submitted, SafeSport or background screening lapses, or serious misconduct is reported and under investigation. Verification may be permanently revoked for falsified credentials, identity fraud, criminal conduct affecting eligibility, permanent suspension by a governing body, sexual misconduct, violence, or repeated policy violations."] },
-      { title: "Digital Certificate and Public Profile", body: ["Verified Officials may receive a digital certificate showing name, verification level, verification ID, date, expiration date if applicable, and QR code linking to a public GotRefs profile. Public profiles may show photo, sports, experience, certifications, badges, service area, ratings, reviews, completed assignments where optional, and expiration dates where appropriate. Sensitive information such as background reports and ID documents will never be displayed publicly."] },
-      { title: "Disclaimer", body: ["The GotRefs Verified Program assists Event Organizers in evaluating Officials. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Verification does not guarantee future performance, assignment eligibility, employment, or officiating ability beyond verified credentials, and does not replace Organizer due diligence. GotRefs does not imply that any official is “safe” or “guaranteed.”"] },
+      { title: "Digital Certificate and Public Profile", body: ["Verified Officials may receive a digital certificate showing name, verification level, verification ID, date, expiration date if applicable, and QR code linking to a public GotREFS profile. Public profiles may show photo, sports, experience, certifications, badges, service area, ratings, reviews, completed assignments where optional, and expiration dates where appropriate. Sensitive information such as background reports and ID documents will never be displayed publicly."] },
+      { title: "Disclaimer", body: ["The GotREFS Verified Program assists Event Organizers in evaluating Officials. Verification only confirms that certain credentials or background information were reviewed as of a specific date. It is not a guarantee of honesty, professionalism, future conduct, or suitability. Verification does not guarantee future performance, assignment eligibility, employment, or officiating ability beyond verified credentials, and does not replace Organizer due diligence. GotREFS does not imply that any official is “safe” or “guaranteed.”"] },
     ],
   },
 ];

@@ -103,7 +103,7 @@ export function AttendingRefsModal({
             <p className="mt-4 text-center text-xs text-neutral-500">
               {refs.length > 1
                 ? "Tap Back to return to the attending list and open another official."
-                : "This is the official’s GotRefs ID for your event."}
+                : "This is the official’s GotREFS ID for your event."}
             </p>
           </>
         ) : (

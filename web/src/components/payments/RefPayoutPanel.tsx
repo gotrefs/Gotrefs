@@ -134,7 +134,7 @@ export function RefPayoutPanel() {
         <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--red)]">Payments</p>
         <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">Get paid with Stripe</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
-          Connect your payout method with Stripe. When organizers pay for your games, GotRefs deposits your
+          Connect your payout method with Stripe. When organizers pay for your games, GotREFS deposits your
           pay by ACH.
         </p>
       </div>

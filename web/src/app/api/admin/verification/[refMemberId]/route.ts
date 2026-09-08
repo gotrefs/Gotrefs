@@ -112,7 +112,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
     const adminNotes =
       adminNotesInput ||
       (action === "approve"
-        ? "Application Approved — you can now request to work games on GotRefs!"
+        ? "Application Approved — you can now request to work games on GotREFS!"
         : action === "reject"
           ? "Your verification was not approved. Please complete the requested fixes and resubmit."
           : null);

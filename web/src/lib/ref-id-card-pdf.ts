@@ -90,7 +90,7 @@ function badge(
 }
 
 /**
- * Data-driven GotRefs ID card PDF (jsPDF drawing only — no DOM/Tailwind capture).
+ * Data-driven GotREFS ID card PDF (jsPDF drawing only — no DOM/Tailwind capture).
  */
 export async function downloadRefIdCardPdf(
   data: RefIdCardPdfData,
@@ -409,7 +409,7 @@ export async function downloadRefIdCardPdf(
 
   if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: "GotRefs ID Card" });
+      await navigator.share({ files: [file], title: "GotREFS ID Card" });
       return;
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;

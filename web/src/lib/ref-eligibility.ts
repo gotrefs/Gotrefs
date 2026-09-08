@@ -92,7 +92,7 @@ export function applyBlockedMessageForStep(step: RefMissingApplyStep | null): st
     case "submit":
       return "Submit your verification for review to book games";
     case "pending_review":
-      return "Awaiting GotRefs approval";
+      return "Awaiting GotREFS approval";
     case "fix_required":
       return "Fix your verification to book games";
     case "rejected":
