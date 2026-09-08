@@ -71,9 +71,10 @@ export async function upsertConnectAccountFromStripe(
   return data as ConnectAccountRow;
 }
 
+/** Recipient + Express for Separate Charges & Transfers (Accounts v2 create). */
 export async function ensureExpressConnectAccount(
   admin: SupabaseClient,
-  args: { memberId: string; email?: string | null }
+  args: { memberId: string; email?: string | null; displayName?: string | null }
 ) {
   const stripe = getStripe();
   const { data: existing } = await admin
@@ -87,24 +88,37 @@ export async function ensureExpressConnectAccount(
     return upsertConnectAccountFromStripe(admin, args.memberId, account);
   }
 
-  const account = await stripe.accounts.create({
-    type: "express",
-    country: "US",
-    email: args.email || undefined,
-    business_type: "individual",
-    capabilities: {
-      transfers: { requested: true },
+  const created = await stripe.v2.core.accounts.create({
+    contact_email: args.email || undefined,
+    display_name: args.displayName?.trim() || args.email || "GotRefs referee",
+    dashboard: "express",
+    identity: {
+      country: "us",
+      entity_type: "individual",
+    },
+    defaults: {
+      currency: "usd",
+      responsibilities: {
+        fees_collector: "application",
+        losses_collector: "application",
+      },
+    },
+    configuration: {
+      recipient: {
+        capabilities: {
+          stripe_balance: {
+            stripe_transfers: { requested: true },
+          },
+        },
+      },
     },
     metadata: {
       member_id: args.memberId,
     },
-    settings: {
-      payouts: {
-        schedule: { interval: "daily" },
-      },
-    },
+    include: ["configuration.recipient", "identity", "requirements"],
   });
 
+  const account = await stripe.accounts.retrieve(created.id);
   return upsertConnectAccountFromStripe(admin, args.memberId, account);
 }
 
@@ -114,12 +128,30 @@ export async function createConnectOnboardingLink(args: {
   refreshUrl: string;
 }) {
   const stripe = getStripe();
-  return stripe.accountLinks.create({
-    account: args.stripeAccountId,
-    refresh_url: args.refreshUrl,
-    return_url: args.returnUrl,
-    type: "account_onboarding",
-  });
+  try {
+    return await stripe.v2.core.accountLinks.create({
+      account: args.stripeAccountId,
+      use_case: {
+        type: "account_onboarding",
+        account_onboarding: {
+          configurations: ["recipient"],
+          return_url: args.returnUrl,
+          refresh_url: args.refreshUrl,
+        },
+      },
+    });
+  } catch (v2Err) {
+    try {
+      return await stripe.accountLinks.create({
+        account: args.stripeAccountId,
+        refresh_url: args.refreshUrl,
+        return_url: args.returnUrl,
+        type: "account_onboarding",
+      });
+    } catch {
+      throw v2Err;
+    }
+  }
 }
 
 export async function createConnectLoginLink(stripeAccountId: string) {

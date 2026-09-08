@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAal2ForSensitiveAction } from "@/lib/auth/mfa";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
-import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
+import { resolveSiteUrlFromRequest } from "@/lib/env/server";
 import { getStripe } from "@/lib/stripe/client";
 import {
   createConnectLoginLink,
@@ -13,9 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 function stripeConnectMfaRequired(): boolean {
-  if (!serverEnv.stripeAllowConnectWithoutMfa()) return true;
-  const key = serverEnv.stripeSecretKey() || process.env.STRIPE_SECRET_KEY?.trim() || "";
-  return !key.startsWith("sk_test_");
+  // Payout Connect opens on Stripe’s site; GotRefs no longer gates this behind 2FA.
+  return false;
 }
 
 export async function GET() {
@@ -86,11 +84,6 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const mfa = await requireAal2ForSensitiveAction(user);
-  if (!mfa.ok) {
-    return NextResponse.json({ error: mfa.error, code: mfa.code }, { status: 403 });
-  }
 
   let body: { action?: "onboard" | "login" } = {};
   try {
