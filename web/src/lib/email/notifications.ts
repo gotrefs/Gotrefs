@@ -568,6 +568,79 @@ export async function notifyVerificationDecision(opts: {
   return sent;
 }
 
+function formatUsdCents(cents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(Math.max(0, cents) / 100);
+}
+
+/**
+ * Receipt email after an organizer is charged for refs (+ fee + deposit).
+ */
+export async function notifyOrganizerPaymentReceipt(opts: {
+  admin: SupabaseClient;
+  organizerMemberId: string;
+  eventId: string;
+  paymentId: string;
+  refSubtotalCents: number;
+  platformFeeCents: number;
+  depositCents: number;
+  totalCents: number;
+  refCount: number;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const org = await emailForMemberId(opts.admin, opts.organizerMemberId);
+  if (!org) return false;
+
+  const event = await eventSummary(opts.admin, opts.eventId);
+  const eventTitle = event?.title || "your event";
+  const eventMeta = event
+    ? `${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}`
+    : "";
+
+  const depositLine =
+    opts.depositCents > 0
+      ? `<p>We also held a <strong>refundable deposit of ${escapeHtml(
+          formatUsdCents(opts.depositCents)
+        )}</strong> (one game rate × each ref). If those refs don’t work extra games, that deposit is returned to your original payment method after the event ends — automatically, or sooner from your Payments tab.</p>`
+      : `<p>Any unused refundable deposit already held for this event is returned after the event ends.</p>`;
+
+  return sendEmail({
+    to: org.email,
+    subject: `${BRAND_NAME}: Payment receipt — ${eventTitle}`,
+    html: emailLayout({
+      title: "Payment receipt",
+      bodyHtml: `
+        <p>Hi ${escapeHtml(org.displayName)},</p>
+        <p>You’ve paid out officials for <strong>${escapeHtml(eventTitle)}</strong>${
+          eventMeta ? ` (${eventMeta})` : ""
+        }. Keep this email as your receipt.</p>
+        <ul>
+          <li>Referee pay: <strong>${escapeHtml(formatUsdCents(opts.refSubtotalCents))}</strong> (${opts.refCount} ref${
+            opts.refCount === 1 ? "" : "s"
+          })</li>
+          <li>GotREFS fee: <strong>${escapeHtml(formatUsdCents(opts.platformFeeCents))}</strong></li>
+          ${
+            opts.depositCents > 0
+              ? `<li>Refundable deposit held: <strong>${escapeHtml(
+                  formatUsdCents(opts.depositCents)
+                )}</strong></li>`
+              : ""
+          }
+          <li>Total charged: <strong>${escapeHtml(formatUsdCents(opts.totalCents))}</strong></li>
+        </ul>
+        ${depositLine}
+        <p>Refs are paid by ACH after the event ends — not at the moment you confirm pay. You can download a full receipt anytime under Payments → Tax / receipts.</p>
+        <p style="font-size:13px;color:#7B8FA0;">Receipt ID: ${escapeHtml(opts.paymentId)}</p>
+      `,
+      ctaLabel: "Open Payments",
+      ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer?tab=payments"),
+    }),
+  });
+}
+
 /**
  * Airbnb-style prompt to add a Stripe Connect payout method.
  * Used when pay is held, or as a day-after-signup setup nudge (no amount yet).

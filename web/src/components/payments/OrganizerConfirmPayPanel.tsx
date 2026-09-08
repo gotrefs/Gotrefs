@@ -119,8 +119,8 @@ export function OrganizerConfirmPayPanel({
       }
       setMsg(
         data.breakdown
-          ? `Paid ${formatCents(data.breakdown.totalCents)}. Refs will be paid by ACH.`
-          : "Payment confirmed."
+          ? `Paid ${formatCents(data.breakdown.totalCents)}. Check your inbox for your receipt. Refs are paid by ACH after the event. Unused deposit is returned to your card after the event ends.`
+          : "Payment confirmed. Check your inbox for your receipt."
       );
       await load(eventId);
       onPaid?.();
@@ -154,7 +154,7 @@ export function OrganizerConfirmPayPanel({
       setMsg(
         data.alreadyRefunded
           ? "Deposit already refunded."
-          : `Refunded ${formatCents(data.refundedCents || 0)} deposit.`
+          : `Refunded ${formatCents(data.refundedCents || 0)} deposit to your original payment method. Check your card or bank for the credit.`
       );
       await load(eventId);
       onPaid?.();

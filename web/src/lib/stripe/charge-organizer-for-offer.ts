@@ -10,6 +10,7 @@ import {
   resolveOfferGamesWorked,
   resolveOfferRateCents,
 } from "@/lib/stripe/offer-checkout-amount";
+import { notifyOrganizerPaymentReceipt } from "@/lib/email/notifications";
 import { getOrganizerPaymentProfile } from "@/lib/stripe/organizer-payment-method";
 import { disbursePaymentToRefs } from "@/lib/stripe/payouts";
 import { getStripe } from "@/lib/stripe/client";
@@ -406,6 +407,22 @@ export async function confirmEventPayment(
       } catch (err) {
         console.error("[confirm-event-payment] disburse failed:", err);
       }
+    }
+
+    try {
+      await notifyOrganizerPaymentReceipt({
+        admin,
+        organizerMemberId: args.organizerMemberId,
+        eventId: event.id,
+        paymentId: payment.id,
+        refSubtotalCents: breakdown.refSubtotalCents,
+        platformFeeCents: breakdown.platformFeeCents,
+        depositCents: breakdown.depositCents,
+        totalCents: breakdown.totalCents,
+        refCount: breakdown.refCount,
+      });
+    } catch (err) {
+      console.error("[confirm-event-payment] receipt email failed:", err);
     }
 
     return { paymentId: payment.id, breakdown, alreadyPaid: false };
