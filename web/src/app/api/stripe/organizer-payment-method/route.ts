@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { resolveSiteUrlFromRequest } from "@/lib/env/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  createOrganizerSetupIntent,
+  confirmOrganizerCheckoutSession,
+  createOrganizerCheckoutSetupSession,
   getOrganizerPaymentProfile,
   saveOrganizerDefaultPaymentMethod,
 } from "@/lib/stripe/organizer-payment-method";
@@ -43,14 +45,6 @@ export async function GET() {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load payment method.";
-    if (/stripe_customer_id|payment_method_/i.test(message)) {
-      return NextResponse.json({
-        ready: false,
-        paymentMethod: null,
-        error:
-          "Payment method storage is not enabled yet. Run supabase/migrations/20260902120000_organizer_payment_method_games_count.sql.",
-      });
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -64,7 +58,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string; setupIntentId?: string; paymentMethodId?: string } = {};
+  let body: {
+    action?: string;
+    setupIntentId?: string;
+    paymentMethodId?: string;
+    sessionId?: string;
+  } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -87,21 +86,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Organizer account required." }, { status: 403 });
   }
 
-  const action = body.action || "create_setup_intent";
+  const action = body.action || "create_checkout_setup";
+  const origin = resolveSiteUrlFromRequest(request);
 
   try {
-    if (action === "create_setup_intent") {
-      const { setupIntent } = await createOrganizerSetupIntent(admin, {
+    if (action === "create_checkout_setup" || action === "onboard") {
+      const { session } = await createOrganizerCheckoutSetupSession(admin, {
         memberId: user.id,
         email: member.email || user.email,
         name: member.display_name,
+        successUrl: `${origin}/dashboard/organizer?tab=payments&pm=return&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${origin}/dashboard/organizer?tab=payments&pm=cancel`,
       });
-      if (!setupIntent.client_secret) {
-        return NextResponse.json({ error: "Stripe did not return a setup client secret." }, { status: 502 });
+      if (!session.url) {
+        return NextResponse.json({ error: "Stripe did not return a Checkout URL." }, { status: 502 });
       }
+      return NextResponse.json({ url: session.url, sessionId: session.id });
+    }
+
+    if (action === "confirm_checkout_session") {
+      const sessionId = (body.sessionId || "").trim();
+      if (!sessionId) {
+        return NextResponse.json({ error: "sessionId is required." }, { status: 400 });
+      }
+      const display = await confirmOrganizerCheckoutSession(admin, {
+        memberId: user.id,
+        sessionId,
+      });
       return NextResponse.json({
-        clientSecret: setupIntent.client_secret,
-        setupIntentId: setupIntent.id,
+        ok: true,
+        paymentMethod: {
+          brand: display.payment_method_brand,
+          last4: display.payment_method_last4,
+          type: display.payment_method_type,
+        },
       });
     }
 
@@ -132,15 +150,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update payment method.";
-    if (/stripe_customer_id|payment_method_/i.test(message)) {
-      return NextResponse.json(
-        {
-          error:
-            "Payment method storage is not enabled yet. Run supabase/migrations/20260902120000_organizer_payment_method_games_count.sql.",
-        },
-        { status: 503 }
-      );
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
