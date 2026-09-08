@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/payout-setup-nudges",
-      "schedule": "0 * * * *"
+      "schedule": "0 14 * * *"
     },
     {
       "path": "/api/cron/refund-event-deposits",
-      "schedule": "15 * * * *"
+      "schedule": "15 15 * * *"
     },
     {
       "path": "/api/cron/disburse-after-events",
-      "schedule": "30 * * * *"
+      "schedule": "30 16 * * *"
     }
   ]
 }
