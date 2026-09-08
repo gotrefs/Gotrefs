@@ -2031,11 +2031,7 @@ export default function OrganizerDashboardClient() {
                           {loc || `ZIP ${e.zip_code}`}
                           {payLabel ? ` · ${payLabel}` : ""}
                         </span>
-                        {payment && payment.totalCents > 0 ? (
-                          <span className="mt-1 block text-xs font-semibold text-amber-800">
-                            Confirm pay {formatCents(payment.totalCents)} (refs + GotREFS fee + deposit)
-                          </span>
-                        ) : offerPaid ? (
+                        {offerPaid ? (
                           <span className="mt-1 block text-xs font-semibold text-neutral-500">
                             Refs paid for this event
                           </span>
@@ -2046,7 +2042,7 @@ export default function OrganizerDashboardClient() {
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}>
                         {status.label}
                       </span>
-                      {unpaidCount > 0 ? (
+                      {unpaidCount > 0 && payment ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -2055,7 +2051,7 @@ export default function OrganizerDashboardClient() {
                           }}
                           className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-amber-700"
                         >
-                          Pay now
+                          Pay {formatCents(payment.totalCents)}
                         </button>
                       ) : null}
                       {hiredCount > 0 ? (
