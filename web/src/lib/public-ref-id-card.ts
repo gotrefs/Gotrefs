@@ -19,6 +19,8 @@ export type PublicRefIdCard = {
   verificationStatus: string | null;
   validThrough: string | null;
   profileComplete: boolean;
+  /** Sample (seed) ref: never shown as verified. */
+  isSample: boolean;
 };
 
 type ProfileRow = {
@@ -191,11 +193,15 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
 
   const memberWithPhoto = await admin
     .from("members")
-    .select("profile_picture_url, role")
+    .select("profile_picture_url, role, is_seed")
     .eq("id", profile.member_id)
     .maybeSingle();
 
-  let member = memberWithPhoto.data as { profile_picture_url?: string | null; role?: string } | null;
+  let member = memberWithPhoto.data as {
+    profile_picture_url?: string | null;
+    role?: string;
+    is_seed?: boolean | null;
+  } | null;
   if (isMissingColumnError(memberWithPhoto.error)) {
     const roleOnly = await admin.from("members").select("role").eq("id", profile.member_id).maybeSingle();
     member = roleOnly.data;
@@ -258,7 +264,8 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
     (typeof meta.certified_by === "string" && meta.certified_by.trim()) ||
     null;
 
-  const approved = submission?.status === "approved";
+  const isSample = member?.is_seed === true;
+  const approved = !isSample && submission?.status === "approved";
 
   return {
     gotrefsId: displayId,
@@ -276,5 +283,6 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
     verificationStatus: submission?.status ?? null,
     validThrough: approved ? formatCardValidThrough(submission?.reviewed_at ?? null) : null,
     profileComplete: approved,
+    isSample,
   };
 }

@@ -57,14 +57,39 @@ const rand = mulberry32(20260929);
 const pick = (list) => list[Math.floor(rand() * list.length)];
 const between = (min, max) => Math.round(min + rand() * (max - min));
 
-const FIRST_NAMES = [
-  "Marcus", "Jasmine", "Diego", "Aaliyah", "Kevin", "Sofia", "Andre", "Priya", "Tyler", "Monique",
-  "Luis", "Hannah", "Darnell", "Mei", "Jordan", "Camila", "Brandon", "Keisha", "Omar", "Rachel",
-  "Anthony", "Lauren", "Javier", "Nia", "Ryan", "Isabella", "Terrence", "Grace", "Carlos", "Destiny",
-  "Eric", "Valeria", "Malik", "Emily", "Victor", "Tiana", "Jason", "Ana", "Derek", "Kayla",
-  "Miguel", "Brianna", "Chris", "Leilani", "Andrew", "Gabriela", "Isaiah", "Megan", "Daniel", "Imani",
-  "Ricardo", "Samantha", "Jamal", "Olivia", "Ethan", "Lucia", "Xavier", "Natalie", "Hector", "Ashley",
+// First names grouped so each name suits the face it's paired with.
+const MALE_NAMES = [
+  "Marcus", "Diego", "Kevin", "Andre", "Tyler", "Luis", "Darnell", "Brandon", "Omar", "Anthony",
+  "Javier", "Ryan", "Terrence", "Carlos", "Eric", "Malik", "Victor", "Jason", "Derek", "Miguel",
+  "Chris", "Andrew", "Isaiah", "Daniel", "Ricardo", "Jamal", "Ethan", "Xavier", "Hector", "Adrian",
+  "Julian", "Mateo", "Dominic", "Andres", "Marco", "Elijah", "Nathan", "Rafael", "Kendrick", "Sergio",
 ];
+const FEMALE_NAMES = [
+  "Jasmine", "Aaliyah", "Sofia", "Priya", "Monique", "Hannah", "Mei", "Camila", "Keisha", "Rachel",
+  "Lauren", "Nia", "Isabella", "Grace", "Destiny", "Valeria", "Emily", "Tiana", "Ana", "Kayla",
+  "Brianna", "Leilani", "Gabriela", "Megan", "Imani", "Samantha", "Olivia", "Lucia", "Natalie", "Ashley",
+  "Mariana", "Daniela", "Alyssa", "Jocelyn", "Vanessa", "Bianca", "Maya", "Selena", "Adriana", "Kiara",
+];
+const NEUTRAL_NAMES = ["Jordan", "Alex", "Taylor", "Riley", "Casey", "Jamie", "Avery", "Quinn", "Skyler", "Rowan"];
+
+// One letter per photo in web/public/sample-refs (001.jpg …): M, F or N (neutral name).
+const PHOTO_NAME_STYLE = [
+  "MFFMFFMFMFMMMMNF",
+  "MFMMFMFFMMMFMMMM",
+  "FFMMFFNFFFFFFMMF",
+  "FMMFFFMFFFFMFMNM",
+  "MFNFFMNFFMFFMFFF",
+  "FNFFFFFFMNMMMMFF",
+  "FNFFMFMFMFFFFFFF",
+  "FFMFFFFFMNFFMNFM",
+  "MMFFFNMFFFFFMFFM",
+  "MFMMMMFFFMFFMFFM",
+].join("");
+const SAMPLE_PHOTO_DIR = path.join(__dirname, "..", "public", "sample-refs");
+function samplePhotoFor(index) {
+  const file = `${String(index).padStart(3, "0")}.jpg`;
+  return fs.existsSync(path.join(SAMPLE_PHOTO_DIR, file)) ? `/sample-refs/${file}` : null;
+}
 const LAST_NAMES = [
   "Johnson", "Garcia", "Nguyen", "Williams", "Martinez", "Kim", "Brown", "Lopez", "Patel", "Davis",
   "Hernandez", "Robinson", "Chen", "Thomas", "Ramirez", "Jackson", "Flores", "Lee", "Harris", "Torres",
@@ -111,9 +136,13 @@ export function buildSampleRefs(count, takenIds = new Set()) {
   const refs = [];
   const usedNames = new Set();
   for (let i = 1; i <= count; i++) {
+    const style = PHOTO_NAME_STYLE[i - 1];
+    const pool =
+      style === "M" ? MALE_NAMES : style === "F" ? FEMALE_NAMES : style === "N" ? NEUTRAL_NAMES
+        : [...MALE_NAMES, ...FEMALE_NAMES, ...NEUTRAL_NAMES];
     let first, last;
     do {
-      first = pick(FIRST_NAMES);
+      first = pick(pool);
       last = pick(LAST_NAMES);
     } while (usedNames.has(`${first} ${last}`));
     usedNames.add(`${first} ${last}`);
@@ -136,6 +165,7 @@ export function buildSampleRefs(count, takenIds = new Set()) {
       firstName: first,
       lastName: last,
       homeZip: pick(ZIPS),
+      photo: samplePhotoFor(i),
       profile: {
         gotrefs_id: gotrefsId,
         primary_sport: sport,
@@ -187,6 +217,7 @@ async function main() {
         sport: r.profile.primary_sport,
         zip: r.homeZip,
         rate: `$${r.profile.rate_per_game}/${r.profile.rate_unit}`,
+        photo: r.photo ?? "initials",
       }))
     );
     console.log(`…${refs.length} sample refs total (dry run, nothing written).`);
@@ -246,7 +277,12 @@ async function main() {
 
     const { error: memErr } = await admin
       .from("members")
-      .update({ is_seed: true, seed_batch: SEED_BATCH, home_zip: ref.homeZip })
+      .update({
+        is_seed: true,
+        seed_batch: SEED_BATCH,
+        home_zip: ref.homeZip,
+        profile_picture_url: ref.photo,
+      })
       .eq("id", user.id);
     if (memErr) throw new Error(`${ref.email} members: ${memErr.message}`);
 
