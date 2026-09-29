@@ -30,6 +30,9 @@ type PlacesWhereInputProps = {
   includedPrimaryTypes?: string[];
 };
 
+// Module-level so the default keeps the same identity across renders (it is an effect dependency).
+const DEFAULT_PRIMARY_TYPES = ["locality", "sublocality", "postal_code", "administrative_area_level_3"];
+
 /** Places Autocomplete (New) with our own dropdown — avoids legacy Autocomplete “Oops!” UI. */
 export function PlacesWhereInput({
   id = "marketplace-where",
@@ -38,7 +41,7 @@ export function PlacesWhereInput({
   onChange,
   onPlaceSelect,
   className = "",
-  includedPrimaryTypes = ["locality", "sublocality", "postal_code", "administrative_area_level_3"],
+  includedPrimaryTypes = DEFAULT_PRIMARY_TYPES,
 }: PlacesWhereInputProps) {
   const [ready, setReady] = useState(false);
   const [mapsError, setMapsError] = useState<string | null>(null);

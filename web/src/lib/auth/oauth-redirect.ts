@@ -24,6 +24,11 @@ export function resolvePostOAuthRedirect(
     return new URL(path, origin);
   }
 
+  // Quick referee signup (/join) finishes on its own one-screen step, not the full wizard.
+  if (safeNext.startsWith("/join/finish")) {
+    return new URL("/join/finish", origin);
+  }
+
   const url = new URL("/auth/signup", origin);
   url.searchParams.set("oauth", "1");
   url.searchParams.set("step", "role");

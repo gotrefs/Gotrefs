@@ -9,6 +9,9 @@ export function MarketingHeader() {
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4">
         <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-12 w-auto sm:h-16" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
+          <Link href="/find-refs" className="hover:text-white">
+            Find Refs
+          </Link>
           <MarketingNavLink href="#features" className="hover:text-white">
             How it works
           </MarketingNavLink>
@@ -29,6 +32,9 @@ export function MarketingHeader() {
           </MarketingNavLink>
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <Link href="/find-refs" className="text-sm font-semibold text-white/90 hover:text-white md:hidden">
+            Find Refs
+          </Link>
           <Link href="/auth/login" className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline">
             Log in
           </Link>

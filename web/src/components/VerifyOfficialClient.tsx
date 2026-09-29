@@ -37,7 +37,9 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
     (card.workRegions ?? []).filter(Boolean).slice(0, 2).join(", ") ||
     "Not listed";
 
-  const isVerified = refVerificationApproved(card.verificationStatus) || card.profileComplete;
+  const isSample = card.isSample;
+  const isVerified =
+    !isSample && (refVerificationApproved(card.verificationStatus) || card.profileComplete);
 
   return (
     <main
@@ -49,17 +51,23 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
           <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/70">
             {BRAND_NAME} verification
           </p>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-4 py-2 ring-1 ring-emerald-400/40">
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-white"
-              aria-hidden
-            >
-              ✓
-            </span>
-            <span className="text-sm font-black tracking-[0.08em] text-emerald-200">
-              {isVerified ? "Verified Official" : `${BRAND_NAME} Official ID`}
-            </span>
-          </div>
+          {isSample ? (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/25">
+              <span className="text-sm font-black tracking-[0.08em] text-white/85">ID card</span>
+            </div>
+          ) : (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-4 py-2 ring-1 ring-emerald-400/40">
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-white"
+                aria-hidden
+              >
+                ✓
+              </span>
+              <span className="text-sm font-black tracking-[0.08em] text-emerald-200">
+                {isVerified ? "Verified Official" : `${BRAND_NAME} Official ID`}
+              </span>
+            </div>
+          )}
           <p className="mt-2 text-sm text-white/65">
             Referee ID <span className="font-semibold text-white">{card.gotrefsId}</span>
           </p>
@@ -81,6 +89,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
               verificationStatus={card.verificationStatus}
               validThrough={card.validThrough}
               profileComplete={card.profileComplete}
+              sample={isSample}
               hideQr
               className="w-full shadow-2xl"
             />

@@ -41,6 +41,8 @@ type RefereeIdCardProps = {
   validThrough?: string | null;
   /** Hide the QR block (used on the public scan page). */
   hideQr?: boolean;
+  /** Sample (seed) ref card: says "ID card" instead of claiming verification. */
+  sample?: boolean;
   onEditField?: (field: EditableRefCardField) => void;
   onUploadPhoto?: (file: File) => void;
   className?: string;
@@ -176,6 +178,7 @@ export function RefereeIdCard({
   validThrough,
   emptyPlaceholders,
   hideQr = false,
+  sample = false,
   onEditField,
   onUploadPhoto,
   className = "",
@@ -267,7 +270,7 @@ export function RefereeIdCard({
             <p
               className="truncate text-[8px] font-bold tracking-[0.12em] text-white/85 sm:text-[9px]"
             >
-              {BRAND_NAME} Verified Official Network
+              {sample ? `${BRAND_NAME} Official Network` : `${BRAND_NAME} Verified Official Network`}
             </p>
             <h2
               className="mt-0.5 text-[1.15rem] font-black uppercase leading-none tracking-[0.04em] text-white sm:text-[1.35rem]"
@@ -384,7 +387,7 @@ export function RefereeIdCard({
                   </span>
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: C.navyMid }}>
-                  Verified official
+                  {sample ? "ID card" : "Verified official"}
                 </p>
               </div>
             </div>

@@ -404,7 +404,7 @@ export function RefereeDigitalCardSection() {
 
         <div className="flex shrink-0 flex-col items-center gap-1.5 sm:gap-2">
           <VerificationPartnerBadge />
-          <Link href="/auth/signup?role=ref" className="btn-demo-hero inline-flex w-full sm:w-auto">
+          <Link href="/join" className="btn-demo-hero inline-flex w-full sm:w-auto">
             Get verified as a ref
           </Link>
         </div>

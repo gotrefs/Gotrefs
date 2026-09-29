@@ -43,6 +43,9 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!card) {
     return NextResponse.json({ error: "Official ID not found." }, { status: 404 });
   }
+  if (card.isSample) {
+    return NextResponse.json({ error: "Sample profiles don't have wallet passes." }, { status: 404 });
+  }
 
   if (!isGoogleWalletConfigured()) {
     return NextResponse.json(
