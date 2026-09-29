@@ -62,6 +62,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
   }
 
+  const { data: refMember } = await admin
+    .from("members")
+    .select("is_seed")
+    .eq("id", body.refMemberId)
+    .maybeSingle();
+  if ((refMember as { is_seed?: boolean } | null)?.is_seed) {
+    return NextResponse.json({ error: "Sample profiles can't be requested." }, { status: 400 });
+  }
+
   const [{ data: screening }, { data: profile }, { data: submission }] = await Promise.all([
     admin.from("screening_checks").select("status").eq("ref_member_id", body.refMemberId).maybeSingle(),
     admin
