@@ -242,6 +242,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
     filtered.sort((a, b) => {
       // Real, bookable refs always come before sample profiles.
       if (a.r.isSample !== b.r.isSample) return a.r.isSample ? 1 : -1;
+      if (Boolean(a.r.photoUrl) !== Boolean(b.r.photoUrl)) return a.r.photoUrl ? -1 : 1;
       if (sort === "price-asc") return byPrice(a.r, b.r);
       if (sort === "price-desc") return byPrice(b.r, a.r);
       if ((sort === "nearest" || sort === "best") && a.d != null && b.d != null) return a.d - b.d;
@@ -321,7 +322,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
               key={id}
               type="button"
               onClick={() => setUnit(id)}
-              className={`flex-1 rounded-full px-2 py-1.5 ${unit === id ? "bg-white text-neutral-900 shadow" : "text-neutral-600"}`}
+              className={`flex-1 whitespace-nowrap rounded-full px-1.5 py-1.5 ${unit === id ? "bg-white text-neutral-900 shadow" : "text-neutral-600"}`}
             >
               {label}
             </button>
@@ -385,7 +386,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
       {/* Search bar */}
       <div className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
-          <div className="flex flex-1 items-center rounded-full border border-neutral-300 shadow-sm focus-within:border-neutral-500">
+          <div className="flex flex-1 flex-col rounded-2xl border border-neutral-300 shadow-sm focus-within:border-neutral-500 sm:flex-row sm:items-center sm:rounded-full">
             <label className="flex flex-1 items-center gap-2 px-4 py-2.5">
               <span className="text-neutral-400" aria-hidden>
                 ⌕
@@ -401,7 +402,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
                 aria-label="Search refs"
               />
             </label>
-            <span className="h-6 w-px bg-neutral-200" aria-hidden />
+            <span className="h-px w-full bg-neutral-200 sm:h-6 sm:w-px" aria-hidden />
             <div className="flex-1 px-4 py-1">
               <PlacesWhereInput
                 id="find-refs-where"
