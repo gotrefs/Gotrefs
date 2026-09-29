@@ -14,6 +14,18 @@ comment on column public.members.is_seed is
 comment on column public.members.seed_batch is
   'Label of the seed run that created this row (e.g. sample-2026-09).';
 
+-- Travel radius was only kept in auth metadata; store it on the profile so the
+-- Find Refs page can filter by it. Backfill existing refs from their metadata.
+alter table public.ref_profiles
+  add column if not exists travel_radius_miles integer;
+
+update public.ref_profiles rp
+set travel_radius_miles = round((u.raw_user_meta_data->>'travel_radius_miles')::numeric)::int
+from auth.users u
+where u.id = rp.member_id
+  and rp.travel_radius_miles is null
+  and (u.raw_user_meta_data->>'travel_radius_miles') ~ '^[0-9]+(\.[0-9]+)?$';
+
 -- Sample refs can never request, accept, or be offered games,
 -- regardless of any verification rows that might exist for them.
 create or replace function public.ref_is_offer_eligible(ref_id uuid)

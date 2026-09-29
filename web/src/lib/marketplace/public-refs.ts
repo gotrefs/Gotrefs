@@ -91,18 +91,20 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.refs;
 
   const admin = createServiceClient();
-  const profileCols =
-    "ref_profiles ( gotrefs_id, primary_sport, additional_sports, certification_level, rate_per_game, rate_type, rate_min, rate_max, rate_unit, travel_radius_miles, bio )";
-  let result: { data: unknown[] | null; error: { message: string } | null } = await admin
-    .from("members")
-    .select(`id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, ${profileCols}`)
-    .eq("role", "ref");
-  if (result.error && /is_seed/.test(result.error.message)) {
-    // Seed migration not applied yet: every ref is real.
-    result = await admin
-      .from("members")
-      .select(`id, display_name, first_name, last_name, home_zip, profile_picture_url, ${profileCols}`)
-      .eq("role", "ref");
+  // Newest columns first; fall back if a migration hasn't been run on this database yet.
+  const baseProfile =
+    "gotrefs_id, primary_sport, additional_sports, certification_level, rate_per_game, rate_type, rate_min, rate_max, rate_unit, bio";
+  const attempts = [
+    `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, ref_profiles ( ${baseProfile}, travel_radius_miles )`,
+    `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, ref_profiles ( ${baseProfile} )`,
+    `id, display_name, first_name, last_name, home_zip, profile_picture_url, ref_profiles ( ${baseProfile} )`,
+    `id, display_name, home_zip, ref_profiles ( gotrefs_id, primary_sport, rate_per_game, rate_type, rate_min, rate_max, rate_unit )`,
+  ];
+  let result: { data: unknown[] | null; error: { message: string } | null } = { data: null, error: null };
+  for (const columns of attempts) {
+    result = await admin.from("members").select(columns).eq("role", "ref");
+    if (!result.error) break;
+    console.warn("[public-refs] select fallback:", result.error.message);
   }
   if (result.error) throw new Error(result.error.message);
   const members = (result.data ?? []) as MemberRow[];
@@ -135,6 +137,19 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
       .in("ref_member_id", realIds.length ? realIds : [emptyId])
       .in("status", ["confirmed", "completed"]),
   ]);
+
+  const metaRadiusByRef = new Map<string, number>();
+  await Promise.all(
+    shown
+      .filter((m) => !m.is_seed)
+      .map(async (m) => {
+        const rp = Array.isArray(m.ref_profiles) ? m.ref_profiles[0] : m.ref_profiles;
+        if (typeof rp?.travel_radius_miles === "number") return;
+        const { data } = await admin.auth.admin.getUserById(m.id);
+        const raw = Number(data?.user?.user_metadata?.travel_radius_miles);
+        if (Number.isFinite(raw) && raw > 0) metaRadiusByRef.set(m.id, Math.round(raw));
+      })
+  );
 
   const ratingByRef = new Map<string, { total: number; count: number }>();
   for (const r of ratingsRes.data ?? []) {
@@ -177,7 +192,8 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
         rateMax: isRange ? Number(rp.rate_max) : exact,
         place: zc?.place ?? null,
         coords: zc ? approximateEventCoords(zc, m.id, PIN_JITTER_MILES) : null,
-        travelRadiusMiles: typeof rp.travel_radius_miles === "number" ? rp.travel_radius_miles : null,
+        travelRadiusMiles:
+          typeof rp.travel_radius_miles === "number" ? rp.travel_radius_miles : metaRadiusByRef.get(m.id) ?? null,
         bio: (rp.bio ?? "").trim(),
         verified: !isSample,
         isSample,
