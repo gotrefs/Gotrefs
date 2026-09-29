@@ -455,6 +455,16 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
             </label>
           </div>
 
+          <Link
+            href="/join"
+            className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-[var(--navy)] px-4 py-3 text-sm text-white hover:opacity-95 sm:px-6"
+          >
+            <span>
+              <span className="font-semibold">Are you a referee?</span> Join free and find games near you.
+            </span>
+            <span className="shrink-0 font-semibold underline">Join →</span>
+          </Link>
+
           {results.length === 0 ? (
             <div className="px-6 py-16 text-center">
               <p className="text-lg font-semibold text-neutral-900">No refs match these filters</p>

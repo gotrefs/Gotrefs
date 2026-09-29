@@ -54,7 +54,7 @@ export function VerifiedRefCardSection() {
           <RefGearPerkCard unlocked compact />
         </div>
 
-        <Link href="/auth/signup?role=ref" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
+        <Link href="/join" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
           Join as a referee
         </Link>
       </div>

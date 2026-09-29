@@ -57,7 +57,7 @@ export default async function HomePage({
                 {hero.subtext}
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
-                <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
+                <Link href="/join" className="btn-primary w-full sm:w-auto">
                   Get verified as a ref
                 </Link>
                 <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
@@ -92,7 +92,7 @@ export default async function HomePage({
             {normalizeBrandInText(cta.subtext)}
           </p>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:mt-8 sm:flex-row">
-            <Link href="/auth/signup?role=ref" className="btn-primary w-full sm:w-auto">
+            <Link href="/join" className="btn-primary w-full sm:w-auto">
               {cta.primaryButton}
             </Link>
             <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">

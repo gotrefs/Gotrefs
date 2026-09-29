@@ -101,7 +101,7 @@ const LAST_NAMES = [
 // Weighted so the marketplace looks like the sports GoTRefs actually serves.
 const SPORTS = [
   ["Basketball", 30], ["Soccer", 25], ["Flag Football", 12], ["Volleyball", 10],
-  ["Baseball", 8], ["Softball", 6], ["Tackle Football", 5], ["Futsal", 4],
+  ["Baseball", 8], ["Softball", 6], ["Tackle Football", 5], ["Lacrosse", 4],
 ];
 function pickSport() {
   const total = SPORTS.reduce((sum, [, w]) => sum + w, 0);
