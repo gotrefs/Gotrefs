@@ -43,6 +43,9 @@ async function bootstrapGoogleMaps(): Promise<typeof google> {
     };
     void importLibrary("maps")
       .then(async () => {
+        // Map pins (google.maps.Marker) live in the separate "marker" library;
+        // without it every map in the app renders with no pins.
+        await importLibrary("marker");
         const places = await importLibrary("places");
         if (!places.AutocompleteSuggestion || !places.AutocompleteSessionToken) {
           throw new Error("Places Autocomplete (New) is unavailable on this key/project.");
