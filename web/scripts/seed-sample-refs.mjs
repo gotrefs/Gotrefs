@@ -115,25 +115,61 @@ function pickSport() {
 
 const CERT_LEVELS = ["Youth / Rec", "High School", "Club", "Adult League", "Collegiate"];
 
-// Southern California ZIPs so refs spread across the map around the launch area.
-const ZIPS = [
-  "90250", "90260", "90266", "90245", "90277", "90278", "90503", "90501", "90301", "90304",
-  "90045", "90066", "90230", "90034", "90019", "90018", "90011", "90016", "90026", "90039",
-  "90042", "90065", "91101", "91106", "91201", "91205", "91506", "91601", "91605", "91401",
-  "91335", "91342", "91711", "91766", "91789", "90601", "90603", "90640", "90650", "90703",
-  "90712", "90805", "90807", "90813", "90802", "90731", "92801", "92805", "92840", "92701",
-  "92704", "92626", "92618", "92614", "92660", "92647", "92683", "91730", "92335", "92501",
-];
+// Four cities per state so sample refs cover all 50 states (200 ZIPs, each used once).
+const STATE_ZIPS = {
+  AL: ["35203", "36104", "36602", "35801"], AK: ["99501", "99701", "99801", "99654"],
+  AZ: ["85004", "85701", "85281", "86001"], AR: ["72201", "72701", "72401", "72901"],
+  CA: ["90012", "94103", "92101", "95814"], CO: ["80202", "80903", "80302", "80521"],
+  CT: ["06103", "06510", "06901", "06604"], DE: ["19801", "19901", "19711", "19958"],
+  FL: ["33130", "32801", "33602", "32202"], GA: ["30303", "31401", "30901", "31201"],
+  HI: ["96813", "96720", "96732", "96766"], ID: ["83702", "83402", "83201", "83814"],
+  IL: ["60601", "62701", "61602", "61101"], IN: ["46204", "46802", "47401", "46601"],
+  IA: ["50309", "52401", "52240", "52801"], KS: ["67202", "66603", "66044", "66502"],
+  KY: ["40202", "40507", "42101", "40601"], LA: ["70112", "70801", "70501", "71101"],
+  ME: ["04101", "04401", "04330", "04240"], MD: ["21202", "21401", "21701", "21801"],
+  MA: ["02108", "01608", "01103", "02139"], MI: ["48226", "49503", "48933", "48104"],
+  MN: ["55401", "55102", "55802", "55901"], MS: ["39201", "39530", "38801", "39401"],
+  MO: ["63101", "64106", "65806", "65201"], MT: ["59101", "59802", "59715", "59601"],
+  NE: ["68102", "68508", "68801", "69101"], NV: ["89101", "89501", "89701", "89014"],
+  NH: ["03101", "03301", "03060", "03801"], NJ: ["07102", "08608", "07302", "08401"],
+  NM: ["87102", "87501", "88001", "88201"], NY: ["10001", "14202", "12207", "14604"],
+  NC: ["28202", "27601", "27701", "27401"], ND: ["58102", "58501", "58201", "58701"],
+  OH: ["43215", "44113", "45202", "43604"], OK: ["73102", "74103", "73069", "74074"],
+  OR: ["97204", "97401", "97301", "97701"], PA: ["19107", "15222", "17101", "18101"],
+  RI: ["02903", "02860", "02840", "02886"], SC: ["29201", "29401", "29601", "29577"],
+  SD: ["57104", "57701", "57501", "57401"], TN: ["37203", "38103", "37902", "37402"],
+  TX: ["77002", "75201", "78701", "78205"], UT: ["84101", "84601", "84401", "84770"],
+  VT: ["05401", "05602", "05701", "05301"], VA: ["23219", "23510", "22201", "24011"],
+  WA: ["98101", "99201", "98402", "98501"], WV: ["25301", "26501", "25701", "26003"],
+  WI: ["53202", "53703", "54301", "54601"], WY: ["82001", "82601", "82070", "82801"],
+};
+const ZIPS = Object.values(STATE_ZIPS).flat();
+
+// Location and rate come from their own random stream so changing them never
+// changes anyone's name, photo or GoTRefs ID.
+const placeRand = mulberry32(50505);
+function shuffled(list) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(placeRand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+const RATE_MIN = 15;
+const RATE_MAX = 30;
+const rateBetween = (min, max) => Math.round(min + placeRand() * (max - min));
 
 const BIO_TEMPLATES = [
   (s, y) => `${y} years officiating ${s.toLowerCase()} — youth leagues, tournaments and weekend showcases.`,
   (s, y) => `${s} official for ${y} seasons. Clear communicator, on time, calm under pressure.`,
-  (s, y) => `Former player turned ${s.toLowerCase()} ref. ${y} years on the whistle across SoCal.`,
+  (s, y) => `Former player turned ${s.toLowerCase()} ref. ${y} years on the whistle.`,
   (s, y) => `${y}+ years reffing ${s.toLowerCase()} for rec, club and high school events.`,
 ];
 
 export function buildSampleRefs(count, takenIds = new Set()) {
   const refs = [];
+  const zipOrder = shuffled(ZIPS);
   const usedNames = new Set();
   for (let i = 1; i <= count; i++) {
     const style = PHOTO_NAME_STYLE[i - 1];
@@ -155,27 +191,29 @@ export function buildSampleRefs(count, takenIds = new Set()) {
 
     const sport = pickSport();
     const years = between(2, 18);
-    const hourly = rand() < 0.6;
-    const base = hourly ? between(25, 70) : between(40, 120);
+    rand(); // (was: hourly vs per-game) kept so later picks don't shift
+    rand(); // (was: base rate)
     const useRange = rand() < 0.35;
+    const rateLow = rateBetween(RATE_MIN, RATE_MAX - (useRange ? 5 : 0));
+    const rateHigh = useRange ? Math.min(RATE_MAX, rateLow + rateBetween(3, 8)) : rateLow;
     const others = SPORTS.map(([s]) => s).filter((s) => s !== sport);
 
     refs.push({
       email: `${SEED_EMAIL_PREFIX}${String(i).padStart(3, "0")}@${SEED_EMAIL_DOMAIN}`,
       firstName: first,
       lastName: last,
-      homeZip: pick(ZIPS),
+      homeZip: (pick(ZIPS), zipOrder[(i - 1) % zipOrder.length]),
       photo: samplePhotoFor(i),
       profile: {
         gotrefs_id: gotrefsId,
         primary_sport: sport,
         additional_sports: rand() < 0.3 ? [pick(others)] : [],
         certification_level: pick(CERT_LEVELS),
-        rate_unit: hourly ? "hour" : "game",
+        rate_unit: "hour",
         rate_type: useRange ? "range" : "exact",
-        rate_per_game: base,
-        rate_min: useRange ? base : null,
-        rate_max: useRange ? base + between(10, 30) : null,
+        rate_per_game: rateLow,
+        rate_min: useRange ? rateLow : null,
+        rate_max: useRange ? (between(10, 30), rateHigh) : null,
         travel_radius_miles: pick([10, 15, 20, 25, 30, 40]),
         bio: pick(BIO_TEMPLATES)(sport, years),
       },
