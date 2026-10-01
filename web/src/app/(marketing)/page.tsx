@@ -4,6 +4,7 @@ import { BrandName } from "@/components/BrandName";
 import siteData from "@/data/site-data.json";
 import { normalizeBrandInText } from "@/lib/brand";
 import { ApartSection } from "@/components/marketing/ApartSection";
+import { FindRefsNowSection } from "@/components/marketing/FindRefsNowSection";
 import { HeroVideoShowcase } from "@/components/marketing/HeroVideoShowcase";
 import { MarketingFaqSection } from "@/components/marketing/MarketingFaqSection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
@@ -74,6 +75,8 @@ export default async function HomePage({
 
         <TrustedByMarquee />
       </div>
+
+      <FindRefsNowSection />
 
       <VerifiedRefCardSection />
       <RefereeDigitalCardSection />
