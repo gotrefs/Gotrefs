@@ -13,7 +13,10 @@ export async function geocodeUsZip(zip: string): Promise<ZipCoordinates | null> 
   if (cache.has(normalized)) return cache.get(normalized) ?? null;
 
   try {
-    const res = await fetch(`https://api.zippopotam.us/us/${normalized}`);
+    // ZIP coordinates never change; let the server cache them for 30 days.
+    const res = await fetch(`https://api.zippopotam.us/us/${normalized}`, {
+      next: { revalidate: 60 * 60 * 24 * 30 },
+    } as RequestInit);
     if (!res.ok) {
       cache.set(normalized, null);
       return null;
