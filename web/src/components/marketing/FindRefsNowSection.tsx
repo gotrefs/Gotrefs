@@ -39,9 +39,9 @@ export function FindRefsNowSection() {
             src="/marketing/find-refs-screenshot.jpg"
             alt="The GoTRefs Find Refs page: filters, referee listings and a map"
             width={1400}
-            height={809}
+            height={788}
             loading="lazy"
-            className="min-h-0 w-full flex-1 object-cover object-[38%_top] lg:object-left-top transition duration-300 group-hover:scale-[1.01]"
+            className="min-h-0 w-full flex-1 object-cover object-left-top transition duration-300 group-hover:scale-[1.01]"
           />
         </Link>
       </div>
