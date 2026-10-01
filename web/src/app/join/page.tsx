@@ -9,12 +9,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: `Join as a referee | ${BRAND_NAME}`,
-  description: "Sign up in seconds with Google or Apple and find local games to referee.",
+  description: "Sign up in seconds with Google and find local games to referee.",
 };
 export const dynamic = "force-dynamic";
 
 const STEPS = [
-  ["Sign up in seconds", "Google or Apple, then tell us your name and sport."],
+  ["Sign up in seconds", "Continue with Google, then tell us your name and sport."],
   ["Find local games", "Browse open games near you on the map."],
   ["Get verified to work", "When you request your first game, add a photo, ID and certification."],
 ];
