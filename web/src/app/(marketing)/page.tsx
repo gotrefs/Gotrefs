@@ -11,6 +11,7 @@ import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { OrganizerBenefitsSection } from "@/components/marketing/OrganizerBenefitsSection";
 import { OrganizerProfileShowcaseSection } from "@/components/marketing/OrganizerProfileShowcaseSection";
 import { RefereeDigitalCardSection } from "@/components/marketing/RefereeDigitalCardSection";
+import { TrustedByMarquee } from "@/components/marketing/TrustedByMarquee";
 import { VerifiedRefCardSection } from "@/components/marketing/VerifiedRefCardSection";
 
 type SD = typeof siteData;
@@ -70,6 +71,8 @@ export default async function HomePage({
             </div>
           </div>
         </section>
+
+        <TrustedByMarquee />
       </div>
 
       <VerifiedRefCardSection />

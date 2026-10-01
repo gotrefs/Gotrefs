@@ -327,3 +327,47 @@ body {
   background: transparent;
   height: 0.5rem;
 }
+
+/* ── Trusted-by logo marquee (home page) ── */
+.trusted-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.trusted-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: trusted-marquee-scroll 40s linear infinite;
+}
+.trusted-marquee:hover .trusted-marquee-track {
+  animation-play-state: paused;
+}
+.trusted-marquee-row {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trusted-marquee-item {
+  flex: none;
+  padding: 0 2.25rem;
+}
+@media (min-width: 640px) {
+  .trusted-marquee-item {
+    padding: 0 3.5rem;
+  }
+}
+@keyframes trusted-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trusted-marquee-track {
+    animation: none;
+  }
+}
