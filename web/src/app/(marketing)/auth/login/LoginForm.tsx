@@ -8,9 +8,12 @@ import { PasswordField } from "@/components/auth/PasswordField";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+type LoginView = "login" | "forgot-password";
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const [view, setView] = useState<LoginView>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(() => {
@@ -30,19 +33,22 @@ export function LoginForm() {
     if (decoded) return `Sign-in failed: ${decoded}.`;
     return "Sign-in failed. Please try again.";
   });
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (view !== "login") return;
     if (!EMAIL_RE.test(email.trim())) return;
     const timer = window.setTimeout(() => {
       passwordInputRef.current?.focus();
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [email]);
+  }, [email, view]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     if (!isSupabaseConfigured()) {
       setError(SUPABASE_SETUP_HINT);
       return;
@@ -78,6 +84,94 @@ export function LoginForm() {
     }
   }
 
+  async function requestPasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    const normalized = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(normalized)) {
+      setError("Enter the email address on your GotREFS account.");
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setError(SUPABASE_SETUP_HINT);
+      return;
+    }
+    setEmail(normalized);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalized }),
+      });
+      const json = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(json.error || "Could not send the password reset email.");
+        return;
+      }
+      setNotice(
+        json.message ||
+          "If an account exists for that email, we sent a link to set or reset your password. Check your inbox."
+      );
+    } catch {
+      setError("Could not reach the server. Try again in a moment.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openForgotPassword() {
+    setError(null);
+    setNotice(null);
+    setView("forgot-password");
+  }
+
+  function backToLogin() {
+    setError(null);
+    setNotice(null);
+    setView("login");
+  }
+
+  if (view === "forgot-password") {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-sm">
+          <button
+            type="button"
+            onClick={backToLogin}
+            className="text-sm font-semibold text-[var(--muted)] underline"
+          >
+            Back to log in
+          </button>
+          <h1 className="mt-4 text-3xl font-bold text-[var(--blue-text)]">Forgot password</h1>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Enter the email on your GotREFS account. We’ll send a link to reset your password.
+          </p>
+          <form onSubmit={(e) => void requestPasswordReset(e)} className="mt-8 flex flex-col gap-4">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--blue-text)]">Email</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rounded-lg border border-[var(--border)] px-3 py-2"
+                autoComplete="email"
+                placeholder="you@example.com"
+              />
+            </label>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {notice && <p className="text-sm font-semibold text-emerald-700">{notice}</p>}
+            <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 disabled:opacity-50">
+              {loading ? "Sending…" : "Send reset link"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
       <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-sm">
@@ -110,7 +204,17 @@ export function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={openForgotPassword}
+              className="text-sm font-semibold text-[var(--red)] underline"
+            >
+              Forgot password?
+            </button>
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {notice && <p className="text-sm font-semibold text-emerald-700">{notice}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 disabled:opacity-50">
             {loading ? "Signing in…" : "Log in"}
           </button>
