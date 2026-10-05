@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { dashboardPathForRole, resolveMemberRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
+import { ResumeAfterSignup } from "@/components/join/ResumeAfterSignup";
 import OrganizerDashboardClient from "./OrganizerDashboardClient";
 
 export default async function OrganizerDashboardPage({
@@ -26,5 +27,10 @@ export default async function OrganizerDashboardPage({
     redirect(dashboardPathForRole(role));
   }
 
-  return <OrganizerDashboardClient />;
+  return (
+    <>
+      <ResumeAfterSignup />
+      <OrganizerDashboardClient />
+    </>
+  );
 }

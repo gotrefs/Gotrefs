@@ -62,7 +62,7 @@ export default async function HomePage({
                 <Link href="/join" className="btn-primary w-full sm:w-auto">
                   Get verified as a ref
                 </Link>
-                <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
+                <Link href="/join/organizer" className="btn-outline-light w-full sm:w-auto">
                   I need refs
                 </Link>
               </div>
@@ -101,7 +101,7 @@ export default async function HomePage({
             <Link href="/join" className="btn-primary w-full sm:w-auto">
               {cta.primaryButton}
             </Link>
-            <Link href="/auth/signup?role=organizer" className="btn-outline-light w-full sm:w-auto">
+            <Link href="/join/organizer" className="btn-outline-light w-full sm:w-auto">
               {cta.secondaryButton}
             </Link>
           </div>
