@@ -14,6 +14,7 @@ import {
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
 import { issueUniqueGotrefsId } from "@/lib/auth/gotrefs-id";
+import { saveSignupProfilePhoto } from "@/lib/auth/signup-photo";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
 import { schedulePayoutSetupNudge } from "@/lib/stripe/payout-setup-nudge";
@@ -51,6 +52,8 @@ type RegisterBody = {
   recommendedAssignorName?: string;
   recommendedAssignorEmail?: string;
   recommendedAssignorPhone?: string;
+  /** Ref's face photo as a small `data:image/...;base64,` URL (the signup form shrinks it first). */
+  profilePhotoDataUrl?: string;
 };
 
 type ProfileSetupInput = {
@@ -394,6 +397,8 @@ export async function POST(request: NextRequest) {
     recommendedAssignorPhone: role === "ref" ? recommendedAssignorPhone : null,
   };
 
+  let photoSaved = false;
+
   if (!data.session && userId && !skipConfirmation) {
     try {
       const admin = createServiceClient();
@@ -403,6 +408,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: profileResult.error }, { status: 503 });
       }
       await markMemberOnboarded(admin, userId);
+      // Saved now so the photo is on the card whichever device they confirm from.
+      if (role === "ref") {
+        photoSaved = await saveSignupProfilePhoto(admin, userId, body.profilePhotoDataUrl).catch(() => false);
+      }
       // Prefer a token_hash email so confirm works on phone even if signup was on computer.
       await sendCrossDeviceSignupConfirmationEmail({
         admin,
@@ -424,6 +433,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       needsEmailConfirmation: true,
       gotrefsId: role === "ref" ? gotrefsId || null : null,
+      photoSaved,
       email,
       pendingRedirect,
       userId,
@@ -481,6 +491,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: profileResult.error }, { status: 503 });
       }
       await markMemberOnboarded(admin, userId);
+      if (role === "ref") {
+        photoSaved = await saveSignupProfilePhoto(admin, userId, body.profilePhotoDataUrl).catch(() => false);
+      }
     } catch {
       // Non-fatal if profile or onboarding flag cannot be set.
     }
@@ -490,6 +503,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     needsEmailConfirmation: false,
     gotrefsId: role === "ref" ? gotrefsId || null : null,
+    photoSaved,
     userId: signInData.user?.id ?? userId,
     role,
     redirect,
