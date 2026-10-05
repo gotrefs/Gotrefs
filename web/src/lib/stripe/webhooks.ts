@@ -4,7 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { upsertConnectAccountFromStripe } from "@/lib/stripe/connect";
 import { disbursePaymentToRefs, disburseVendorPayment, retryHeldPayoutsForMember } from "@/lib/stripe/payouts";
-import { saveOrganizerDefaultPaymentMethod } from "@/lib/stripe/organizer-payment-method";
+import { checkoutSessionKind } from "@/lib/stripe/checkout-session-kind";
+import {
+  confirmOrganizerCheckoutSession,
+  saveOrganizerDefaultPaymentMethod,
+} from "@/lib/stripe/organizer-payment-method";
 
 async function markWebhookProcessed(
   admin: SupabaseClient,
@@ -75,6 +79,13 @@ async function markPaymentPaidFromCheckout(
     if (error) throw new Error(error.message);
     paymentId = data.id;
   } else {
+    const organizerMemberId = meta.organizerMemberId?.trim() || null;
+    if (!organizerMemberId) {
+      // Not a GoTRefs payment checkout we can attribute (no organizer on it). Recording it
+      // would violate payments.organizer_member_id and make Stripe retry forever.
+      console.warn(`[webhooks/stripe] Checkout ${sessionId} has no organizerMemberId; not recorded as a payment.`);
+      return null;
+    }
     const offerIds = (meta.acceptedOfferIds || "")
       .split(",")
       .map((id) => id.trim())
@@ -82,7 +93,7 @@ async function markPaymentPaidFromCheckout(
     const { data, error } = await admin
       .from("payments")
       .insert({
-        organizer_member_id: meta.organizerMemberId || null,
+        organizer_member_id: organizerMemberId,
         event_id: meta.eventId || null,
         vendor_id: meta.vendorId || null,
         purpose: meta.purpose === "vendor" ? "vendor" : "event_refs",
@@ -124,7 +135,22 @@ export async function handleStripeWebhookEvent(admin: SupabaseClient, event: Str
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      if (session.payment_status === "paid" || session.status === "complete") {
+      const kind = checkoutSessionKind(session);
+      if (kind === "setup") {
+        // Organizer saved a card through hosted Checkout: no money moved, so this is
+        // never a payment. Save the card (also done on return and by setup_intent.succeeded).
+        const memberId = session.metadata?.member_id?.trim();
+        if (memberId) {
+          try {
+            await confirmOrganizerCheckoutSession(admin, { memberId, sessionId: session.id });
+          } catch (err) {
+            console.warn(
+              "[webhooks/stripe] setup checkout card save skipped:",
+              err instanceof Error ? err.message : err
+            );
+          }
+        }
+      } else if (kind === "payment") {
         await markPaymentPaidFromCheckout(admin, session);
       }
       break;
