@@ -160,6 +160,206 @@ const RATE_MIN = 15;
 const RATE_MAX = 30;
 const rateBetween = (min, max) => Math.round(min + placeRand() * (max - min));
 
+// ── Sport-specific descriptions ────────────────────────────────────────────
+// Bios use their own random stream so rewriting them never changes anyone's
+// name, photo, GoTRefs ID, location or rate.
+const bioRand = mulberry32(90210);
+const bioPick = (list) => list[Math.floor(bioRand() * list.length)];
+const bioBetween = (min, max) => Math.round(min + bioRand() * (max - min));
+const bioChance = (p) => bioRand() < p;
+
+/** How each sport's officials talk about the job: the right title, career length and details. */
+const SPORT_VOICE = {
+  Basketball: {
+    title: "basketball official",
+    verb: "officiating basketball",
+    years: [2, 14],
+    details: [
+      "Comfortable in two- and three-person crews.",
+      "I keep the game moving and talk to coaches early.",
+      "Strong on block/charge and off-ball contact.",
+      "Good with table crews and running-clock formats.",
+      "I like a clean pregame so partners are on the same page.",
+      "Happy to take the early games or the late ones.",
+      "I'll work back-to-backs all day at a tournament.",
+    ],
+  },
+  Soccer: {
+    title: "soccer referee",
+    verb: "refereeing soccer",
+    years: [1, 12],
+    details: [
+      "Center or assistant referee, small-sided through 11v11.",
+      "Fit enough to keep up with older age groups.",
+      "Comfortable working solo on small-sided fields.",
+      "Good with advantage and managing the benches.",
+      "I'd rather talk a player down than reach for a card.",
+      "Assistant referee most weekends, center when needed.",
+      "Experienced with indoor and 7v7 formats too.",
+    ],
+  },
+  "Flag Football": {
+    title: "flag football official",
+    verb: "officiating flag football",
+    years: [1, 7],
+    details: [
+      "I know 5v5 and 7v7 rule sets.",
+      "Sharp on flag guarding and rush-line calls.",
+      "Comfortable working alone or in a two-person crew.",
+      "Good with younger divisions who are still learning the rules.",
+      "I explain calls quickly so the game keeps its pace.",
+      "Used to short fields and fast clocks.",
+    ],
+  },
+  "Tackle Football": {
+    title: "football official",
+    verb: "officiating football",
+    years: [3, 18],
+    details: [
+      "Mostly a line judge; I can fill in as back judge.",
+      "I work in four- and five-person crews.",
+      "Wing official who can step in as umpire.",
+      "I know youth weight-limit and age-division rules.",
+      "Player safety comes first on every snap.",
+      "Experienced as crew chief for youth and JV crews.",
+      "Friday nights and Saturday youth doubleheaders.",
+    ],
+  },
+  Volleyball: {
+    title: "volleyball referee",
+    verb: "refereeing volleyball",
+    years: [1, 4],
+    details: [
+      "First or second referee, and happy to line judge.",
+      "Comfortable with rally scoring and libero tracking.",
+      "Started as a line judge and moved up to the stand.",
+      "I played, so I read the net well.",
+      "Good with scorekeepers and rotation questions.",
+      "Indoor mostly; I'll work sand tournaments in the summer.",
+    ],
+  },
+  Baseball: {
+    title: "baseball umpire",
+    verb: "umpiring baseball",
+    years: [2, 16],
+    details: [
+      "Plate or bases.",
+      "Consistent strike zone from the first pitch to the last.",
+      "I work one- and two-umpire systems.",
+      "I bring my own plate gear.",
+      "Good with pitch-count and time-limit tournaments.",
+      "I'll take the plate in a doubleheader.",
+      "Calm when a coach wants to talk about a call.",
+    ],
+  },
+  Softball: {
+    title: "softball umpire",
+    verb: "umpiring softball",
+    years: [2, 12],
+    details: [
+      "Fastpitch and slowpitch.",
+      "Plate or bases in a two-umpire system.",
+      "I know the pitching rules and call illegal pitches consistently.",
+      "I bring my own plate gear.",
+      "Used to long tournament days.",
+      "Good with younger divisions and newer coaches.",
+    ],
+  },
+  Lacrosse: {
+    title: "lacrosse official",
+    verb: "officiating lacrosse",
+    years: [1, 8],
+    details: [
+      "I know both the boys' and girls' game.",
+      "Two- and three-person mechanics.",
+      "I played attack, so I see the crease well.",
+      "Strict on checks to the head and neck.",
+      "Comfortable with youth modifications and smaller fields.",
+      "Good at explaining calls to newer programs.",
+    ],
+  },
+};
+
+/** Where they work, phrased to match the certification level on their card. */
+const LEVEL_PHRASES = {
+  "Youth / Rec": ["rec leagues", "youth leagues", "park district games", "elementary and middle school games", "weekend youth tournaments"],
+  "High School": ["JV and varsity", "freshman through varsity", "high school and summer league", "middle school and high school games"],
+  Club: ["club and travel tournaments", "travel teams", "club leagues", "weekend club showcases"],
+  "Adult League": ["adult rec leagues", "men's and women's leagues", "adult and corporate leagues", "weeknight adult leagues"],
+  Collegiate: ["small-college and junior college games", "college club and intramural games", "college scrimmages and high school varsity"],
+};
+
+const BACKGROUNDS = [
+  "Played through high school.",
+  "Played in college.",
+  "Former youth coach.",
+  "PE teacher during the week.",
+  "Started when my kid's league was short on officials.",
+  "Got into it through a friend on a crew.",
+  "Coach for years before switching sides.",
+  "Grew up around the game.",
+];
+
+const AVAILABILITY = [
+  "Free most weekends.",
+  "Weeknights after 5 and all day Saturday.",
+  "Available for tournaments and doubleheaders.",
+  "Weekday evenings only.",
+  "Open all summer.",
+  "Saturdays and Sundays.",
+  "Flexible schedule; short notice is fine.",
+];
+
+function yearsPhrase(years, voice) {
+  if (years === 1) {
+    return bioPick([
+      `In my first full season as a ${voice.title}.`,
+      `New ${voice.title} with one season done.`,
+      `One season ${voice.verb} so far.`,
+    ]);
+  }
+  const ordinal = { 2: "Second", 3: "Third", 4: "Fourth", 5: "Fifth" }[years];
+  const options = [
+    `${years} years ${voice.verb}.`,
+    `${voice.title[0].toUpperCase()}${voice.title.slice(1)} for ${years} years.`,
+    `${years} seasons as a ${voice.title}.`,
+    `Been ${voice.verb} for ${years} years.`,
+  ];
+  if (ordinal) options.push(`${ordinal} season as a ${voice.title}.`);
+  if (years >= 10) options.push(`${years}+ years ${voice.verb}.`);
+  return bioPick(options);
+}
+
+/** A career this short doesn't reach the college level; keep the card consistent. */
+function realisticLevel(level, years) {
+  if (level === "Collegiate" && years < 4) return years < 2 ? "Youth / Rec" : "High School";
+  return level;
+}
+
+const usedBios = new Set();
+function writeBio(sport, level, years) {
+  const voice = SPORT_VOICE[sport];
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const parts = [yearsPhrase(years, voice)];
+    const where = bioPick(LEVEL_PHRASES[level]);
+    parts.push(bioPick([`Mostly ${where}.`, `I work ${where}.`, `${where[0].toUpperCase()}${where.slice(1)}.`]));
+    parts.push(bioPick(voice.details));
+    if (bioChance(0.45)) parts.push(bioPick(BACKGROUNDS));
+    if (bioChance(0.55)) parts.push(bioPick(AVAILABILITY));
+    const bio = parts.join(" ");
+    // Skip drafts that read awkwardly: two sentences opening the same way, or "played" twice.
+    const openers = parts.map((part) => part.split(" ").slice(0, 2).join(" ").toLowerCase());
+    if (new Set(openers).size !== openers.length) continue;
+    if ((bio.match(/\bplayed\b/gi) ?? []).length > 1) continue;
+    if (!usedBios.has(bio)) {
+      usedBios.add(bio);
+      return bio;
+    }
+  }
+  throw new Error(`Could not write a unique bio for ${sport}`);
+}
+
+// Old generic templates (kept only so the main random stream stays in step).
 const BIO_TEMPLATES = [
   (s, y) => `${y} years officiating ${s.toLowerCase()} — youth leagues, tournaments and weekend showcases.`,
   (s, y) => `${s} official for ${y} seasons. Clear communicator, on time, calm under pressure.`,
@@ -169,6 +369,7 @@ const BIO_TEMPLATES = [
 
 export function buildSampleRefs(count, takenIds = new Set()) {
   const refs = [];
+  usedBios.clear();
   const zipOrder = shuffled(ZIPS);
   const usedNames = new Set();
   for (let i = 1; i <= count; i++) {
@@ -190,7 +391,8 @@ export function buildSampleRefs(count, takenIds = new Set()) {
     takenIds.add(gotrefsId);
 
     const sport = pickSport();
-    const years = between(2, 18);
+    between(2, 18); // (was: years) kept so later picks don't shift
+    const years = bioBetween(...SPORT_VOICE[sport].years);
     rand(); // (was: hourly vs per-game) kept so later picks don't shift
     rand(); // (was: base rate)
     const useRange = rand() < 0.35;
@@ -208,16 +410,18 @@ export function buildSampleRefs(count, takenIds = new Set()) {
         gotrefs_id: gotrefsId,
         primary_sport: sport,
         additional_sports: rand() < 0.3 ? [pick(others)] : [],
-        certification_level: pick(CERT_LEVELS),
+        certification_level: realisticLevel(pick(CERT_LEVELS), years),
         rate_unit: "hour",
         rate_type: useRange ? "range" : "exact",
         rate_per_game: rateLow,
         rate_min: useRange ? rateLow : null,
         rate_max: useRange ? (between(10, 30), rateHigh) : null,
         travel_radius_miles: pick([10, 15, 20, 25, 30, 40]),
-        bio: pick(BIO_TEMPLATES)(sport, years),
+        bio: (pick(BIO_TEMPLATES), ""), // written just below, once the level is known
       },
     });
+    const profile = refs[refs.length - 1].profile;
+    profile.bio = writeBio(sport, profile.certification_level, years);
   }
   return refs;
 }
