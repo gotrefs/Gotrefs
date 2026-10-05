@@ -1,6 +1,6 @@
 /**
  * Create sample referee accounts so the marketplace, map and ID cards can be
- * seen with realistic volume before real refs join.
+ * seen with a few example profiles before real refs join.
  *
  * Every account created here is flagged members.is_seed = true and tagged with
  * members.seed_batch, is never bookable (see ref_is_offer_eligible), and shows
@@ -9,8 +9,9 @@
  *
  * Usage (from web/, needs NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local):
  *   node scripts/seed-sample-refs.mjs --dry-run     # print what would be created
- *   node scripts/seed-sample-refs.mjs               # create 200 sample refs
- *   node scripts/seed-sample-refs.mjs --count 50    # create a different number
+ *   node scripts/seed-sample-refs.mjs               # create the 20 sample refs
+ *   node scripts/seed-sample-refs.mjs --all         # create the full original set of 200
+ *   node scripts/seed-sample-refs.mjs --count 50    # create the first 50 of the full set
  *
  * Safe to re-run: existing sample accounts (same email) are updated, not duplicated.
  * Remove them all with: node scripts/delete-sample-refs.mjs
@@ -24,6 +25,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SEED_BATCH = "sample-2026-09";
 export const SEED_EMAIL_PREFIX = "gotrefs-sample-";
 export const SEED_EMAIL_DOMAIN = "example.com";
+/** Size of the full generated set. The site shows only KEPT_SAMPLE_NUMBERS from it. */
+export const FULL_SAMPLE_COUNT = 200;
+/**
+ * The 20 sample refs kept on the site (the other 180 were removed in Oct 2026).
+ * One per state across 20 states, every sport covered, all with photos.
+ * Numbers match the account email: 1 = gotrefs-sample-001@example.com.
+ */
+export const KEPT_SAMPLE_NUMBERS = [1, 2, 4, 19, 24, 25, 29, 30, 36, 38, 39, 58, 61, 63, 64, 65, 87, 90, 116, 118];
 
 function loadEnvLocal() {
   const envPath = path.join(__dirname, "..", ".env.local");
@@ -426,6 +435,15 @@ export function buildSampleRefs(count, takenIds = new Set()) {
   return refs;
 }
 
+/**
+ * The sample refs the site shows. Built from the full set so each kept ref has
+ * exactly the same name, photo, ID, location and rate as before the cut.
+ */
+export function buildKeptSampleRefs(takenIds = new Set()) {
+  const keep = new Set(KEPT_SAMPLE_NUMBERS);
+  return buildSampleRefs(FULL_SAMPLE_COUNT, takenIds).filter((_, i) => keep.has(i + 1));
+}
+
 async function listSeedUsers(admin) {
   const byEmail = new Map();
   for (let page = 1; page <= 50; page++) {
@@ -445,13 +463,15 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const countArg = args.indexOf("--count");
-  const count = countArg >= 0 ? Number(args[countArg + 1]) : 200;
-  if (!Number.isInteger(count) || count < 1 || count > 1000) {
+  // Default: just the 20 kept refs. --all or --count N build from the full set instead.
+  const count = countArg >= 0 ? Number(args[countArg + 1]) : args.includes("--all") ? FULL_SAMPLE_COUNT : null;
+  if (count !== null && (!Number.isInteger(count) || count < 1 || count > 1000)) {
     throw new Error("--count must be a whole number between 1 and 1000");
   }
+  const build = (taken) => (count === null ? buildKeptSampleRefs(taken) : buildSampleRefs(count, taken));
 
   if (dryRun) {
-    const refs = buildSampleRefs(count);
+    const refs = build();
     console.table(
       refs.slice(0, 15).map((r) => ({
         name: `${r.firstName} ${r.lastName}`,
@@ -488,7 +508,7 @@ async function main() {
     for (const row of data ?? []) if (row.gotrefs_id) keptIdByMember.set(row.member_id, row.gotrefs_id);
   }
   const taken = new Set((existingIds ?? []).map((r) => r.gotrefs_id.toUpperCase()));
-  const refs = buildSampleRefs(count, taken);
+  const refs = build(taken);
 
   let created = 0;
   let updated = 0;

@@ -1,13 +1,14 @@
 /**
  * Writes supabase/seed/sample_refs_seed.sql from the same data as seed-sample-refs.mjs,
- * so the 200 sample refs can be created by pasting SQL into the Supabase SQL editor.
+ * so the sample refs can be created by pasting SQL into the Supabase SQL editor.
+ * It keeps the 20 refs in KEPT_SAMPLE_NUMBERS and removes every other sample account.
  *   node scripts/build-sample-refs-sql.mjs
  */
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { buildSampleRefs, SEED_BATCH } from "./seed-sample-refs.mjs";
+import { buildKeptSampleRefs, SEED_BATCH, SEED_EMAIL_DOMAIN, SEED_EMAIL_PREFIX } from "./seed-sample-refs.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(__dirname, "..", "..", "supabase", "seed", "sample_refs_seed.sql");
@@ -21,7 +22,7 @@ function stableUuid(email) {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
-const refs = buildSampleRefs(200);
+const refs = buildKeptSampleRefs();
 const rows = refs.map((r) => {
   const p = r.profile;
   return `  (${[
@@ -35,6 +36,8 @@ const rows = refs.map((r) => {
 const sql = `-- GoTRefs sample referees (${refs.length}) — paste into Supabase → SQL Editor → Run.
 -- Run AFTER supabase/migrations/20260929090000_seed_refs_flag.sql.
 -- Safe to run twice: existing sample accounts are updated, not duplicated.
+-- Any OTHER sample account (is_seed + ${SEED_EMAIL_PREFIX}…@${SEED_EMAIL_DOMAIN}) is deleted,
+-- so the site ends up with exactly these ${refs.length}. Real accounts are never touched.
 -- These accounts cannot log in (no password) and can never be booked.
 -- Remove them all later with supabase/seed/sample_refs_delete.sql.
 
@@ -108,9 +111,17 @@ on conflict (member_id) do update set
   bio = excluded.bio,
   updated_at = now();
 
+-- Remove every sample account that is not one of the ${refs.length} above.
+delete from auth.users u
+using public.members m
+where m.id = u.id
+  and m.is_seed
+  and u.email like '${SEED_EMAIL_PREFIX}%@${SEED_EMAIL_DOMAIN}'
+  and u.id not in (select id from sample_refs);
+
 commit;
 
--- Should show 200:
+-- Should show ${refs.length}:
 select count(*) as sample_refs from public.members where is_seed;
 `;
 
