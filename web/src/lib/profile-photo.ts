@@ -1,8 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Resolve a profile photo for display. Values may be a full URL (OAuth) or a
- * private `verification_documents` storage path that needs a signed URL.
+ * Sample ref photos are files in web/public/sample-refs, served by the site itself
+ * (not Supabase storage). Returns the site path ("/sample-refs/001.jpg") or null.
+ */
+export function siteAssetPhotoPath(value: string | null | undefined): string | null {
+  const v = (value ?? "").trim().replace(/^\/+/, "");
+  return /^sample-refs\/[\w.-]+$/.test(v) ? `/${v}` : null;
+}
+
+/**
+ * Resolve a profile photo for display. Values may be a full URL (OAuth), a site
+ * asset path (sample refs) or a private `verification_documents` storage path
+ * that needs a signed URL.
  */
 export async function resolveProfilePhotoUrl(
   supabase: SupabaseClient,
@@ -12,6 +22,8 @@ export async function resolveProfilePhotoUrl(
   const value = (pathOrUrl ?? "").trim();
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value;
+  const siteAsset = siteAssetPhotoPath(value);
+  if (siteAsset) return siteAsset;
 
   // Normalize accidental leading slashes from older writes.
   const path = value.replace(/^\/+/, "");
@@ -27,6 +39,7 @@ export async function resolveProfilePhotoUrl(
 export function isUploadedProfilePhotoPath(value: string | null | undefined): boolean {
   const v = (value ?? "").trim();
   if (!v || /^https?:\/\//i.test(v) || v.startsWith("blob:")) return false;
+  if (siteAssetPhotoPath(v)) return false;
   return true;
 }
 
@@ -64,6 +77,10 @@ export async function pickProfilePhotoSource(
 
   const uploadedCandidate = cleaned.find((value) => isUploadedProfilePhotoPath(value));
   if (uploadedCandidate) return uploadedCandidate;
+
+  // Sample refs have no uploads; their photo is a file on the site.
+  const siteAsset = candidates.map((value) => siteAssetPhotoPath(value)).find(Boolean);
+  if (siteAsset) return siteAsset;
 
   const stored = await findStoredProfilePhotoPath(supabase, memberId);
   if (stored) return stored;

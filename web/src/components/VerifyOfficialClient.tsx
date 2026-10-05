@@ -70,7 +70,10 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
               </span>
             </div>
           )}
-          <p className="mt-2 text-sm text-white/65">
+          {card.displayName ? (
+            <p className="mt-3 text-2xl font-black tracking-tight text-white">{card.displayName}</p>
+          ) : null}
+          <p className="mt-1 text-sm text-white/65">
             Referee ID <span className="font-semibold text-white">{card.gotrefsId}</span>
           </p>
         </div>
@@ -78,6 +81,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
         <div className="w-full">
           <div id="id-card" className="mx-auto w-full max-w-[400px]">
             <RefereeIdCard
+              fullName={card.displayName ?? undefined}
               gotrefsId={card.gotrefsId}
               primarySport={card.primarySport ?? undefined}
               additionalSports={card.additionalSports}
@@ -94,6 +98,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
               sample={isSample}
               verified={isVerified}
               hideQr
+              emptyPlaceholders
               className="w-full shadow-2xl"
             />
           </div>
@@ -106,7 +111,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
           <dl className="mt-3 space-y-3 text-sm text-neutral-800">
             <div>
               <dt className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">
-                Certified sports
+                {isVerified ? "Certified sports" : "Sports"}
               </dt>
               <dd className="mt-1 font-semibold">{sports.join(" · ")}</dd>
             </div>

@@ -313,7 +313,9 @@ export function RefereeIdCard({
                     }}
                   >
                     <span className="text-xl font-black">{avatarLabel}</span>
-                    <span className="text-[8px] font-bold uppercase tracking-wide">Add photo</span>
+                    {onUploadPhoto || onEditField ? (
+                      <span className="text-[8px] font-bold uppercase tracking-wide">Add photo</span>
+                    ) : null}
                   </div>
                 )}
                 {onUploadPhoto ? (
