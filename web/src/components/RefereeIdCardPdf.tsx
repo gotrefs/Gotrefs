@@ -389,7 +389,7 @@ export function RefereeIdCardPdf({
                 color: "rgba(207, 250, 254, 0.8)",
               }}
             >
-              {cardTitle || `${BRAND_NAME} verified official`}
+              {cardTitle || `${BRAND_NAME} official ID`}
             </p>
             <h3
               style={{

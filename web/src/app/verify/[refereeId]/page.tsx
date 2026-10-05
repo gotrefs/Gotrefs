@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { refereeId } = await params;
   const id = normalizeGotrefsId(refereeId || "");
   return {
-    title: id ? `GotREFS Verified Official · ${id}` : "GotREFS Verified Official",
-    description: "Scan-verified GotREFS official ID card.",
+    title: id ? `GotREFS Official ID · ${id}` : "GotREFS Official ID",
+    description: "GotREFS official ID card.",
     robots: { index: false, follow: false },
   };
 }

@@ -47,7 +47,7 @@ export function buildApplePassBuffers(card: PublicRefIdCard) {
         {
           key: "status",
           label: "STATUS",
-          value: "VERIFIED OFFICIAL",
+          value: card.profileComplete && !card.isSample ? "VERIFIED OFFICIAL" : "OFFICIAL ID",
         },
       ],
       secondaryFields: [

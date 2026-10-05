@@ -68,6 +68,17 @@ function splitName(fullName: string) {
   };
 }
 
+function RedirectToSimpleSignup({ href }: { href: string }) {
+  useEffect(() => {
+    window.location.replace(href);
+  }, [href]);
+  return (
+    <main className="mx-auto flex min-h-[72vh] max-w-5xl items-center justify-center px-4 py-10">
+      <p className="text-sm font-semibold text-[var(--muted)]">Loading…</p>
+    </main>
+  );
+}
+
 export function AuthFlow() {
   const searchParams = useSearchParams();
   const requestedRole = searchParams.get("role");
@@ -810,6 +821,24 @@ export function AuthFlow() {
       <main className="mx-auto flex min-h-[72vh] max-w-5xl items-center justify-center px-4 py-10">
         <p className="text-sm font-semibold text-[var(--muted)]">Loading…</p>
       </main>
+    );
+  }
+
+  // Referee signup is now the one-screen form at /join (name, photo, sport): no license,
+  // certification or government ID. The old multi-step wizard only opens with ?wizard=legacy.
+  if (step === "onboarding" && role === "ref" && searchParams.get("wizard") !== "legacy") {
+    return <RedirectToSimpleSignup href={oauthMode ? "/join/finish" : "/join"} />;
+  }
+
+  // Organizer signup is the one-screen form at /join/organizer (no card). Google/Apple
+  // sign-ins still finish here because their account already exists.
+  if (step === "onboarding" && role === "organizer" && !oauthMode && searchParams.get("wizard") !== "legacy") {
+    const next = searchParams.get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+    return (
+      <RedirectToSimpleSignup
+        href={safeNext ? `/join/organizer?next=${encodeURIComponent(safeNext)}` : "/join/organizer"}
+      />
     );
   }
 

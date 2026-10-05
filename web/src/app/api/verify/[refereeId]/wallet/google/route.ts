@@ -82,13 +82,13 @@ export async function GET(_request: Request, context: RouteContext) {
             cardTitle: {
               defaultValue: {
                 language: "en-US",
-                value: "GotREFS Verified Official",
+                value: card.profileComplete ? "GotREFS Verified Official" : "GotREFS Official ID",
               },
             },
             header: {
               defaultValue: {
                 language: "en-US",
-                value: "VERIFIED OFFICIAL",
+                value: card.profileComplete ? "VERIFIED OFFICIAL" : "OFFICIAL ID",
               },
             },
             subheader: {

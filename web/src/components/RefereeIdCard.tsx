@@ -43,6 +43,11 @@ type RefereeIdCardProps = {
   hideQr?: boolean;
   /** Sample (seed) ref card: says "ID card" instead of claiming verification. */
   sample?: boolean;
+  /**
+   * Whether GoTRefs has verified this ref. When omitted, falls back to
+   * verificationStatus === "approved". Unverified cards never say "Verified".
+   */
+  verified?: boolean;
   onEditField?: (field: EditableRefCardField) => void;
   onUploadPhoto?: (file: File) => void;
   className?: string;
@@ -179,11 +184,14 @@ export function RefereeIdCard({
   emptyPlaceholders,
   hideQr = false,
   sample = false,
+  verified,
+  verificationStatus,
   onEditField,
   onUploadPhoto,
   className = "",
   cardRef,
 }: RefereeIdCardProps) {
+  const isVerifiedCard = !sample && (verified ?? verificationStatus === "approved");
   const id = gotrefsId?.trim() || (emptyPlaceholders ? "" : "GR-2026-4587");
   const name = fullName?.trim() || "";
   const sports = [primarySport, ...additionalSports]
@@ -199,7 +207,8 @@ export function RefereeIdCard({
   const availability = availabilitySummary?.trim() || "";
   const years = validYearRange(validThrough);
   const expireLabel = validThrough?.trim() || (emptyPlaceholders ? "" : "Pending approval");
-  const typeLabel = certificationLevel?.trim() || `${BRAND_NAME} Accreditation`;
+  const typeLabel =
+    certificationLevel?.trim() || (isVerifiedCard ? `${BRAND_NAME} Accreditation` : "Not yet verified");
 
   const gamesList = useMemo(() => {
     if (sports.length > 0) return sports;
@@ -270,7 +279,7 @@ export function RefereeIdCard({
             <p
               className="truncate text-[8px] font-bold tracking-[0.12em] text-white/85 sm:text-[9px]"
             >
-              {sample ? `${BRAND_NAME} Official Network` : `${BRAND_NAME} Verified Official Network`}
+              {isVerifiedCard ? `${BRAND_NAME} Verified Official Network` : `${BRAND_NAME} Official Network`}
             </p>
             <h2
               className="mt-0.5 text-[1.15rem] font-black uppercase leading-none tracking-[0.04em] text-white sm:text-[1.35rem]"
@@ -387,7 +396,7 @@ export function RefereeIdCard({
                   </span>
                 </div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: C.navyMid }}>
-                  {sample ? "ID card" : "Verified official"}
+                  {isVerifiedCard ? "Verified official" : sample ? "ID card" : "Official ID card"}
                 </p>
               </div>
             </div>
@@ -460,7 +469,7 @@ export function RefereeIdCard({
           {/* Games + Location */}
           <div className="mt-3.5 grid h-[7.5rem] grid-cols-2 gap-2">
             <InfoBox
-              title="Games certified to ref"
+              title={isVerifiedCard ? "Games certified to ref" : "Sports"}
               onClick={() => onEditField?.("sports")}
               className="h-full"
               bodyClassName="max-h-[5.25rem]"

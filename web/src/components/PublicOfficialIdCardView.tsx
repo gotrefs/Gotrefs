@@ -35,6 +35,7 @@ export function PublicOfficialIdCardClient({
         validThrough={card.validThrough}
         profileComplete={card.profileComplete}
         sample={card.isSample}
+        verified={!card.isSample && card.profileComplete}
         hideQr
         className="w-full max-w-[400px] shadow-2xl"
       />

@@ -97,7 +97,12 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("GOTREFS VERIFIED OFFICIAL NETWORK", W / 2 + 16, 28, { align: "center" });
+  doc.text(
+    card.profileComplete && !card.isSample ? "GOTREFS VERIFIED OFFICIAL NETWORK" : "GOTREFS OFFICIAL NETWORK",
+    W / 2 + 16,
+    28,
+    { align: "center" }
+  );
   doc.setFontSize(18);
   doc.text("OFFICIAL ID CARD", W / 2 + 16, 50, { align: "center" });
 
