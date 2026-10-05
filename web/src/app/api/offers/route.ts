@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { refOfferEligible } from "@/lib/ref-eligibility";
 import { normalizeGamesCount } from "@/lib/stripe/offer-checkout-amount";
+import { getOrganizerPaymentProfile } from "@/lib/stripe/organizer-payment-method";
 
 type Body = {
   eventId: string;
@@ -60,6 +61,24 @@ export async function POST(request: Request) {
     admin = createServiceClient();
   } catch {
     return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+  }
+
+  // Booking is the moment a card is required: when the ref accepts, the organizer is
+  // charged right away, so the request can't go out without a card on file.
+  try {
+    const paymentProfile = await getOrganizerPaymentProfile(admin, user.id);
+    if (!paymentProfile?.stripe_customer_id || !paymentProfile.default_payment_method_id) {
+      return NextResponse.json(
+        {
+          error: "Add a card to send this request. You're only charged when the ref accepts.",
+          code: "missing_payment_method",
+        },
+        { status: 402 }
+      );
+    }
+  } catch (err) {
+    console.error("[api/offers] payment profile check:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Could not check your payment method. Try again." }, { status: 503 });
   }
 
   const { data: refMember } = await admin

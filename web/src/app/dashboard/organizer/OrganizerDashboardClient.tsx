@@ -10,7 +10,10 @@ import {
 } from "@/components/marketplace/OrganizerEventComposer";
 import { OrganizerPaymentMethodPanel } from "@/components/payments/OrganizerPaymentMethodPanel";
 import { OrganizerConfirmPayPanel } from "@/components/payments/OrganizerConfirmPayPanel";
-import { OrganizerCardRequiredModal } from "@/components/payments/OrganizerCardRequiredModal";
+import {
+  OrganizerCardRequiredModal,
+  requestOrganizerCard,
+} from "@/components/payments/OrganizerCardRequiredModal";
 import { OrganizerIdCard } from "@/components/OrganizerIdCard";
 import { EventMatchingView } from "@/components/organizer/EventMatchingView";
 import {
@@ -534,8 +537,14 @@ export default function OrganizerDashboardClient() {
           gamesCount: action === "accept" ? gamesCount : undefined,
         }),
       });
-      const j = (await res.json()) as { error?: string; status?: string };
+      const j = (await res.json()) as { error?: string; status?: string; code?: string };
       if (!res.ok) {
+        if (j.code === "missing_payment_method") {
+          const detail = "Add a card to approve this ref. You're only charged when you book.";
+          setMsg(detail);
+          requestOrganizerCard();
+          return detail;
+        }
         const detail = j.error || `Could not ${action} this application.`;
         setMsg(detail);
         return detail;
@@ -1040,7 +1049,12 @@ export default function OrganizerDashboardClient() {
           message: "We'd love for you to ref for our upcoming event.",
         }),
       });
-      const j = (await res.json()) as { error?: string };
+      const j = (await res.json()) as { error?: string; code?: string };
+      if (!res.ok && j.code === "missing_payment_method") {
+        setMsg("Add a card to send this request. You're only charged when the ref accepts.");
+        requestOrganizerCard();
+        return false;
+      }
       setMsg(
         res.ok
           ? `Request sent for ${hireGamesCount} game${hireGamesCount === 1 ? "" : "s"}. When they accept, your saved payment method is charged automatically.`

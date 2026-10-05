@@ -400,7 +400,7 @@ export function AuthFlow() {
       const destination =
         json.redirect ||
         (next && next !== "/dashboard" ? next : null) ||
-        (json.role === "organizer" ? "/dashboard/organizer?tab=payments" : "/dashboard/referee");
+        (json.role === "organizer" ? "/dashboard/organizer" : "/dashboard/referee");
       window.location.assign(destination);
     } catch {
       setError("Could not reach the server. Check web/.env.local and try again.");
@@ -787,7 +787,7 @@ export function AuthFlow() {
       const next = searchParams.get("next");
       let destination = next && next !== "/dashboard" ? next : json.redirect || "/dashboard";
       if (role === "organizer" && destination.startsWith("/dashboard/organizer") && !destination.includes("tab=")) {
-        destination = `/dashboard/organizer?tab=payments`;
+        destination = `/dashboard/organizer`;
       }
       if (docsUploaded || role !== "ref") {
         await clearRefSignupDraft();

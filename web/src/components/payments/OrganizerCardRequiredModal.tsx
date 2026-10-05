@@ -10,7 +10,19 @@ function StripeMark() {
   );
 }
 
-/** On login: Stripe Checkout prompt for organizers without a card on file. */
+/** Fired by booking actions when the organizer has no card on file yet. */
+export const CARD_REQUIRED_EVENT = "gotrefs:card-required";
+
+/** Ask the card prompt to open (call when a booking action reports a missing card). */
+export function requestOrganizerCard() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(CARD_REQUIRED_EVENT));
+}
+
+/**
+ * Stripe Checkout prompt for organizers without a card on file.
+ * It does NOT open on its own at signup/login — only when a booking needs a card
+ * (see requestOrganizerCard) — and it can be dismissed.
+ */
 export function OrganizerCardRequiredModal() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,16 +71,7 @@ export function OrganizerCardRequiredModal() {
           window.history.replaceState({}, "", "/dashboard/organizer?tab=payments");
         }
 
-        const res = await fetch("/api/stripe/organizer-payment-method");
-        const json = (await res.json()) as { ready?: boolean; error?: string };
-        if (cancelled) return;
-        if (!res.ok) {
-          setError(json.error || "Could not check payment status.");
-          setLoading(false);
-          return;
-        }
-        if (!json.ready) setOpen(true);
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       } catch {
         if (!cancelled) setLoading(false);
       }
@@ -76,6 +79,15 @@ export function OrganizerCardRequiredModal() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const openPrompt = () => {
+      setError(null);
+      setOpen(true);
+    };
+    window.addEventListener(CARD_REQUIRED_EVENT, openPrompt);
+    return () => window.removeEventListener(CARD_REQUIRED_EVENT, openPrompt);
   }, []);
 
   if (loading || !open) return null;
@@ -95,10 +107,11 @@ export function OrganizerCardRequiredModal() {
             <StripeMark />
           </div>
           <h2 className="mt-3 text-2xl font-bold tracking-tight text-neutral-900">
-            Save a card on file to pay out refs: Connect via Stripe
+            Add a card to book this ref
           </h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            Stripe protects your card details. GotREFS never stores your full card number.
+            You&apos;re only charged when a ref accepts. Stripe protects your card details — GotREFS
+            never stores your full card number.
           </p>
         </div>
 
@@ -118,11 +131,18 @@ export function OrganizerCardRequiredModal() {
             onClick={() => void startStripe()}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#635BFF] px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#5851ea] disabled:opacity-60"
           >
-            {starting ? "Opening Stripe…" : "Connect with Stripe"}
+            {starting ? "Opening Stripe…" : "Add card with Stripe"}
           </button>
           <p className="mt-3 text-center text-xs text-neutral-500">
             You’ll finish setup on Stripe’s secure site, then return to GotREFS.
           </p>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="mt-3 w-full rounded-xl px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-100"
+          >
+            Not now
+          </button>
         </div>
       </div>
     </div>

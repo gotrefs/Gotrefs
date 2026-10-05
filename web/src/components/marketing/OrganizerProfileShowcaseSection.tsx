@@ -31,7 +31,7 @@ export function OrganizerProfileShowcaseSection() {
             />
           </div>
         </div>
-        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-4 inline-flex w-full sm:mt-5 sm:w-auto">
+        <Link href="/join/organizer" className="btn-demo-hero mt-4 inline-flex w-full sm:mt-5 sm:w-auto">
           Create organizer profile
         </Link>
       </div>

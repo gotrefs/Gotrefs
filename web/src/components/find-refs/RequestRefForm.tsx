@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicRefListing } from "@/lib/marketplace/public-refs";
 import { PLATFORM_FEE_PERCENT_LABEL, PLATFORM_FEE_RATE } from "@/lib/platform-fee";
 import { sportEmoji } from "@/lib/sport-emoji";
@@ -18,6 +18,8 @@ type Draft = {
 };
 
 const DRAFT_KEY = "gotrefs_ref_request_draft";
+/** Where to send a brand-new organizer after signup / email confirmation. */
+export const POST_SIGNUP_NEXT_KEY = "gotrefs_post_signup_next";
 /** Assumed length of one game when a ref charges per game (sets the event end time). */
 const HOURS_PER_GAME = 1.5;
 
@@ -82,9 +84,16 @@ export function RequestRefForm({
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [openingCard, setOpeningCard] = useState(false);
+  const [sendAfterCard, setSendAfterCard] = useState(false);
 
   // Bring back what the organizer picked before they created an account.
   useEffect(() => {
+    try {
+      localStorage.removeItem(POST_SIGNUP_NEXT_KEY);
+    } catch {
+      // ignore
+    }
     const saved = loadDraft(r.gotrefsId);
     if (saved) {
       // localStorage only exists after hydration, so restoring has to happen in an effect.
@@ -132,13 +141,36 @@ export function RequestRefForm({
       return;
     }
     saveDraft(r.gotrefsId, draft);
+    try {
+      // Lets the dashboard send them back here after they confirm their email.
+      localStorage.setItem(POST_SIGNUP_NEXT_KEY, JSON.stringify({ path: returnPath, at: Date.now() }));
+    } catch {
+      // ignore
+    }
     const next = encodeURIComponent(returnPath);
     window.location.assign(
-      kind === "signup" ? `/auth/signup?role=organizer&next=${next}` : `/auth/login?next=${next}`
+      kind === "signup" ? `/join/organizer?next=${next}` : `/auth/login?next=${next}`
     );
   }
 
-  async function sendRequest() {
+  /** Booking is when a card is needed: open Stripe's card form, then come back here. */
+  async function openCardForm() {
+    saveDraft(r.gotrefsId, draft);
+    setOpeningCard(true);
+    const res = await fetch("/api/stripe/organizer-payment-method", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "onboard", returnTo: returnPath }),
+    });
+    const json = (await res.json()) as { url?: string; error?: string };
+    if (!res.ok || !json.url) {
+      setOpeningCard(false);
+      throw new Error(json.error || "Could not open the secure card form. Try again.");
+    }
+    window.location.assign(json.url);
+  }
+
+  async function sendRequest(options: { afterCard?: boolean } = {}) {
     const problem = validate();
     if (problem) {
       setError(problem);
@@ -147,6 +179,15 @@ export function RequestRefForm({
     setError(null);
     setSending(true);
     try {
+      if (!options.afterCard) {
+        const pmRes = await fetch("/api/stripe/organizer-payment-method");
+        const pm = (await pmRes.json()) as { ready?: boolean };
+        if (pmRes.ok && !pm.ready) {
+          await openCardForm();
+          return;
+        }
+      }
+
       const startsAt = new Date(`${draft.date}T${draft.start}`);
       const hours = perGame ? draft.amount * HOURS_PER_GAME : draft.amount;
       const endsAt = new Date(startsAt.getTime() + hours * 3600 * 1000);
@@ -179,7 +220,14 @@ export function RequestRefForm({
           gamesCount: draft.amount,
         }),
       });
-      const offerJson = (await offerRes.json()) as { error?: string };
+      const offerJson = (await offerRes.json()) as { error?: string; code?: string };
+      if (!offerRes.ok && offerJson.code === "missing_payment_method") {
+        if (options.afterCard) {
+          throw new Error("We couldn't confirm your card yet. Tap Request to try again.");
+        }
+        await openCardForm();
+        return;
+      }
       if (!offerRes.ok) throw new Error(offerJson.error || "Could not send the request.");
 
       clearDraft();
@@ -190,6 +238,56 @@ export function RequestRefForm({
       setSending(false);
     }
   }
+
+  // Keep a handle on the latest sendRequest so the "back from Stripe" effect can call it.
+  const sendRequestRef = useRef(sendRequest);
+  useEffect(() => {
+    sendRequestRef.current = sendRequest;
+  });
+
+  // Back from Stripe's card form: save the card, tidy the URL, then send the request.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pm = params.get("pm");
+    if (!pm) return;
+    const sessionId = params.get("session_id");
+    window.history.replaceState({}, "", window.location.pathname);
+    if (pm === "cancel") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError("No card was added, so the request wasn't sent. Tap Request when you're ready.");
+      return;
+    }
+    if (pm !== "return" || !sessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/stripe/organizer-payment-method", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "confirm_checkout_session", sessionId }),
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          const json = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(json.error || "We couldn't confirm your card. Tap Request to try again.");
+          return;
+        }
+        setSendAfterCard(true);
+      } catch {
+        if (!cancelled) setError("We couldn't confirm your card. Tap Request to try again.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sendAfterCard) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSendAfterCard(false);
+    void sendRequestRef.current({ afterCard: true });
+  }, [sendAfterCard]);
 
   if (sent) {
     return (
@@ -424,10 +522,10 @@ export function RequestRefForm({
               <button
                 type="button"
                 onClick={() => (viewerRole === "organizer" ? void sendRequest() : continueToAccount("signup"))}
-                disabled={sending}
+                disabled={sending || openingCard}
                 className="mt-4 w-full rounded-xl bg-[var(--red)] py-3.5 text-base font-semibold text-white hover:bg-[var(--red-dark)] disabled:opacity-60"
               >
-                {sending ? "Sending…" : "Request"}
+                {openingCard ? "Opening secure card form…" : sending ? "Sending…" : "Request"}
               </button>
             )}
             <p className="mt-3 text-center text-sm text-neutral-600">You won&apos;t be charged yet</p>

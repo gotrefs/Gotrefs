@@ -49,7 +49,7 @@ export function OrganizerBenefitsSection() {
           ))}
         </ul>
 
-        <Link href="/auth/signup?role=organizer" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
+        <Link href="/join/organizer" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
           Post your first event
         </Link>
       </div>

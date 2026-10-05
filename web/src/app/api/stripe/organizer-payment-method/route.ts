@@ -63,6 +63,8 @@ export async function POST(request: Request) {
     setupIntentId?: string;
     paymentMethodId?: string;
     sessionId?: string;
+    /** Page to come back to after adding a card (only the Find Refs request page is allowed). */
+    returnTo?: string;
   } = {};
   try {
     body = (await request.json()) as typeof body;
@@ -91,12 +93,15 @@ export async function POST(request: Request) {
 
   try {
     if (action === "create_checkout_setup" || action === "onboard") {
+      // Booking from Find Refs returns to that request so it can be sent right after the card is saved.
+      const requested = (body.returnTo || "").trim();
+      const returnPath = /^\/find-refs\/request\/[A-Za-z0-9%_-]{1,80}$/.test(requested) ? requested : null;
       const { session } = await createOrganizerCheckoutSetupSession(admin, {
         memberId: user.id,
         email: member.email || user.email,
         name: member.display_name,
-        successUrl: `${origin}/dashboard/organizer?tab=payments&pm=return&session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${origin}/dashboard/organizer?tab=payments&pm=cancel`,
+        successUrl: `${origin}${returnPath ?? "/dashboard/organizer?tab=payments"}${returnPath ? "?" : "&"}pm=return&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${origin}${returnPath ?? "/dashboard/organizer?tab=payments"}${returnPath ? "?" : "&"}pm=cancel`,
       });
       if (!session.url) {
         return NextResponse.json({ error: "Stripe did not return a Checkout URL." }, { status: 502 });
