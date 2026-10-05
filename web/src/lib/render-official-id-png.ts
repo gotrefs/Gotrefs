@@ -199,7 +199,11 @@ export async function renderOfficialIdPng(input: OfficialIdRenderInput): Promise
   ctx.fillStyle = "rgba(255,255,255,0.75)";
   ctx.font = "600 16px system-ui, -apple-system, Segoe UI, sans-serif";
   ctx.fillText(
-    input.validThrough ? `Valid through ${input.validThrough}` : "GotREFS verified official",
+    input.validThrough
+      ? `Valid through ${input.validThrough}`
+      : input.verified
+        ? "GotREFS verified official"
+        : "GotREFS official ID",
     36,
     H - 36
   );

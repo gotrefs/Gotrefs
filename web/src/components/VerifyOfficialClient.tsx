@@ -51,9 +51,11 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
           <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/70">
             {BRAND_NAME} verification
           </p>
-          {isSample ? (
+          {isSample || !isVerified ? (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/25">
-              <span className="text-sm font-black tracking-[0.08em] text-white/85">ID card</span>
+              <span className="text-sm font-black tracking-[0.08em] text-white/85">
+                {isSample ? "ID card" : "Official ID · not yet verified"}
+              </span>
             </div>
           ) : (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-4 py-2 ring-1 ring-emerald-400/40">
@@ -64,7 +66,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
                 ✓
               </span>
               <span className="text-sm font-black tracking-[0.08em] text-emerald-200">
-                {isVerified ? "Verified Official" : `${BRAND_NAME} Official ID`}
+                Verified Official
               </span>
             </div>
           )}
@@ -90,6 +92,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
               validThrough={card.validThrough}
               profileComplete={card.profileComplete}
               sample={isSample}
+              verified={isVerified}
               hideQr
               className="w-full shadow-2xl"
             />

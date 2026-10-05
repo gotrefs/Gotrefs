@@ -1613,6 +1613,7 @@ export default function RefereeDashboardClient() {
               verificationStatus={verificationStatus}
               verificationSkipped={cardMeta.verificationSkipped}
               profileComplete={profileComplete}
+              verified={isVerified}
               validThrough={
                 showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null
               }

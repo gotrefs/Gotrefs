@@ -247,7 +247,7 @@ export async function downloadRefIdCardPdf(
   doc.setTextColor(165, 243, 252);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text(data.cardTitle || `${BRAND_NAME} verified official`, textX, 118);
+  doc.text(data.cardTitle || `${BRAND_NAME} official ID`, textX, 118);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);

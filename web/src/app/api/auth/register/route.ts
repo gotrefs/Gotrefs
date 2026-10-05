@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/onboarding-test-account";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { syncMemberAccount } from "@/lib/auth/sync-member";
+import { issueUniqueGotrefsId } from "@/lib/auth/gotrefs-id";
 import { validateEmail, validateName } from "@/lib/auth/validation";
 import { resolveSiteUrlFromRequest, serverEnv } from "@/lib/env/server";
 import { schedulePayoutSetupNudge } from "@/lib/stripe/payout-setup-nudge";
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
   const rateType = body.rateType === "range" ? "range" : body.rateType === "exact" ? "exact" : null;
   const rateUnit = body.rateUnit === "game" ? "game" : body.rateUnit === "hour" ? "hour" : null;
   const bio = (body.bio ?? "").trim().slice(0, 800) || null;
-  const gotrefsId = (body.gotrefsId ?? "").trim();
+  let gotrefsId = (body.gotrefsId ?? "").trim();
   const baseCity = (body.baseCity ?? "").trim();
   const workRegions = Array.isArray(body.workRegions)
     ? body.workRegions.filter((region) => typeof region === "string" && region.trim()).map((region) => region.trim())
@@ -265,6 +266,15 @@ export async function POST(request: NextRequest) {
       { error: "You must accept the applicable GotREFS terms and policies before creating an account." },
       { status: 400 }
     );
+  }
+
+  // Every ref gets a GoTRefs ID. If the signup form didn't supply one, issue a unique one here.
+  if (role === "ref" && !gotrefsId) {
+    try {
+      gotrefsId = await issueUniqueGotrefsId(createServiceClient());
+    } catch (err) {
+      console.error("[api/auth/register] could not issue GoTRefs ID:", err instanceof Error ? err.message : err);
+    }
   }
 
   const userMetadata = {
@@ -413,6 +423,7 @@ export async function POST(request: NextRequest) {
     return jsonWithSessionCookies(sessionResponse, {
       ok: true,
       needsEmailConfirmation: true,
+      gotrefsId: role === "ref" ? gotrefsId || null : null,
       email,
       pendingRedirect,
       userId,
@@ -478,6 +489,7 @@ export async function POST(request: NextRequest) {
   return jsonWithSessionCookies(sessionResponse, {
     ok: true,
     needsEmailConfirmation: false,
+    gotrefsId: role === "ref" ? gotrefsId || null : null,
     userId: signInData.user?.id ?? userId,
     role,
     redirect,

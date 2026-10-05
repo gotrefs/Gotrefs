@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { JoinProviderButtons } from "@/components/join/JoinProviderButtons";
+import { RefQuickSignupForm } from "@/components/join/RefQuickSignupForm";
+import { PRIMARY_SPORTS } from "@/data/sports";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { isOAuthProviderEnabled } from "@/lib/auth/oauth-provider-flags";
 import { BRAND_NAME } from "@/lib/brand";
@@ -9,14 +11,14 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: `Join as a referee | ${BRAND_NAME}`,
-  description: "Sign up in seconds with Google and find local games to referee.",
+  description: "Get your GoTRefs ref card in a minute: your name, a photo and your sport.",
 };
 export const dynamic = "force-dynamic";
 
 const STEPS = [
-  ["Sign up in seconds", "Continue with Google, then tell us your name and sport."],
+  ["Get your ref card", "Your name, a photo and your sport. That's it."],
   ["Find local games", "Browse open games near you on the map."],
-  ["Get verified to work", "When you request your first game, add a photo, ID and certification."],
+  ["Get verified to work", "When you request your first game, add your ID and certification."],
 ];
 
 export default async function JoinPage() {
@@ -74,31 +76,21 @@ export default async function JoinPage() {
             </ol>
           </div>
 
-          <div className="rounded-3xl bg-white p-7 shadow-[0_10px_40px_rgba(0,0,0,0.08)] sm:p-8">
-            <h2 className="text-2xl font-semibold text-neutral-900">Create your referee account</h2>
-            <p className="mt-1 text-sm text-neutral-600">Free. Takes about 30 seconds.</p>
-            <div className="mt-6">
-              <JoinProviderButtons enabled={enabled} />
-            </div>
-            <div className="my-6 flex items-center gap-3 text-xs text-neutral-400">
-              <span className="h-px flex-1 bg-neutral-200" />
-              or
-              <span className="h-px flex-1 bg-neutral-200" />
-            </div>
-            <Link
-              href="/auth/signup?role=ref"
-              className="block w-full rounded-xl border border-neutral-300 px-4 py-3.5 text-center text-[15px] font-semibold text-neutral-900 hover:bg-neutral-50"
-            >
-              Sign up with email
-            </Link>
-            <p className="mt-6 text-center text-sm text-neutral-600">
+          <div className="space-y-4">
+            <RefQuickSignupForm sports={[...PRIMARY_SPORTS]} />
+            {(enabled.google || enabled.apple) && (
+              <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
+                <p className="mb-3 text-center text-sm text-neutral-600">Or sign up faster with</p>
+                <JoinProviderButtons enabled={enabled} />
+              </div>
+            )}
+            <p className="text-center text-sm text-neutral-600">
               Already have an account?{" "}
               <Link href="/auth/login" className="font-semibold text-neutral-900 underline">
                 Log in
               </Link>
-            </p>
-            <p className="mt-4 text-center text-sm text-neutral-600">
-              Hiring refs instead?{" "}
+              {" · "}
+              Hiring refs?{" "}
               <Link href="/find-refs" className="font-semibold text-neutral-900 underline">
                 Find refs
               </Link>
