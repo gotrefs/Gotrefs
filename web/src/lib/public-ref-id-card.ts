@@ -8,6 +8,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export type PublicRefIdCard = {
   gotrefsId: string;
+  /** First name + last initial ("Marcus J."), the same name Find Refs shows. Never the full last name. */
+  displayName: string | null;
   primarySport: string | null;
   additionalSports: string[];
   certificationLevel: string | null;
@@ -106,7 +108,20 @@ async function loadProfileByMemberId(
   return (base.data as ProfileRow | null) ?? null;
 }
 
-/** Load public ID card fields by GotREFS ID (no legal name/email/phone). */
+/** "Marcus J." from the member row, or null when no name is on file. */
+function publicDisplayName(member: {
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+} | null): string | null {
+  const parts = (member?.display_name ?? "").trim().split(/\s+/).filter(Boolean);
+  const first = (member?.first_name ?? "").trim() || parts[0] || "";
+  const last = (member?.last_name ?? "").trim() || (parts.length > 1 ? parts[parts.length - 1] : "");
+  if (!first) return null;
+  return last ? `${first} ${last[0].toUpperCase()}.` : first;
+}
+
+/** Load public ID card fields by GotREFS ID (first name + last initial only; no email/phone). */
 export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCard | null> {
   const gotrefsId = normalizeGotrefsId(rawId || "");
   if (!gotrefsId || gotrefsId.length < 4) return null;
@@ -193,7 +208,7 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
 
   const memberWithPhoto = await admin
     .from("members")
-    .select("profile_picture_url, role, is_seed")
+    .select("profile_picture_url, role, is_seed, display_name, first_name, last_name")
     .eq("id", profile.member_id)
     .maybeSingle();
 
@@ -201,9 +216,16 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
     profile_picture_url?: string | null;
     role?: string;
     is_seed?: boolean | null;
+    display_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
   } | null;
   if (isMissingColumnError(memberWithPhoto.error)) {
-    const roleOnly = await admin.from("members").select("role").eq("id", profile.member_id).maybeSingle();
+    const roleOnly = await admin
+      .from("members")
+      .select("role, display_name")
+      .eq("id", profile.member_id)
+      .maybeSingle();
     member = roleOnly.data;
   }
 
@@ -269,6 +291,7 @@ export async function loadPublicRefIdCard(rawId: string): Promise<PublicRefIdCar
 
   return {
     gotrefsId: displayId,
+    displayName: publicDisplayName(member),
     primarySport:
       profile.primary_sport || (typeof meta.primary_sport === "string" ? meta.primary_sport : null),
     additionalSports,
