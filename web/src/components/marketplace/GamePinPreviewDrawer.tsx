@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { OpenEventRecord } from "@/lib/marketplace/event-filters";
 import { EVENT_PRIVACY_RADIUS_MILES } from "@/lib/maps/geo";
 import { formatPayRangeLabel } from "@/lib/pay-range";
@@ -50,6 +50,7 @@ export function GamePinPreviewDrawer({
   requesting,
   canApply = true,
   applyBlockedLabel = "Verification required",
+  blockedActionable = false,
   onClose,
   onApply,
 }: {
@@ -58,9 +59,13 @@ export function GamePinPreviewDrawer({
   requesting?: boolean;
   canApply?: boolean;
   applyBlockedLabel?: string;
+  /** Blocked, but the Ref can fix it: Apply stays clickable and leads to the missing step. */
+  blockedActionable?: boolean;
   onClose: () => void;
   onApply: (event: OpenEventRecord) => void;
 }) {
+  const [askedId, setAskedId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!event) return;
     const onKey = (e: KeyboardEvent) => {
@@ -73,10 +78,14 @@ export function GamePinPreviewDrawer({
   if (!event) return null;
 
   const requested = Boolean(alreadyRequested);
+  const blocked = !canApply;
+  const asked = askedId === event.id;
   const ctaLabel = requested
     ? "Requested to work"
-    : !canApply
-      ? applyBlockedLabel
+    : blocked
+      ? blockedActionable && !asked
+        ? "Apply"
+        : applyBlockedLabel
       : requesting
         ? "Submitting…"
         : "Apply";
@@ -156,10 +165,16 @@ export function GamePinPreviewDrawer({
             </div>
           </dl>
 
+          {blocked && blockedActionable && asked && !requested ? (
+            <p className="text-center text-sm text-neutral-600">One quick step first. Do it once and you can request any game.</p>
+          ) : null}
           <button
             type="button"
-            disabled={requested || requesting || !canApply}
-            onClick={() => onApply(event)}
+            disabled={requested || requesting || (blocked && !blockedActionable)}
+            onClick={() => {
+              if (blocked && !asked) setAskedId(event.id);
+              else onApply(event);
+            }}
             className={`mt-1 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
               requested
                 ? "cursor-default bg-emerald-600"

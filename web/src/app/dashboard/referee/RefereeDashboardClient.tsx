@@ -1287,6 +1287,34 @@ export default function RefereeDashboardClient() {
     );
   }
 
+  // Everything the Ref's own card shows. Used by the approved banner and the My Player Card tab.
+  const refCardProps = {
+    fullName: displayName,
+    gotrefsId: cardMeta.gotrefsId,
+    primarySport: sport,
+    additionalSports: additionalSports,
+    certificationLevel: cert,
+    additionalCertificationLevels: additionalCerts,
+    certifiedBy: cardMeta.certifiedBy || cert || undefined,
+    rate: rateLabel(),
+    avatarUrl: avatarUrl ?? undefined,
+    avatarLabel: avatarLabel,
+    baseCity: cardMeta.baseCity,
+    workRegions: cardMeta.workRegions,
+    travelRadius: cardMeta.travelRadius,
+    availabilitySummary: availabilitySummary,
+    govIdUploaded: Boolean(govIdPath),
+    certUploaded: Boolean(certDocPath),
+    backgroundStatus: screening?.status,
+    verificationStatus: verificationStatus,
+    verificationSkipped: cardMeta.verificationSkipped,
+    profileComplete: profileComplete,
+    verified: isVerified,
+    validThrough: showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null,
+    onEditField: (field: EditableRefCardField) => openProfileWizard(field),
+    onUploadPhoto: (file: File) => void uploadProfilePhoto(file),
+  };
+
   return (
     <div className="flex flex-col gap-10">
       <RefPayoutRequiredModal hasAcceptedJob={hasAcceptedJob} />
@@ -1467,15 +1495,22 @@ export default function RefereeDashboardClient() {
                 return;
               }
               setMsg(applyBlockedLabel);
+              // Open the step the button named (e.g. "Upload your government ID"), not just the first gap.
+              const gateField: EditableRefCardField | null =
+                applyGateStep === "government_id" || applyGateStep === "submit"
+                  ? "verification"
+                  : applyGateStep === "certification"
+                    ? "certification"
+                    : null;
               const next = missingActions[0];
-              if (next) openProfileWizard(next.field);
-              else openProfileWizard("certification");
+              openProfileWizard(gateField ?? next?.field ?? "certification");
             }}
             onReload={load}
             offers={offers}
             applications={applications}
             bookings={bookings}
             payoutPanel={<RefPayoutPanel />}
+            cardPanel={<RefereeIdCard {...refCardProps} />}
           />
         </section>
       )}
@@ -1596,35 +1631,7 @@ export default function RefereeDashboardClient() {
             ) : null}
           </div>
           <div>
-            <RefereeIdCard
-              cardRef={idCardRef}
-              fullName={displayName}
-              gotrefsId={cardMeta.gotrefsId}
-              primarySport={sport}
-              additionalSports={additionalSports}
-              certificationLevel={cert}
-              additionalCertificationLevels={additionalCerts}
-              certifiedBy={cardMeta.certifiedBy || cert || undefined}
-              rate={rateLabel()}
-              avatarUrl={avatarUrl ?? undefined}
-              avatarLabel={avatarLabel}
-              baseCity={cardMeta.baseCity}
-              workRegions={cardMeta.workRegions}
-              travelRadius={cardMeta.travelRadius}
-              availabilitySummary={availabilitySummary}
-              govIdUploaded={Boolean(govIdPath)}
-              certUploaded={Boolean(certDocPath)}
-              backgroundStatus={screening?.status}
-              verificationStatus={verificationStatus}
-              verificationSkipped={cardMeta.verificationSkipped}
-              profileComplete={profileComplete}
-              verified={isVerified}
-              validThrough={
-                showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null
-              }
-              onEditField={(field) => openProfileWizard(field)}
-              onUploadPhoto={(file) => void uploadProfilePhoto(file)}
-            />
+            <RefereeIdCard cardRef={idCardRef} {...refCardProps} />
           </div>
         </div>
       ) : null}

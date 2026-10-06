@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isEventOpenForRequests, type OpenEventRecord } from "@/lib/marketplace/event-filters";
 import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
 import { EVENT_PRIVACY_RADIUS_MILES } from "@/lib/maps/geo";
@@ -51,6 +51,7 @@ export function GameDetailsApplyModal({
   unrequesting,
   canApply = true,
   applyBlockedLabel = "Verification required",
+  blockedActionable = false,
   onClose,
   onApply,
   onUnrequest,
@@ -61,10 +62,18 @@ export function GameDetailsApplyModal({
   unrequesting?: boolean;
   canApply?: boolean;
   applyBlockedLabel?: string;
+  /**
+   * The Ref can't book yet, but there is something they can do about it (upload an ID, etc.).
+   * They can then tap Apply; the button turns into the blocked message and stays clickable.
+   */
+  blockedActionable?: boolean;
   onClose: () => void;
   onApply: (event: OpenEventRecord) => void;
   onUnrequest?: (event: OpenEventRecord) => void;
 }) {
+  // Which game the Ref already tapped Apply on while blocked (so the next tap opens the missing step).
+  const [askedId, setAskedId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!event) return;
     const onKey = (e: KeyboardEvent) => {
@@ -80,12 +89,16 @@ export function GameDetailsApplyModal({
   const ended = !isEventOpenForRequests(event);
   const slotsLeft = Math.max(0, event.officials_needed - (event.booked_count ?? 0));
   const busy = Boolean(requesting || unrequesting);
+  const blocked = !canApply;
+  const asked = askedId === event.id;
   const applyLabel = ended
     ? "Game ended"
     : slotsLeft === 0
       ? "No openings left"
-      : !canApply
-        ? applyBlockedLabel
+      : blocked
+        ? blockedActionable && !asked
+          ? "Apply"
+          : applyBlockedLabel
         : requesting
           ? "Submitting…"
           : "Apply";
@@ -189,14 +202,23 @@ export function GameDetailsApplyModal({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              disabled={ended || busy || slotsLeft === 0 || !canApply}
-              onClick={() => onApply(event)}
-              className="mt-1 w-full rounded-xl bg-[#d81d24] py-3 text-sm font-semibold text-white transition hover:bg-[#c01820] disabled:opacity-60"
-            >
-              {applyLabel}
-            </button>
+            <>
+              {blocked && blockedActionable && asked && !ended && slotsLeft > 0 ? (
+                <p className="text-center text-sm text-neutral-600">One quick step first. Do it once and you can request any game.</p>
+              ) : null}
+              <button
+                type="button"
+                disabled={ended || busy || slotsLeft === 0 || (blocked && !blockedActionable)}
+                onClick={() => {
+                  // First tap while blocked: say what's missing. Second tap: open that step.
+                  if (blocked && !asked) setAskedId(event.id);
+                  else onApply(event);
+                }}
+                className="mt-1 w-full rounded-xl bg-[#d81d24] py-3 text-sm font-semibold text-white transition hover:bg-[#c01820] disabled:opacity-60"
+              >
+                {applyLabel}
+              </button>
+            </>
           )}
         </div>
       </div>
