@@ -778,7 +778,7 @@ export function RefSignupAirbnbWizard({
                 className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"
                 value={bio}
                 onChange={(event) => onBio(event.target.value.slice(0, 800))}
-                placeholder="Example: I've been a CIF referee for 30 years and have worked multiple CIF championships across basketball and football."
+                placeholder="Example: I've been a CIF REFeree for 30 years and have worked multiple CIF championships across basketball and football."
                 maxLength={800}
                 rows={6}
               />
@@ -791,7 +791,7 @@ export function RefSignupAirbnbWizard({
               <div>
                 <p className="text-sm text-neutral-500">Step 2</p>
                 <h1 className="mt-3 text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl">
-                  Verify you&apos;re ready to ref
+                  Verify you&apos;re ready to REF
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
                   Upload your government ID and certification so organizers know you&apos;re a qualified official.
@@ -1029,7 +1029,7 @@ export function RefSignupAirbnbWizard({
                       rel="noreferrer"
                       className="font-semibold text-neutral-900 underline"
                     >
-                      Referee & Official Terms & Conditions
+                      REFeree & Official Terms & Conditions
                     </a>
                     ,{" "}
                     <a

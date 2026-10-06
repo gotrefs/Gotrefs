@@ -56,7 +56,7 @@ export function MatchingRefDeepDiveModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--red)]">Referee profile</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--red)]">REFeree profile</p>
             <h2 className="mt-1 text-2xl font-semibold text-neutral-900">{name}</h2>
             <p className="mt-1 text-sm text-neutral-500">ID {refData.gotrefsId}</p>
           </div>
@@ -140,7 +140,7 @@ export function MatchingRefDeepDiveModal({
           onClick={onRequest}
           className="mt-6 w-full rounded-full bg-[var(--red)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--red-dark)] disabled:cursor-not-allowed disabled:bg-neutral-300"
         >
-          {requestSent ? "Request Sent" : busy ? "Sending…" : "Request Referee"}
+          {requestSent ? "Request Sent" : busy ? "Sending…" : "Request REFeree"}
         </button>
       </div>
     </div>

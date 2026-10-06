@@ -138,9 +138,9 @@ export default function AdminSignupUploadsModal({
             <p className="text-sm text-[var(--muted)]">Loading uploaded info…</p>
           ) : (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-              <section aria-label={person.role === "ref" ? "Ref card" : "Profile"}>
+              <section aria-label={person.role === "ref" ? "REF card" : "Profile"}>
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {person.role === "ref" ? "Ref card" : "Profile"}
+                  {person.role === "ref" ? "REF card" : "Profile"}
                 </h3>
                 {person.role === "ref" ? (
                   <div className="mt-2">

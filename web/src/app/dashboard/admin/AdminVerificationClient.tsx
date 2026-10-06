@@ -189,7 +189,7 @@ export default function AdminVerificationClient() {
         setMsg(json.error || "Could not update the queue.");
         return;
       }
-      const name = entry.display_name || entry.email || "Referee";
+      const name = entry.display_name || entry.email || "REFeree";
       const hiddenAt = action === "remove" ? json.adminQueueHiddenAt ?? new Date().toISOString() : null;
       setEntries((current) =>
         current.map((row) =>
@@ -243,15 +243,15 @@ export default function AdminVerificationClient() {
   async function review(action: "approve" | "reject" | "request_info") {
     if (!selected) return;
     if (action === "request_info" && fixRequiredSteps.length === 0) {
-      setMsg("Select at least one signup step (1–5) the referee needs to fix.");
+      setMsg("Select at least one signup step (1–5) the REFeree needs to fix.");
       return;
     }
     if (action === "request_info" && !adminNotes.trim()) {
-      setMsg("Add a message explaining what the referee needs to provide.");
+      setMsg("Add a message explaining what the REFeree needs to provide.");
       return;
     }
     if (action === "reject" && !adminNotes.trim()) {
-      setMsg("Add a reason explaining why this referee is not approved / approval is revoked.");
+      setMsg("Add a reason explaining why this REFeree is not approved / approval is revoked.");
       return;
     }
     setSubmitting(true);
@@ -313,9 +313,9 @@ export default function AdminVerificationClient() {
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Admin only</p>
-        <h2 className="mt-1 font-display text-3xl font-black text-[var(--navy)]">Referee verification review</h2>
+        <h2 className="mt-1 font-display text-3xl font-black text-[var(--navy)]">REFeree verification review</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-          Every referee account appears here — submitted packages, incomplete signups, approved, and rejected.
+          Every REFeree account appears here — submitted packages, incomplete signups, approved, and rejected.
           Resubmissions land under <strong>Pending</strong> (and <strong>Resubmitted</strong>) — not Rejected.
           Document buttons use the newest files in storage when available.
         </p>
@@ -355,7 +355,7 @@ export default function AdminVerificationClient() {
           ))}
         </div>
         <label className="min-w-[14rem] flex-1">
-          <span className="sr-only">Search referees</span>
+          <span className="sr-only">Search REFerees</span>
           <input
             type="search"
             value={search}
@@ -383,7 +383,7 @@ export default function AdminVerificationClient() {
           {loading ? (
             <p className="px-4 py-6 text-sm text-[var(--muted)]">Loading submissions…</p>
           ) : filteredEntries.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-[var(--muted)]">No referees in this filter.</p>
+            <p className="px-4 py-6 text-sm text-[var(--muted)]">No REFerees in this filter.</p>
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {filteredEntries.map((entry) => {
@@ -396,7 +396,7 @@ export default function AdminVerificationClient() {
                 const displayName =
                   entry.display_name ||
                   `${entry.first_name ?? ""} ${entry.last_name ?? ""}`.trim() ||
-                  "Unnamed referee";
+                  "Unnamed REFeree";
                 return (
                   <li key={entry.ref_member_id} className="relative">
                     <div
@@ -548,11 +548,11 @@ export default function AdminVerificationClient() {
           {selected ? (
             <>
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)]">Selected referee</p>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--red)]">Selected REFeree</p>
                 <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">
                   {selected.display_name ||
                     `${selected.first_name ?? ""} ${selected.last_name ?? ""}`.trim() ||
-                    "Unnamed referee"}
+                    "Unnamed REFeree"}
                 </h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">{selected.email}</p>
                 {isHiddenFromQueue(selected) && (
@@ -684,7 +684,7 @@ export default function AdminVerificationClient() {
               </label>
 
               <label className="mt-5 block">
-                <span className="text-sm font-bold text-[var(--navy)]">Reason / message to referee</span>
+                <span className="text-sm font-bold text-[var(--navy)]">Reason / message to REFeree</span>
                 <textarea
                   value={adminNotes}
                   onChange={(event) => setAdminNotes(event.target.value)}
@@ -740,7 +740,7 @@ export default function AdminVerificationClient() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-[var(--muted)]">Select a referee from the queue to review their submission.</p>
+            <p className="text-sm text-[var(--muted)]">Select a REFeree from the queue to review their submission.</p>
           )}
         </section>
       </div>

@@ -186,7 +186,7 @@ export async function renderOfficialIdPng(input: OfficialIdRenderInput): Promise
     ty += size + 28;
   };
 
-  label("Referee ID");
+  label("REFeree ID");
   value(input.gotrefsId, 26);
   label("Certified sports");
   value(sportsLabel, 20);

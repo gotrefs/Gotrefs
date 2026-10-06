@@ -236,7 +236,7 @@ export function RefMyWorkPanel({
                   sportForVisual={sport}
                   eyebrow="Organizer invite"
                   title="Organizer invite"
-                  subtitle={ev?.title ? `Invited you to ${ev.title}` : "Invited you to referee a game"}
+                  subtitle={ev?.title ? `Invited you to ${ev.title}` : "Invited you to REFeree a game"}
                   emptyReviewsLabel="Host"
                   reviewsTitle="About this game"
                   reviews={[]}

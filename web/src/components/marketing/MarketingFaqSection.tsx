@@ -27,7 +27,7 @@ function FaqAnswer({ item }: { item: FaqItem }) {
 
 function tabIndexForChip(chip: string): number {
   if (chip.includes("free")) {
-    return FAQ_SECTIONS.findIndex((s) => s.title === "For Referees");
+    return FAQ_SECTIONS.findIndex((s) => s.title === "For REFerees");
   }
   if (chip.includes("organizers find")) {
     return FAQ_SECTIONS.findIndex((s) => s.title === "For Event Organizers");
@@ -39,13 +39,13 @@ function tabIndexForChip(chip: string): number {
     return FAQ_SECTIONS.findIndex((s) => s.title === "General Questions");
   }
   if (chip.includes("verified")) {
-    return FAQ_SECTIONS.findIndex((s) => s.title === "For Referees");
+    return FAQ_SECTIONS.findIndex((s) => s.title === "For REFerees");
   }
   return 0;
 }
 
 function questionForChip(chip: string): string {
-  if (chip === "Is it free for referees?") return "Is there a cost to join?";
+  if (chip === "Is it free for REFerees?") return "Is there a cost to join?";
   if (chip === "How do organizers find officials?") {
     return "How does GotREFS help me find officials?";
   }

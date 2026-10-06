@@ -5,8 +5,8 @@ import { BRAND_NAME } from "@/lib/brand";
 import { loadPublicRefListings, type PublicRefListing } from "@/lib/marketplace/public-refs";
 
 export const metadata: Metadata = {
-  title: `Find referees near you | ${BRAND_NAME}`,
-  description: "Browse referees by sport, location and rate. No account needed until you book.",
+  title: `Find REFerees near you | ${BRAND_NAME}`,
+  description: "Browse REFerees by sport, location and rate. No account needed until you book.",
 };
 
 export const revalidate = 300;

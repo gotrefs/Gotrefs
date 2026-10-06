@@ -110,7 +110,7 @@ export function OrganizerTaxDocsPanel({ highlightPaymentId }: { highlightPayment
           <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Tax docs</p>
           <h2 className="mt-1 text-2xl font-black text-[var(--navy)]">Payments &amp; receipts</h2>
           <p className="mt-2 max-w-2xl text-sm text-neutral-600">
-            Download receipts and a year-end CSV of what you paid refs through GotREFS. This is expense
+            Download receipts and a year-end CSV of what you paid REFS through GotREFS. This is expense
             documentation for your books — not a 1099. Officials get 1099-NEC via Stripe when required.
           </p>
         </div>
@@ -165,7 +165,7 @@ export function OrganizerTaxDocsPanel({ highlightPaymentId }: { highlightPayment
       <div className="mt-5 grid gap-3">
         {payments.length === 0 && !loading ? (
           <p className="rounded-xl border border-dashed border-neutral-200 px-4 py-8 text-center text-sm text-neutral-500">
-            No payments yet. After you pay accepted refs with Stripe, receipts will show up here.
+            No payments yet. After you pay accepted REFS with Stripe, receipts will show up here.
           </p>
         ) : null}
         {payments.map((payment) => {

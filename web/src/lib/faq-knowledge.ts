@@ -82,7 +82,7 @@ const STOP_WORDS = new Set([
 export const FAQ_QUICK_CHIPS = [
   "What is GotREFS?",
   "How do I get verified?",
-  "Is it free for referees?",
+  "Is it free for REFerees?",
   "How do organizers find officials?",
   "Are officials background checked?",
   "What makes GotREFS different?",
@@ -90,7 +90,7 @@ export const FAQ_QUICK_CHIPS = [
 
 export const FAQ_TAB_SHORT: Record<string, string> = {
   "General Questions": "General",
-  "For Referees": "Referees",
+  "For REFerees": "REFerees",
   "For Event Organizers": "Organizers",
   "Verification & Safety": "Safety",
   "Platform Features": "Features",

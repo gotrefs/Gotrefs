@@ -19,7 +19,7 @@ export function RequestSentSuccessModal({
         <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Request sent</p>
         <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Request sent to {refLabel}!</h2>
         <p className="mt-2 text-sm text-neutral-500">
-          They&apos;ll get an email and can accept or decline from their referee dashboard. Exact address stays hidden until they accept.
+          They&apos;ll get an email and can accept or decline from their REFeree dashboard. Exact address stays hidden until they accept.
         </p>
         <div className="mt-6 grid gap-2">
           <button

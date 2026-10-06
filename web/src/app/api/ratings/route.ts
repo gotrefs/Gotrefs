@@ -171,7 +171,7 @@ export async function POST(request: Request) {
   ]);
 
   if (!booking && !acceptedOffer) {
-    return NextResponse.json({ error: "Only booked refs can be rated." }, { status: 400 });
+    return NextResponse.json({ error: "Only booked REFS can be rated." }, { status: 400 });
   }
 
   const { error } = await admin.from("ref_ratings").upsert(

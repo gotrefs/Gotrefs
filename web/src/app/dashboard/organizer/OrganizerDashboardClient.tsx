@@ -540,7 +540,7 @@ export default function OrganizerDashboardClient() {
       const j = (await res.json()) as { error?: string; status?: string; code?: string };
       if (!res.ok) {
         if (j.code === "missing_payment_method") {
-          const detail = "Add a card to approve this ref. You're only charged when you book.";
+          const detail = "Add a card to approve this REF. You're only charged when you book.";
           setMsg(detail);
           requestOrganizerCard();
           return detail;
@@ -551,10 +551,10 @@ export default function OrganizerDashboardClient() {
       }
       setMsg(
         action === "accept"
-          ? "Ref approved and charged (ref pay + fee + deposit). Funds are held until the game ends, then paid to the ref."
+          ? "REF approved and charged (REF pay + fee + deposit). Funds are held until the game ends, then paid to the REF."
           : action === "withdraw"
-            ? "Request removed. The ref was notified and can request again if the game is still open."
-            : "Request denied. The ref was emailed and won’t see this game anymore."
+            ? "Request removed. The REF was notified and can request again if the game is still open."
+            : "Request denied. The REF was emailed and won’t see this game anymore."
       );
       const acceptedEventId =
         action === "accept"
@@ -584,7 +584,7 @@ export default function OrganizerDashboardClient() {
 
     const message =
       checkout === "success"
-        ? "Payment received. Refs are paid out once their bank is connected under Payments."
+        ? "Payment received. REFS are paid out once their bank is connected under Payments."
         : checkout === "cancelled"
           ? "Checkout was cancelled."
           : searchParams.get("pm") === "return"
@@ -614,7 +614,7 @@ export default function OrganizerDashboardClient() {
   function requireOrganizerOnboarding() {
     if (isOrganizerProfileComplete()) return true;
     setWizardOpen(true);
-    setMsg("Finish your organizer listing first so refs know who they are working with.");
+    setMsg("Finish your organizer listing first so REFS know who they are working with.");
     return false;
   }
 
@@ -659,7 +659,7 @@ export default function OrganizerDashboardClient() {
     if (!requireOrganizerOnboarding()) return;
     const owned = events.some((event) => event.id === eventId);
     if (!owned) {
-      setMsg("You can only hire refs for your own events.");
+      setMsg("You can only hire REFS for your own events.");
       return;
     }
     setStaffingEventId(eventId);
@@ -859,7 +859,7 @@ export default function OrganizerDashboardClient() {
       return false;
     }
     if (!/^\d{5}(-\d{4})?$/.test(zipVal)) {
-      setMsg("Enter a valid ZIP code so refs can match by area.");
+      setMsg("Enter a valid ZIP code so REFS can match by area.");
       return false;
     }
     if (textContainsOrganizerContact(draft.refInstructions)) {
@@ -922,7 +922,7 @@ export default function OrganizerDashboardClient() {
       return;
     }
     if (!/^\d{5}(-\d{4})?$/.test(zipVal)) {
-      const text = "Enter a valid ZIP code so refs can match by area.";
+      const text = "Enter a valid ZIP code so REFS can match by area.";
       setEventMsg(text);
       setMsg(text);
       return;
@@ -1003,7 +1003,7 @@ export default function OrganizerDashboardClient() {
 
   async function sendOfferFromRequest(applicant: ApplicantRow) {
     const ok = await decideApplicant(applicant.id, "accept");
-    if (ok) setMsg("Ref approved — they’ll see the full address under Upcoming games.");
+    if (ok) setMsg("REF approved — they’ll see the full address under Upcoming games.");
   }
 
   async function declineApplicant(applicant: ApplicantRow) {
@@ -1027,11 +1027,11 @@ export default function OrganizerDashboardClient() {
   async function sendOffer(refMemberId = offerRef, eventId = offerEvent) {
     if (!requireOrganizerOnboarding()) return false;
     if (!eventId || !refMemberId) {
-      setMsg("Pick an event and a referee before sending the request.");
+      setMsg("Pick an event and a REFeree before sending the request.");
       return false;
     }
     if (!events.some((e) => e.id === eventId)) {
-      setMsg("You can only hire refs for your own events.");
+      setMsg("You can only hire REFS for your own events.");
       return false;
     }
     if (offerSending) return false;
@@ -1046,12 +1046,12 @@ export default function OrganizerDashboardClient() {
           refMemberId,
           offeredPay: event?.pay_offer ?? null,
           gamesCount: hireGamesCount,
-          message: "We'd love for you to ref for our upcoming event.",
+          message: "We'd love for you to REF for our upcoming event.",
         }),
       });
       const j = (await res.json()) as { error?: string; code?: string };
       if (!res.ok && j.code === "missing_payment_method") {
-        setMsg("Add a card to send this request. You're only charged when the ref accepts.");
+        setMsg("Add a card to send this request. You're only charged when the REF accepts.");
         requestOrganizerCard();
         return false;
       }
@@ -1204,7 +1204,7 @@ export default function OrganizerDashboardClient() {
           setWizardOpen(false);
           setPayoutWizardOpen(false);
           setActiveTab("payments");
-          setMsg("Save your card or bank here. You’ll be charged when you approve a ref.");
+          setMsg("Save your card or bank here. You’ll be charged when you approve a REF.");
           if (forceWizard) {
             window.history.replaceState({}, "", "/dashboard/organizer?tab=payments");
           }
@@ -1231,7 +1231,7 @@ export default function OrganizerDashboardClient() {
 
   const setupActions: { step: OrganizerSetupStep; label: string; done: boolean }[] = [
     { step: "sport", label: "Primary sport", done: Boolean(sport.trim()) },
-    { step: "pay", label: "Hourly pay for referees", done: hasOrganizerPay() },
+    { step: "pay", label: "Hourly pay for REFerees", done: hasOrganizerPay() },
     { step: "bio", label: "About your org", done: Boolean(bio.trim()) },
     { step: "events", label: "Add upcoming events", done: events.length > 0 || Boolean(eventsListPath) },
     { step: "identity", label: "Organization logo & brand colors", done: Boolean(logoPath) },
@@ -1496,7 +1496,7 @@ export default function OrganizerDashboardClient() {
                 className="min-h-[110px] rounded border border-[var(--border)] px-3 py-2"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell refs about your league, school, tournaments, sports, and expectations."
+                placeholder="Tell REFS about your league, school, tournaments, sports, and expectations."
               />
             </label>
             <button
@@ -1794,8 +1794,8 @@ export default function OrganizerDashboardClient() {
               </h2>
               <p className="mt-2 text-sm text-neutral-500">
                 {needsSetup
-                  ? "To get refs booked, you'll need to complete and publish your listing."
-                  : "Post an event and invite refs to get your first booking."}
+                  ? "To get REFS booked, you'll need to complete and publish your listing."
+                  : "Post an event and invite REFS to get your first booking."}
               </p>
               <button
                 type="button"
@@ -1848,7 +1848,7 @@ export default function OrganizerDashboardClient() {
           <div>
             <h2 className="text-xl font-semibold text-neutral-900">Calendar</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Your games by date. Click a game to hire refs for that event only.
+              Your games by date. Click a game to hire REFS for that event only.
             </p>
           </div>
         </div>
@@ -1925,7 +1925,7 @@ export default function OrganizerDashboardClient() {
                                     : "bg-amber-50 text-amber-700 hover:bg-amber-100"
                                 }`}
                               >
-                                {hiredCount}/{event.officials_needed} Refs · {event.sport}
+                                {hiredCount}/{event.officials_needed} REFS · {event.sport}
                               </button>
                               <div className="pointer-events-none absolute left-0 top-7 z-20 hidden w-56 rounded-xl border border-[var(--border)] bg-white p-3 text-left text-xs shadow-xl group-hover:block">
                                 <p className="font-black text-[var(--navy)]">{event.title}</p>
@@ -1947,7 +1947,7 @@ export default function OrganizerDashboardClient() {
                 })}
               </div>
               <p className="mt-3 text-xs text-[var(--muted)]">
-                Click a blank date to post a new event. Click one of your games to hire refs for that listing only.
+                Click a blank date to post a new event. Click one of your games to hire REFS for that listing only.
               </p>
             </div>
         </div>
@@ -1961,7 +1961,7 @@ export default function OrganizerDashboardClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Your listings</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Games you posted for {organizationName || "your organization"}. Open a listing to review applicants or request refs.
+              Games you posted for {organizationName || "your organization"}. Open a listing to review applicants or request REFS.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1979,7 +1979,7 @@ export default function OrganizerDashboardClient() {
           <div className="rounded-3xl border border-dashed border-neutral-300 bg-white px-6 py-16 text-center">
             <h3 className="text-lg font-semibold text-neutral-900">No listings yet</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500">
-              Post your first game for {organizationName || "your organization"}. Refs will request to work it from Find Games.
+              Post your first game for {organizationName || "your organization"}. REFS will request to work it from Find Games.
             </p>
             <button
               type="button"
@@ -2015,7 +2015,7 @@ export default function OrganizerDashboardClient() {
                   ? { className: "bg-amber-50 text-amber-900", label: `${applicantCount} applicant${applicantCount === 1 ? "" : "s"}` }
                   : pendingCount > 0
                     ? { className: "bg-sky-50 text-sky-900", label: "Invite pending" }
-                    : { className: "bg-neutral-100 text-neutral-700", label: "Needs refs" };
+                    : { className: "bg-neutral-100 text-neutral-700", label: "Needs REFS" };
               const visual = sportListingVisual(e.sport);
               return (
                 <article
@@ -2047,7 +2047,7 @@ export default function OrganizerDashboardClient() {
                         </span>
                         {offerPaid ? (
                           <span className="mt-1 block text-xs font-semibold text-neutral-500">
-                            Refs paid for this event
+                            REFS paid for this event
                           </span>
                         ) : null}
                       </span>
@@ -2077,7 +2077,7 @@ export default function OrganizerDashboardClient() {
                           }}
                           className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
                         >
-                          {hiredCount}/{e.officials_needed} hired · View refs
+                          {hiredCount}/{e.officials_needed} hired · View REFS
                         </button>
                       ) : (
                         <span className="rounded-full bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-700">
@@ -2119,7 +2119,7 @@ export default function OrganizerDashboardClient() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Completed games</p>
-              <h2 className="mt-1 font-display text-xl font-bold text-[var(--navy)]">Rate your refs</h2>
+              <h2 className="mt-1 font-display text-xl font-bold text-[var(--navy)]">Rate your REFS</h2>
               <p className="mt-1 text-sm text-amber-900">
                 After a game ends, leave a star rating and public review — the same way Airbnb asks hosts to review guests.
               </p>
@@ -2201,8 +2201,8 @@ export default function OrganizerDashboardClient() {
                 photoUrls={acceptPhotosForSport(sr.primarySport || "Basketball", sr.avatarUrl)}
                 photoAlt={`Official ${sr.gotrefsId}`}
                 sportForVisual={sr.primarySport || "Basketball"}
-                eyebrow="Ref application"
-                title={`Ref ${sr.gotrefsId}`}
+                eyebrow="REF application"
+                title={`REF ${sr.gotrefsId}`}
                 subtitle={`Requested to work ${sr.eventTitle}`}
                 refMemberId={sr.refMemberId}
                 ratingAverage={sr.ratingAverage}
@@ -2216,7 +2216,7 @@ export default function OrganizerDashboardClient() {
                 }))}
                 metaRows={[
                   sr.gotrefsId ? `GotREFS ID ${sr.gotrefsId}` : null,
-                  sr.refRateLabel ? `Ref rate ${sr.refRateLabel}` : null,
+                  sr.refRateLabel ? `REF rate ${sr.refRateLabel}` : null,
                   sr.eventPayLabel ? `Your event pay ${sr.eventPayLabel}` : null,
                 ].filter(Boolean) as string[]}
                 primaryLabel="Review & decide"
@@ -2239,7 +2239,7 @@ export default function OrganizerDashboardClient() {
             <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Confirm</p>
             <h2 className="mt-2 text-xl font-bold text-neutral-900">Are you sure?</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-600">
-              Deny <span className="font-semibold text-neutral-900">Ref {confirmDenyApplicant.gotrefsId}</span>{" "}
+              Deny <span className="font-semibold text-neutral-900">REF {confirmDenyApplicant.gotrefsId}</span>{" "}
               for{" "}
               <span className="font-semibold text-neutral-900">{confirmDenyApplicant.eventTitle}</span>? They
               will be notified and won’t stay on this request.
@@ -2270,7 +2270,7 @@ export default function OrganizerDashboardClient() {
       {activeTab === "messages" && (
         <section className="mx-auto w-full max-w-2xl">
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Messages</h2>
-          <p className="mt-1 text-sm text-neutral-500">Requests and replies between you and refs.</p>
+          <p className="mt-1 text-sm text-neutral-500">Requests and replies between you and REFS.</p>
           <div className="mt-5 space-y-3">
             {signupRequests.map((sr) => (
               <button
@@ -2284,7 +2284,7 @@ export default function OrganizerDashboardClient() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-neutral-900">
-                    Ref {sr.gotrefsId}
+                    REF {sr.gotrefsId}
                   </span>
                   <span className="block truncate text-xs text-neutral-500">
                     Requested to work {sr.eventTitle} — tap to review
@@ -2348,7 +2348,7 @@ export default function OrganizerDashboardClient() {
                 </p>
                 <h3 className="mt-4 text-lg font-semibold text-neutral-900">No messages yet</h3>
                 <p className="mt-1 text-sm text-neutral-500">
-                  When refs apply to your events or respond to invites, you&apos;ll see the conversation here.
+                  When REFS apply to your events or respond to invites, you&apos;ll see the conversation here.
                 </p>
               </div>
             )}

@@ -232,7 +232,7 @@ export default function RefereeDashboardClient() {
       String(meta.full_name ?? "").trim() ||
         `${String(meta.first_name ?? "").trim()} ${String(meta.last_name ?? "").trim()}`.trim() ||
         user.email?.split("@")[0] ||
-        "Referee"
+        "REFeree"
     );
 
     const { data: memberRow } = await supabase
@@ -1036,7 +1036,7 @@ export default function RefereeDashboardClient() {
         return;
       }
       setIsAssignor(Boolean(json.isAssignor));
-      setMsg(enabled ? "Assignor mode enabled. Add refs you work with below." : "Assignor mode turned off.");
+      setMsg(enabled ? "Assignor mode enabled. Add REFS you work with below." : "Assignor mode turned off.");
       if (enabled) {
         const rosterRes = await fetch("/api/assignor/roster");
         const rosterJson = (await rosterRes.json()) as { entries?: AssignorRosterEntry[] };
@@ -1080,11 +1080,11 @@ export default function RefereeDashboardClient() {
       });
       const json = (await res.json()) as { error?: string; entry?: AssignorRosterEntry };
       if (!res.ok) {
-        setMsg(json.error || "Could not add ref.");
+        setMsg(json.error || "Could not add REF.");
         return;
       }
       if (json.entry) setRosterEntries((prev) => [json.entry!, ...prev]);
-      setMsg("Ref saved to your assignor roster.");
+      setMsg("REF saved to your assignor roster.");
     } catch {
       setMsg("Could not reach the server.");
     } finally {
@@ -1281,7 +1281,7 @@ export default function RefereeDashboardClient() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
-        <p className="text-sm font-semibold text-neutral-800">Loading your referee dashboard…</p>
+        <p className="text-sm font-semibold text-neutral-800">Loading your REFeree dashboard…</p>
         <p className="mt-2 text-xs text-neutral-500">This usually takes a second after Stripe Connect.</p>
       </div>
     );

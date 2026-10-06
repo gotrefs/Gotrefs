@@ -357,7 +357,7 @@ export function RefVerificationResubmitFlow({
         </h2>
         <p className="mt-2 text-sm leading-6 text-[var(--slate)]">
           {isEditMode
-            ? "Your ref ID card reflects the updates you made."
+            ? "Your REF ID card reflects the updates you made."
             : "Your fixes were sent back to GotREFS for review. We'll notify you when your verification is updated."}
         </p>
         <button
@@ -614,7 +614,7 @@ export function RefVerificationResubmitFlow({
             )}
             <VerificationUploadField
               title="Certification / license document"
-              description="Upload your referee certification, license, or training credential."
+              description="Upload your REFeree certification, license, or training credential."
               uploaded={Boolean(certDocFile)}
               uploadedLabel={`✓ ${certDocFile?.name ?? "Document uploaded"}`}
               onFile={(event) => setCertDocFile(event.target.files?.[0] ?? null)}

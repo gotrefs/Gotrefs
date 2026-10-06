@@ -90,7 +90,7 @@ export async function ensureExpressConnectAccount(
 
   const created = await stripe.v2.core.accounts.create({
     contact_email: args.email || undefined,
-    display_name: args.displayName?.trim() || args.email || "GotREFS referee",
+    display_name: args.displayName?.trim() || args.email || "GotREFS REFeree",
     dashboard: "express",
     identity: {
       country: "us",

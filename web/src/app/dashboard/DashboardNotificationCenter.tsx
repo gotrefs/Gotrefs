@@ -214,8 +214,8 @@ export function DashboardNotificationCenter() {
           return {
             id: `request-${request.id}`,
             kind: "system" as const,
-            title: "New ref application",
-            body: `${member?.display_name ?? "A referee"} applied to ref ${event?.title ?? "your event"}.`,
+            title: "New REF application",
+            body: `${member?.display_name ?? "A REFeree"} applied to REF ${event?.title ?? "your event"}.`,
             targetUrl: "/dashboard/organizer?panel=requests",
             tone: "red" as const,
           };
@@ -230,7 +230,7 @@ export function DashboardNotificationCenter() {
             id: `offer-${offer.id}`,
             kind: "system" as const,
             title: `Invite ${offer.status}`,
-            body: `${member?.display_name ?? "A referee"} ${offer.status} ${event?.title ?? "your event"}.`,
+            body: `${member?.display_name ?? "A REFeree"} ${offer.status} ${event?.title ?? "your event"}.`,
             targetUrl: "/dashboard/organizer?panel=responses",
             tone: accepted ? ("green" as const) : ("amber" as const),
           };

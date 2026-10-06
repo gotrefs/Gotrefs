@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Only registered event organizers can contact refs. Sign up or log in as an organizer.",
+          "Only registered event organizers can contact REFS. Sign up or log in as an organizer.",
       },
       { status: 403 }
     );
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   const message = (body.message ?? "").trim();
 
   if (!refMemberId) {
-    return NextResponse.json({ error: "Ref is required." }, { status: 400 });
+    return NextResponse.json({ error: "REF is required." }, { status: 400 });
   }
   if (!message) {
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!refMember || refMember.role !== "ref") {
-    return NextResponse.json({ error: "Ref not found." }, { status: 404 });
+    return NextResponse.json({ error: "REF not found." }, { status: 404 });
   }
 
   const { error } = await admin.from("ref_inquiries").insert({

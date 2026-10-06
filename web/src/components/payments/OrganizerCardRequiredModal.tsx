@@ -88,14 +88,14 @@ export function OrganizerCardRequiredModal() {
   return (
     <StripePromptModal
       eyebrow="Secure payments"
-      title="Add a card to pay your Ref"
+      title="Add a card to pay your REF"
       actionLabel="Continue to Stripe"
       busy={starting}
       error={error}
       onAction={() => void startStripe()}
       onDismiss={() => setOpen(false)}
     >
-      Fill this out on Stripe so your Ref can be paid. You&apos;re only charged when a Ref accepts.
+      Fill this out on Stripe so your REF can be paid. You&apos;re only charged when a REF accepts.
       Stripe protects your card details. GotREFS never stores your full card number.
     </StripePromptModal>
   );

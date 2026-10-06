@@ -53,17 +53,17 @@ export default async function HomePage({
                 <BrandName /> Marketplace
               </p>
               <h1 className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-tight sm:mt-4 sm:text-5xl md:text-6xl">
-                The Referee Marketplace For Every Sport
+                The REFeree Marketplace For Every Sport
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-white/85 sm:mt-5 md:text-lg md:leading-7">
                 {hero.subtext}
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
                 <Link href="/join" className="btn-primary w-full sm:w-auto">
-                  Get verified as a ref
+                  Get verified as a REF
                 </Link>
                 <Link href="/join/organizer" className="btn-outline-light w-full sm:w-auto">
-                  I need refs
+                  I need REFS
                 </Link>
               </div>
             </div>

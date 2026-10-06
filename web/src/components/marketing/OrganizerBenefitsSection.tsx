@@ -8,7 +8,7 @@ const ORGANIZER_REASONS = [
   },
   {
     title: "Quality Guaranteed",
-    description: "Peer reviews keep refs accountable and performing at their best.",
+    description: "Peer reviews keep REFS accountable and performing at their best.",
   },
   {
     title: "Tap & Book",
@@ -26,7 +26,7 @@ export function OrganizerBenefitsSection() {
     >
       <div className="mx-auto w-full max-w-6xl">
         <p className="marketing-eyebrow text-[#1b2132]">For Event Organizers</p>
-        <h2 className="marketing-headline text-[#1b2132]">Certified Refs. Zero Logistics.</h2>
+        <h2 className="marketing-headline text-[#1b2132]">Certified REFS. Zero Logistics.</h2>
         <p className="marketing-body">
           Cut the costly per diems, hotel blocks, and meal stipends. <BrandName /> connects you instantly with
           verified, certified, local officials for a small convenience fee.

@@ -65,7 +65,7 @@ export function AttendingRefsModal({
                   Official ID
                 </p>
                 <h2 className="mt-1 truncate text-xl font-bold text-neutral-900">
-                  Ref {selected.gotrefsId}
+                  REF {selected.gotrefsId}
                 </h2>
                 <p className="mt-1 text-sm text-neutral-500">{eventTitle}</p>
               </div>
@@ -83,7 +83,7 @@ export function AttendingRefsModal({
 
             <div className="mt-5">
               <RefereeIdCard
-                fullName={`Ref ${selected.gotrefsId}`}
+                fullName={`REF ${selected.gotrefsId}`}
                 gotrefsId={selected.gotrefsId}
                 primarySport={selected.primarySport ?? undefined}
                 additionalSports={selected.additionalSports ?? []}
@@ -152,7 +152,7 @@ export function AttendingRefsModal({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold text-neutral-900">
-                          Ref {ref.gotrefsId}
+                          REF {ref.gotrefsId}
                         </span>
                         <span className="mt-0.5 block truncate text-sm text-neutral-500">
                           {[ref.primarySport, ref.offeredPay != null ? `$${ref.offeredPay}` : null]

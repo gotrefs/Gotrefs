@@ -14,10 +14,10 @@ export default function AssignorsPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--red)]">For Assignors</p>
               <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-6xl">
-                Bring your ref list into {BRAND_NAME} in minutes.
+                Bring your REF list into {BRAND_NAME} in minutes.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 sm:text-lg">
-                Add refs one at a time or upload your current crew list. {BRAND_NAME} keeps the roster organized so
+                Add REFS one at a time or upload your current crew list. {BRAND_NAME} keeps the roster organized so
                 future games can be staffed faster.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -25,7 +25,7 @@ export default function AssignorsPage() {
                   Start as an assignor
                 </Link>
                 <Link href={`/auth/login?next=${next}`} className="btn-outline-light w-full sm:w-auto">
-                  Log in to add refs
+                  Log in to add REFS
                 </Link>
               </div>
             </div>
@@ -36,8 +36,8 @@ export default function AssignorsPage() {
                 <div className="mt-5 grid gap-3">
                   {[
                     ["1", "Choose manual entry or upload a file"],
-                    ["2", `${BRAND_NAME} stores each ref in your Supabase roster`],
-                    ["3", "Refs can later claim and complete their profiles"],
+                    ["2", `${BRAND_NAME} stores each REF in your Supabase roster`],
+                    ["3", "REFS can later claim and complete their profiles"],
                   ].map(([number, text]) => (
                     <div key={number} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                       <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--navy)] text-sm font-black text-white">
@@ -56,8 +56,8 @@ export default function AssignorsPage() {
           <div className="mx-auto max-w-6xl">
             <div className="grid gap-4 md:grid-cols-3">
               {[
-                ["Manual add", "Perfect for adding a few refs with name, sport, certification, email, and notes."],
-                ["File upload", "Upload a CSV or text list from your current spreadsheet and store the refs at once."],
+                ["Manual add", "Perfect for adding a few REFS with name, sport, certification, email, and notes."],
+                ["File upload", "Upload a CSV or text list from your current spreadsheet and store the REFS at once."],
                 ["Automatic Uploads", `${BRAND_NAME} will clean messy files, delete draft profiles, and send claim profile emails.`],
               ].map(([title, body]) => (
                 <article key={title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

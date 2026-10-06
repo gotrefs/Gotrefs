@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
   const sync = await syncMemberAccount(admin, user);
   if (sync.role !== "ref") {
-    return NextResponse.json({ error: "Only referees can apply to work events." }, { status: 403 });
+    return NextResponse.json({ error: "Only REFerees can apply to work events." }, { status: 403 });
   }
 
   const [{ data: profile }, { data: submission }, { data: screening }] = await Promise.all([
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
         event_id: eventId,
         ref_member_id: refMemberId,
         status: "pending",
-        message: "Ref applied from the open games marketplace",
+        message: "REF applied from the open games marketplace",
       },
       { onConflict: "event_id,ref_member_id" }
     )

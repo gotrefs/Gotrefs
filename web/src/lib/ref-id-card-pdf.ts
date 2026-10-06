@@ -100,7 +100,7 @@ export async function downloadRefIdCardPdf(
   const H = 640;
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: [W, H] });
 
-  const name = data.fullName?.trim() || "Referee";
+  const name = data.fullName?.trim() || "REFeree";
   const id = data.gotrefsId?.trim() || "GR-PENDING";
   const sport = data.primarySport?.trim()
     ? `${data.primarySport.trim()} Official`

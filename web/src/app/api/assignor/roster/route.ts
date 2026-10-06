@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   const isAssignor = await requireAssignor(user.id, supabase);
   if (!isAssignor) {
     return NextResponse.json(
-      { error: "Enable assignor mode on your dashboard before adding refs to your roster." },
+      { error: "Enable assignor mode on your dashboard before adding REFS to your roster." },
       { status: 403 }
     );
   }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
 
   const displayName = (body.display_name ?? "").trim();
   if (!displayName) {
-    return NextResponse.json({ error: "Ref name is required." }, { status: 400 });
+    return NextResponse.json({ error: "REF name is required." }, { status: 400 });
   }
 
   const rateRaw = body.rate_per_game;

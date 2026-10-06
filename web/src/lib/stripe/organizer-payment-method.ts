@@ -6,7 +6,7 @@ import { getStripe } from "@/lib/stripe/client";
 
 /** Note shown on Stripe's card page when an organizer adds a card while booking. */
 export const ORGANIZER_CARD_FORM_MESSAGE =
-  "Fill this out to pay your Ref. You're only charged when a Ref accepts your request.";
+  "Fill this out to pay your REF. You're only charged when a REF accepts your request.";
 
 export type OrganizerPaymentMethodRow = {
   member_id: string;

@@ -50,7 +50,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
 
     const { data: member } = await admin.from("members").select("id, role").eq("id", refMemberId).maybeSingle();
     if (!member || member.role !== "ref") {
-      return NextResponse.json({ error: "Referee not found." }, { status: 404 });
+      return NextResponse.json({ error: "REFeree not found." }, { status: 404 });
     }
 
     if (action === "remove" || action === "restore") {
@@ -90,18 +90,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
 
     if (action === "reject" && !adminNotesInput) {
       return NextResponse.json(
-        { error: "Add a reason explaining why this referee is not approved." },
+        { error: "Add a reason explaining why this REFeree is not approved." },
         { status: 400 }
       );
     }
 
     if (action === "request_info" && !adminNotesInput) {
-      return NextResponse.json({ error: "Add a message explaining what the referee needs to change." }, { status: 400 });
+      return NextResponse.json({ error: "Add a message explaining what the REFeree needs to change." }, { status: 400 });
     }
 
     if (action === "request_info" && fixRequiredSteps.length === 0) {
       return NextResponse.json(
-        { error: "Select at least one item (1–5) the referee needs to fix before sending." },
+        { error: "Select at least one item (1–5) the REFeree needs to fix before sending." },
         { status: 400 }
       );
     }
@@ -167,7 +167,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ refMe
         {
           ref_member_id: refMemberId,
           status: "pending",
-          summary: "Changes requested — approval paused until ref resubmits and is re-approved",
+          summary: "Changes requested — approval paused until REF resubmits and is re-approved",
           updated_at: now,
         },
         { onConflict: "ref_member_id" }

@@ -17,5 +17,5 @@ export async function issueUniqueGotrefsId(admin: SupabaseClient): Promise<strin
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return candidate;
   }
-  throw new Error("Could not issue a GoTRefs ID. Try again.");
+  throw new Error("Could not issue a GotREFS ID. Try again.");
 }

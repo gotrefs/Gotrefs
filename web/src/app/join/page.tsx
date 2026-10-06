@@ -10,13 +10,13 @@ import { BRAND_NAME } from "@/lib/brand";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: `Join as a referee | ${BRAND_NAME}`,
-  description: "Get your GoTRefs ref card in a minute: your name, a photo and your sport.",
+  title: `Join as a REFeree | ${BRAND_NAME}`,
+  description: "Get your GotREFS REF card in a minute: your name, a photo and your sport.",
 };
 export const dynamic = "force-dynamic";
 
 const STEPS = [
-  ["Get your ref card", "Your name, a photo and your sport. That's it."],
+  ["Get your REF card", "Your name, a photo and your sport. That's it."],
   ["Find local games", "Browse open games near you on the map."],
   ["Get verified to work", "When you request your first game, add your ID and certification."],
 ];
@@ -54,9 +54,9 @@ export default async function JoinPage() {
       <main className="min-h-dvh bg-neutral-50 px-4 py-12 sm:py-20">
         <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[1fr_420px] lg:items-center">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--red)]">For referees</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--red)]">For REFerees</p>
             <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight text-[var(--navy)] sm:text-5xl">
-              Ref more games near you.
+              REF more games near you.
             </h1>
             <p className="mt-4 max-w-lg text-lg text-neutral-600">
               Join {BRAND_NAME} free, see games in your area, and get paid through the app.
@@ -90,9 +90,9 @@ export default async function JoinPage() {
                 Log in
               </Link>
               {" · "}
-              Hiring refs?{" "}
+              Hiring REFS?{" "}
               <Link href="/find-refs" className="font-semibold text-neutral-900 underline">
-                Find refs
+                Find REFS
               </Link>
             </p>
           </div>

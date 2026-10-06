@@ -8,7 +8,7 @@ type RoleFilter = "all" | "ref" | "organizer";
 const PREVIEW_ROWS = 15;
 
 const ROLE_LABEL: Record<AdminSignupEntry["role"], string> = {
-  ref: "Referee",
+  ref: "REFeree",
   organizer: "Organizer",
   unknown: "Not set",
 };
@@ -25,7 +25,7 @@ function csvCell(value: string) {
 }
 
 function toCsv(rows: AdminSignupEntry[]) {
-  const header = ["First name", "Last name", "Email", "Phone", "Type", "Sport", "Organization", "GoTRefs ID", "Signed up", "Email confirmed"];
+  const header = ["First name", "Last name", "Email", "Phone", "Type", "Sport", "Organization", "GotREFS ID", "Signed up", "Email confirmed"];
   const lines = rows.map((row) =>
     [
       row.firstName || row.name,
@@ -158,7 +158,7 @@ export default function AdminSignupsPanel() {
           {(
             [
               ["all", "All", counts.all],
-              ["ref", "Referees", counts.ref],
+              ["ref", "REFerees", counts.ref],
               ["organizer", "Organizers", counts.organizer],
             ] as const
           ).map(([value, label, count]) => (

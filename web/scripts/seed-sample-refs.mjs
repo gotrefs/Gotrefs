@@ -346,6 +346,14 @@ function realisticLevel(level, years) {
 }
 
 const usedBios = new Set();
+/** House style: REF is always in capitals ("REF", "REFS", "REFeree"). */
+function capRef(text) {
+  return text
+    .replace(/\b[Rr]eferee(s|d|ing)?\b/g, (_m, tail = "") => `REFeree${tail ?? ""}`)
+    .replace(/\b[Rr]eff(ing|ed)\b/g, (_m, tail) => `REFf${tail}`)
+    .replace(/\b[Rr]efs\b/g, "REFS")
+    .replace(/\b[Rr]ef\b/g, "REF");
+}
 function writeBio(sport, level, years) {
   const voice = SPORT_VOICE[sport];
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -355,7 +363,7 @@ function writeBio(sport, level, years) {
     parts.push(bioPick(voice.details));
     if (bioChance(0.45)) parts.push(bioPick(BACKGROUNDS));
     if (bioChance(0.55)) parts.push(bioPick(AVAILABILITY));
-    const bio = parts.join(" ");
+    const bio = capRef(parts.join(" "));
     // Skip drafts that read awkwardly: two sentences opening the same way, or "played" twice.
     const openers = parts.map((part) => part.split(" ").slice(0, 2).join(" ").toLowerCase());
     if (new Set(openers).size !== openers.length) continue;

@@ -3,32 +3,32 @@
   "meta": {
     "siteName": "GotREFS",
     "domain": "gotrefs.org",
-    "defaultTitle": "GotREFS — Find Certified Referees Instantly"
+    "defaultTitle": "GotREFS — Find Certified REFerees Instantly"
   },
   "nav": {
-    "refereeCta": "I'm a Referee",
+    "refereeCta": "I'm a REFeree",
     "organizerCta": "Post an Event"
   },
   "hero": {
-    "badge": "4,800+ Verified Refs Nationwide",
+    "badge": "4,800+ Verified REFS Nationwide",
     "headline": {
-      "line1": "The Referee",
+      "line1": "The REFeree",
       "line2Accent": "Marketplace",
       "line3": "for Every Sport"
     },
     "subtext": "Certified. Background-checked. Ready to work. Connect with verified officials or find games in your area — in minutes, not weeks.",
     "ctaReferee": {
       "icon": "🏀",
-      "title": "I'm a Referee",
+      "title": "I'm a REFeree",
       "subtitle": "Find games & get paid"
     },
     "ctaOrganizer": {
       "icon": "📋",
       "title": "I'm an Organizer",
-      "subtitle": "Find refs for your event"
+      "subtitle": "Find REFS for your event"
     },
     "stats": [
-      { "value": "4,800+", "label": "Active Refs" },
+      { "value": "4,800+", "label": "Active REFS" },
       { "value": "32", "label": "Sports" },
       { "value": "50", "label": "States" },
       { "value": "98%", "label": "Satisfaction" }
@@ -40,7 +40,7 @@
     "sectionSubtext": "Whether you're blowing a whistle or running a tournament, we make it effortless.",
     "forReferees": {
       "icon": "🏀",
-      "title": "For Referees",
+      "title": "For REFerees",
       "steps": [
         {
           "num": 1,
@@ -58,7 +58,7 @@
           "description": "Accept bookings, show up, officiate. Payment hits your account within 24 hours."
         }
       ],
-      "button": "Join as a Referee →"
+      "button": "Join as a REFeree →"
     },
     "forOrganizers": {
       "icon": "📋",
@@ -72,7 +72,7 @@
         {
           "num": 2,
           "title": "Get Matched",
-          "description": "We surface verified, available refs in your area that match your requirements."
+          "description": "We surface verified, available REFS in your area that match your requirements."
         },
         {
           "num": 3,
@@ -80,7 +80,7 @@
           "description": "Book, pay securely, and receive confirmation. Your game is covered."
         }
       ],
-      "button": "Find Refs Now →"
+      "button": "Find REFS Now →"
     }
   },
   "trustStrip": {
@@ -94,19 +94,19 @@
   },
   "ctaBanner": {
     "title": "Ready to Get in the Game?",
-    "subtext": "Join thousands of refs and organizers already using GotREFS.",
-    "primaryButton": "I'm a Referee — Sign Me Up",
-    "secondaryButton": "Find a Ref for My Event"
+    "subtext": "Join thousands of REFS and organizers already using GotREFS.",
+    "primaryButton": "I'm a REFeree — Sign Me Up",
+    "secondaryButton": "Find a REF for My Event"
   },
   "footer": {
-    "tagline": "The fastest way to connect certified referees with sports organizers nationwide.",
+    "tagline": "The fastest way to connect certified REFerees with sports organizers nationwide.",
     "columns": [
       {
-        "heading": "Referees",
+        "heading": "REFerees",
         "links": [
-          { "label": "Join as a Ref", "href": "/auth/signup?role=ref" },
+          { "label": "Join as a REF", "href": "/auth/signup?role=ref" },
           { "label": "Log in", "href": "/auth/login" },
-          { "label": "Referee dashboard", "href": "/dashboard/referee" }
+          { "label": "REFeree dashboard", "href": "/dashboard/referee" }
         ]
       },
       {
@@ -135,7 +135,7 @@
     "tabs": [
       {
         "id": "refs",
-        "title": "For Referees",
+        "title": "For REFerees",
         "description": "GotREFS gives verified officials one place to build a profile, browse published events, request assignments, and accept offers — without chasing organizers by text or email.",
         "bullets": [
           "Set your sports, availability, and rate per game",
@@ -143,16 +143,16 @@
           "Upload certifications and complete background screening",
           "Accept offers and get confirmed for games in minutes"
         ],
-        "ctaLabel": "Join as a Referee",
+        "ctaLabel": "Join as a REFeree",
         "ctaHref": "/auth/signup?role=ref"
       },
       {
         "id": "organizers",
         "title": "For Organizers",
-        "description": "Post events, review ref requests, and send offers from a single dashboard — so your tournaments and leagues stay staffed without spreadsheets or group chats.",
+        "description": "Post events, review REF requests, and send offers from a single dashboard — so your tournaments and leagues stay staffed without spreadsheets or group chats.",
         "bullets": [
           "Post events individually or upload a CSV schedule",
-          "See ref requests for your events only",
+          "See REF requests for your events only",
           "Send offers with one click from the request list",
           "Track confirmed bookings in one place"
         ],
@@ -162,12 +162,12 @@
       {
         "id": "verification",
         "title": "Verification & Trust",
-        "description": "Every referee on GotREFS completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
+        "description": "Every REFeree on GotREFS completes identity verification, certification upload, and background screening — so organizers hire with confidence.",
         "bullets": [
           "Government ID and certification document upload",
           "Background screening with National SportsID (NSID)",
           "External verification path for existing credentials",
-          "Organizers only see eligible, verified refs"
+          "Organizers only see eligible, verified REFS"
         ],
         "ctaLabel": "See verification flow",
         "ctaHref": "/auth/signup?role=ref"
@@ -175,12 +175,12 @@
       {
         "id": "offers",
         "title": "Offers & Bookings",
-        "description": "When an organizer sends an offer, the ref accepts or declines in their dashboard. Accepted offers become confirmed bookings automatically.",
+        "description": "When an organizer sends an offer, the REF accepts or declines in their dashboard. Accepted offers become confirmed bookings automatically.",
         "bullets": [
-          "Organizers send offers from ref requests or hire flow",
-          "Refs accept or decline from their dashboard",
+          "Organizers send offers from REF requests or hire flow",
+          "REFS accept or decline from their dashboard",
           "Confirmed bookings created on acceptance",
-          "Each organizer only sees their own events and refs"
+          "Each organizer only sees their own events and REFS"
         ],
         "ctaLabel": "Get started free",
         "ctaHref": "/auth/signup"
@@ -192,18 +192,18 @@
     "items": [
       {
         "icon": "✓",
-        "title": "Verified Referee Marketplace",
+        "title": "Verified REFeree Marketplace",
         "description": "Connect with background-checked, certified officials — not unvetted volunteers from a Facebook post."
       },
       {
         "icon": "⚡",
         "title": "Connected Offer Workflows",
-        "description": "Post an event, receive ref requests, send offers, and confirm bookings without duplicate entry or disconnected tools."
+        "description": "Post an event, receive REF requests, send offers, and confirm bookings without duplicate entry or disconnected tools."
       },
       {
         "icon": "📅",
         "title": "Real-Time Event Calendar",
-        "description": "Refs browse all published events; organizers manage their own schedule and staffing from one dashboard."
+        "description": "REFS browse all published events; organizers manage their own schedule and staffing from one dashboard."
       }
     ]
   },
@@ -214,14 +214,14 @@
       {
         "icon": "shield",
         "value": "4,800+",
-        "title": "Verified Refs",
+        "title": "Verified REFS",
         "description": "Background-checked, certified officials ready to work — so organizers hire with confidence, not guesswork."
       },
       {
         "icon": "globe",
         "value": "50",
         "title": "States Covered",
-        "description": "Nationwide reach connecting organizers and refs across youth leagues, schools, and tournament circuits."
+        "description": "Nationwide reach connecting organizers and REFS across youth leagues, schools, and tournament circuits."
       },
       {
         "icon": "people",
@@ -233,54 +233,54 @@
         "icon": "stopwatch",
         "value": "Minutes",
         "title": "Not Weeks",
-        "description": "Post an event, receive ref requests, and send offers in minutes — not weeks of phone tag and group texts."
+        "description": "Post an event, receive REF requests, and send offers in minutes — not weeks of phone tag and group texts."
       }
     ]
   },
   "seeHowItWorks": {
     "title": "See How GotREFS Works",
-    "body": "Take a walkthrough of the GotREFS platform and see how organizers post events, review ref requests, and confirm assignments — while refs browse games, complete verification, and accept offers from one connected dashboard.",
+    "body": "Take a walkthrough of the GotREFS platform and see how organizers post events, review REF requests, and confirm assignments — while REFS browse games, complete verification, and accept offers from one connected dashboard.",
     "ctaLabel": "Book a Demo",
     "ctaHref": "mailto:hello@gotrefs.org?subject=GotREFS%20Demo%20Request"
   },
   "faqs": [
     {
       "q": "What is GotREFS?",
-      "a": "GotREFS is a referee marketplace that connects certified officials with event organizers. Refs find games, set availability, and get paid. Organizers post events and hire verified refs in minutes."
+      "a": "GotREFS is a REFeree marketplace that connects certified officials with event organizers. REFS find games, set availability, and get paid. Organizers post events and hire verified REFS in minutes."
     },
     {
       "q": "Who uses GotREFS?",
-      "a": "Youth leagues, school athletic departments, tournament directors, and independent referees use GotREFS to staff games and find officiating work."
+      "a": "Youth leagues, school athletic departments, tournament directors, and independent REFerees use GotREFS to staff games and find officiating work."
     },
     {
       "q": "How does verification work?",
-      "a": "Refs upload ID and certification documents, complete background screening, and submit a verification package. Organizers can only send offers to eligible refs."
+      "a": "REFS upload ID and certification documents, complete background screening, and submit a verification package. Organizers can only send offers to eligible REFS."
     },
     {
       "q": "Is GotREFS free to join?",
-      "a": "Yes — create a free account as a referee or organizer. Sign up, complete your profile, and start using the marketplace."
+      "a": "Yes — create a free account as a REFeree or organizer. Sign up, complete your profile, and start using the marketplace."
     }
   ],
   "modals": {
     "referee": {
-      "tag": "Referee Sign-Up",
-      "title": "Join as a Referee",
-      "intro": "Create your referee profile. We store your details securely, review your certification upload, then follow up by email to finish verification and background check consent.",
+      "tag": "REFeree Sign-Up",
+      "title": "Join as a REFeree",
+      "intro": "Create your REFeree profile. We store your details securely, review your certification upload, then follow up by email to finish verification and background check consent.",
       "successBanner": "✓ You're on the list! We'll review your profile and be in touch within 24 hours.",
       "successTitle": "You're on the list!",
       "successMessage": "Thanks for signing up! We'll review your profile and reach out within 24 hours to complete verification.",
-      "submitLabel": "Create My Referee Profile →",
+      "submitLabel": "Create My REFeree Profile →",
       "submitLoading": "Submitting..."
     },
     "organizer": {
       "tag": "Event Request",
-      "title": "Find Refs for Your Event",
-      "successBanner": "✓ Request received! We're matching you with available refs now. Check your email within 2 hours.",
+      "title": "Find REFS for Your Event",
+      "successBanner": "✓ Request received! We're matching you with available REFS now. Check your email within 2 hours.",
       "successTitle": "Request Received!",
-      "successMessage": "We're matching you with available refs now. Expect a response within 2 hours. Check your email for next steps.",
-      "submitLabel": "Find Refs for My Event →",
+      "successMessage": "We're matching you with available REFS now. Expect a response within 2 hours. Check your email for next steps.",
+      "submitLabel": "Find REFS for My Event →",
       "submitLoading": "Submitting...",
-      "footerNote": "We'll match you with available, verified refs within 2 hours. No commitment until you confirm."
+      "footerNote": "We'll match you with available, verified REFS within 2 hours. No commitment until you confirm."
     }
   },
   "forms": {
@@ -310,11 +310,11 @@
       { "value": "National / Professional", "label": "National / Professional" }
     ],
     "officialsNeeded": [
-      { "value": "1", "label": "1 Referee" },
-      { "value": "2", "label": "2 Referees" },
-      { "value": "3", "label": "3 Referees" },
-      { "value": "4-6", "label": "4–6 Referees" },
-      { "value": "7-10", "label": "7–10 Referees" },
+      { "value": "1", "label": "1 REFeree" },
+      { "value": "2", "label": "2 REFerees" },
+      { "value": "3", "label": "3 REFerees" },
+      { "value": "4-6", "label": "4–6 REFerees" },
+      { "value": "7-10", "label": "7–10 REFerees" },
       { "value": "10+", "label": "10+ (Tournament)" }
     ],
     "availabilityDays": [
@@ -328,7 +328,7 @@
     ],
     "verificationUpload": {
       "label": "Verification Document *",
-      "hint": "Upload a photo of your referee certification card, NFHS card, or government-issued ID. Accepted: JPG, PNG, PDF (max 10 MB).",
+      "hint": "Upload a photo of your REFeree certification card, NFHS card, or government-issued ID. Accepted: JPG, PNG, PDF (max 10 MB).",
       "dropzoneLabel": "Click to upload or drag & drop",
       "dropzoneSub": "JPG, PNG or PDF · Max 10 MB",
       "maxBytes": 10485760

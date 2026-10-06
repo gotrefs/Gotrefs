@@ -321,7 +321,7 @@ export async function confirmEventPayment(
         ...metadata,
         paymentId: payment.id,
       },
-      description: `${event.title || "GotREFS event"} · ${breakdown.refCount} ref${breakdown.refCount === 1 ? "" : "s"} + deposit`,
+      description: `${event.title || "GotREFS event"} · ${breakdown.refCount} REF${breakdown.refCount === 1 ? "" : "S"} + deposit`,
     });
 
     if (intent.status !== "succeeded" && intent.status !== "processing") {
@@ -601,7 +601,7 @@ export async function refundOrganizerPayment(
     throw new OrganizerChargeError("Payment not found.", 404, "payment_not_found");
   }
   if (payment.purpose !== "event_refs") {
-    throw new OrganizerChargeError("Only event ref payments can be refunded here.", 400, "wrong_purpose");
+    throw new OrganizerChargeError("Only event REF payments can be refunded here.", 400, "wrong_purpose");
   }
   if (payment.status === "refunded" || payment.status === "canceled") {
     return { refundedCents: 0, alreadyRefunded: true, transferredPayoutCount: 0 };
@@ -625,7 +625,7 @@ export async function refundOrganizerPayment(
   const transferred = (payouts ?? []).filter((p) => Boolean(p.stripe_transfer_id) || p.status === "paid");
   if (transferred.length > 0 && !args.allowTransferred) {
     throw new OrganizerChargeError(
-      `Refs already have ${transferred.length} Connect transfer(s). Reverse those in Stripe first, or retry with allowTransferred.`,
+      `REFS already have ${transferred.length} Connect transfer(s). Reverse those in Stripe first, or retry with allowTransferred.`,
       409,
       "has_transfers"
     );

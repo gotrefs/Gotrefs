@@ -153,7 +153,7 @@ export async function notifyOfferInvite(opts: {
     to: ref.email,
     subject: `New Request: ${event.organizerName} requested you for ${event.title}`,
     html: emailLayout({
-      title: "New referee request",
+      title: "New REFeree request",
       bodyHtml: `
         <p>Hi ${escapeHtml(ref.displayName)},</p>
         <p><strong>${escapeHtml(event.organizerName)}</strong> requested you for an upcoming game:</p>
@@ -252,20 +252,20 @@ export async function notifyOfferResponseToOrganizer(opts: {
   return sendEmail({
     to: org.email,
     subject: opts.accepted
-      ? `${BRAND_NAME}: Ref ${refId} accepted — confirm pay`
-      : `${BRAND_NAME}: Ref ${refId} declined your offer`,
+      ? `${BRAND_NAME}: REF ${refId} accepted — confirm pay`
+      : `${BRAND_NAME}: REF ${refId} declined your offer`,
     html: emailLayout({
       title: opts.accepted ? "Offer accepted — payment ready" : "Offer declined",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
-        <p><strong>Ref ${escapeHtml(refId)}</strong> ${opts.accepted ? "accepted" : "declined"} your offer for:</p>
+        <p><strong>REF ${escapeHtml(refId)}</strong> ${opts.accepted ? "accepted" : "declined"} your offer for:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}</li>
         </ul>
         <p>${
           opts.accepted
-            ? "Confirm and pay in your dashboard to finish hiring. Total includes referee pay, the GotREFS fee, and a refundable deposit (1 game rate × each ref)."
+            ? "Confirm and pay in your dashboard to finish hiring. Total includes REFeree pay, the GotREFS fee, and a refundable deposit (1 game rate × each REF)."
             : "You can invite another verified official from your dashboard."
         }</p>
       `,
@@ -308,7 +308,7 @@ export async function notifyOfferAcceptedToRef(opts: {
         ${notesBlock}
         <p>This game is also saved under Upcoming games in your dashboard.</p>
       `,
-      ctaLabel: "Open referee dashboard",
+      ctaLabel: "Open REFeree dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
@@ -369,12 +369,12 @@ export async function notifyApplicationWithdrawnToOrganizer(opts: {
 
   return sendEmail({
     to: org.email,
-    subject: `${BRAND_NAME}: Ref canceled request — ${event.title}`,
+    subject: `${BRAND_NAME}: REF canceled request — ${event.title}`,
     html: emailLayout({
       title: "Request canceled",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
-        <p><strong>Ref ${escapeHtml(gotrefsId)}</strong> canceled their request for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}).</p>
+        <p><strong>REF ${escapeHtml(gotrefsId)}</strong> canceled their request for <strong>${escapeHtml(event.title)}</strong> (${escapeHtml(event.sport)} · ${escapeHtml(event.startsAt)}).</p>
         <p>They may request again later if the game is still open.</p>
       `,
       ctaLabel: "View requests",
@@ -444,12 +444,12 @@ export async function notifyOrganizerNewApplication(opts: {
 
   return sendEmail({
     to: org.email,
-    subject: `Ref Requested For ${event.title} (${event.place} · ${event.startsAt})`,
+    subject: `REF Requested For ${event.title} (${event.place} · ${event.startsAt})`,
     html: emailLayout({
-      title: "Ref requested for your event",
+      title: "REF requested for your event",
       bodyHtml: `
         <p>Hi ${escapeHtml(org.displayName)},</p>
-        <p><strong>Ref ${escapeHtml(gotrefsId)}</strong> requested to officiate:</p>
+        <p><strong>REF ${escapeHtml(gotrefsId)}</strong> requested to officiate:</p>
         <ul>
           <li><strong>${escapeHtml(event.title)}</strong></li>
           <li>${escapeHtml(event.place)}</li>
@@ -512,7 +512,7 @@ export async function notifyVerificationDecision(opts: {
           <p>Hi ${escapeHtml(ref.displayName)},</p>
           <p>Great news — your ${BRAND_NAME} verification is approved.</p>
           <p>You can now request to work open games and receive invites from event organizers.</p>
-          <p>Open your referee dashboard to start finding games near you.</p>
+          <p>Open your REFeree dashboard to start finding games near you.</p>
         `,
         ctaLabel: "Find games now",
         ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
@@ -553,11 +553,11 @@ export async function notifyVerificationDecision(opts: {
         ${stepsHtml}
         <p>${
           wantsChanges
-            ? "Sign in to your referee dashboard, update the items listed above, and resubmit for review. We’ll email you again once we’ve reviewed your updates."
+            ? "Sign in to your REFeree dashboard, update the items listed above, and resubmit for review. We’ll email you again once we’ve reviewed your updates."
             : "If you have questions, reply to this email or contact GotREFS support."
         }</p>
       `,
-      ctaLabel: wantsChanges ? "Fix & resubmit now" : "Open referee dashboard",
+      ctaLabel: wantsChanges ? "Fix & resubmit now" : "Open REFeree dashboard",
       ctaUrl: dashboardUrl(siteUrl, "/dashboard/referee"),
     }),
   });
@@ -604,7 +604,7 @@ export async function notifyOrganizerPaymentReceipt(opts: {
     opts.depositCents > 0
       ? `<p>We also held a <strong>refundable deposit of ${escapeHtml(
           formatUsdCents(opts.depositCents)
-        )}</strong> (one game rate × each ref). If those refs don’t work extra games, that deposit is returned to your original payment method after the event ends — automatically, or sooner from your Payments tab.</p>`
+        )}</strong> (one game rate × each REF). If those REFS don’t work extra games, that deposit is returned to your original payment method after the event ends — automatically, or sooner from your Payments tab.</p>`
       : `<p>Any unused refundable deposit already held for this event is returned after the event ends.</p>`;
 
   return sendEmail({
@@ -618,8 +618,8 @@ export async function notifyOrganizerPaymentReceipt(opts: {
           eventMeta ? ` (${eventMeta})` : ""
         }. Keep this email as your receipt.</p>
         <ul>
-          <li>Referee pay: <strong>${escapeHtml(formatUsdCents(opts.refSubtotalCents))}</strong> (${opts.refCount} ref${
-            opts.refCount === 1 ? "" : "s"
+          <li>REFeree pay: <strong>${escapeHtml(formatUsdCents(opts.refSubtotalCents))}</strong> (${opts.refCount} REF${
+            opts.refCount === 1 ? "" : "S"
           })</li>
           <li>GotREFS fee: <strong>${escapeHtml(formatUsdCents(opts.platformFeeCents))}</strong></li>
           ${
@@ -632,7 +632,7 @@ export async function notifyOrganizerPaymentReceipt(opts: {
           <li>Total charged: <strong>${escapeHtml(formatUsdCents(opts.totalCents))}</strong></li>
         </ul>
         ${depositLine}
-        <p>Refs are paid by ACH after the event ends — not at the moment you confirm pay. You can download a full receipt anytime under Payments → Tax / receipts.</p>
+        <p>REFS are paid by ACH after the event ends — not at the moment you confirm pay. You can download a full receipt anytime under Payments → Tax / receipts.</p>
         <p style="font-size:13px;color:#7B8FA0;">Receipt ID: ${escapeHtml(opts.paymentId)}</p>
       `,
       ctaLabel: "Open Payments",
@@ -701,9 +701,9 @@ export async function notifyPayoutMethodNeeded(opts: {
         <p>Hi ${escapeHtml(ref.displayName)},</p>
         ${lead}
         ${eventLine}
-        <p>Or you can visit your referee dashboard and update your payout method under <strong>Payments</strong>.</p>
+        <p>Or you can visit your REFeree dashboard and update your payout method under <strong>Payments</strong>.</p>
         <p style="margin-top:24px;font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#7B8FA0;">Frequently asked questions</p>
-        <p style="margin:12px 0 4px;"><strong>Where do I find my payout information?</strong><br/>Open your GotREFS referee dashboard → <em>Payments</em>.</p>
+        <p style="margin:12px 0 4px;"><strong>Where do I find my payout information?</strong><br/>Open your GotREFS REFeree dashboard → <em>Payments</em>.</p>
         <p style="margin:12px 0 4px;"><strong>How do I set up a way to get paid?</strong><br/>Tap <em>Add payout method</em> below. Stripe Express will walk you through connecting your bank${
           needsTax ? " and tax details" : ""
         } for ACH direct deposit.</p>

@@ -36,7 +36,7 @@ export function LandingAuthPopup() {
             <div>
               <h2 className="text-3xl font-black tracking-tight md:text-4xl">Success starts here</h2>
               <ul className="mt-8 space-y-5 text-lg font-black leading-7">
-                <li>✓ Find verified referees faster</li>
+                <li>✓ Find verified REFerees faster</li>
                 <li>✓ Post games and staff events in minutes</li>
                 <li>✓ Browse local gigs across every sport</li>
               </ul>
@@ -51,7 +51,7 @@ export function LandingAuthPopup() {
           <div className="w-full">
             <h1 className="text-2xl font-black tracking-tight md:text-3xl">Welcome to GotREFS</h1>
             <p className="mt-3 text-base text-[var(--slate)]">
-              One clean login and signup flow for refs, organizers, and assignors.{" "}
+              One clean login and signup flow for REFS, organizers, and assignors.{" "}
               <Link href="/auth/login" className="font-bold text-[var(--navy)] underline">
                 Continue
               </Link>

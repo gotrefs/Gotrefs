@@ -37,7 +37,7 @@ const ROLE_CARDS: Array<{
 }> = [
   {
     role: "ref",
-    title: "I am a Referee",
+    title: "I am a REFeree",
     description: "Find games, accept assignments, and manage your schedule.",
   },
   {
@@ -48,7 +48,7 @@ const ROLE_CARDS: Array<{
   {
     role: "assignor",
     title: "I am an Assignor",
-    description: "Schedule official crews and manage referee pools.",
+    description: "Schedule official crews and manage REFeree pools.",
   },
 ];
 
@@ -206,7 +206,7 @@ export function AuthFlow() {
         setNotice("Welcome back — we restored your signup exactly where you left off.");
       } else {
         setStep("role");
-        setNotice("You have a saved referee signup. Choose “I am a Referee” to continue where you left off.");
+        setNotice("You have a saved REFeree signup. Choose “I am a REFeree” to continue where you left off.");
       }
       setDraftHydrated(true);
     })();
@@ -753,7 +753,7 @@ export function AuthFlow() {
           const detail =
             submitError instanceof Error ? submitError.message : "Could not submit verification.";
           setNotice(
-            `Account created, but verification was not queued for review (${detail}). Ask your admin to run supabase/RUN_ADMIN_VERIFICATION_SETUP.sql in Supabase, then open your referee dashboard to resubmit.`
+            `Account created, but verification was not queued for review (${detail}). Ask your admin to run supabase/RUN_ADMIN_VERIFICATION_SETUP.sql in Supabase, then open your REFeree dashboard to resubmit.`
           );
           try {
             await saveRefSignupDraft(
@@ -933,7 +933,7 @@ export function AuthFlow() {
           if (savedScreen) setResumeScreen(savedScreen);
           setHasSavedRefDraft(true);
           setError(null);
-          setNotice("Progress saved. Choose “I am a Referee” anytime to continue where you left off.");
+          setNotice("Progress saved. Choose “I am a REFeree” anytime to continue where you left off.");
           setStep("role");
         }}
       />
@@ -951,7 +951,7 @@ export function AuthFlow() {
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
             {step === "role"
               ? "Choose how you’ll use GotREFS. If you already started signup on this device, we’ll pick up where you left off."
-              : "One clean entry point for referees, organizers, and assignors."}
+              : "One clean entry point for REFerees, organizers, and assignors."}
           </p>
           {notice ? (
             <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -984,7 +984,7 @@ export function AuthFlow() {
               <li>Use the newest email if you resend — older links may expire.</li>
               <li>Check spam or promotions if you do not see it within a minute.</li>
               {pendingRedirect === "/dashboard/referee" && (
-                <li>After you confirm, your 10% gear discount code will appear on your referee dashboard.</li>
+                <li>After you confirm, your 10% gear discount code will appear on your REFeree dashboard.</li>
               )}
             </ul>
 
@@ -1180,7 +1180,7 @@ export function AuthFlow() {
               <p className="mt-1 text-sm text-[var(--muted)]">We will tailor setup around how you use {BRAND_NAME}.</p>
               {hasSavedRefDraft ? (
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  Saved referee progress found — pick Referee to jump back to your last signup step.
+                  Saved REFeree progress found — pick REFeree to jump back to your last signup step.
                 </p>
               ) : null}
             </div>
@@ -1207,7 +1207,7 @@ export function AuthFlow() {
               onClick={() => {
                 setWizardStep(0);
                 if (role === "ref" && hasSavedRefDraft) {
-                  setNotice("Welcome back — continuing your referee signup where you left off.");
+                  setNotice("Welcome back — continuing your REFeree signup where you left off.");
                 } else {
                   setNotice(null);
                 }
@@ -1216,7 +1216,7 @@ export function AuthFlow() {
               className="w-full rounded-xl bg-gradient-to-r from-[var(--navy)] to-emerald-600 px-5 py-3 text-sm font-black text-white"
             >
               {role === "ref" && hasSavedRefDraft
-                ? "Continue referee signup"
+                ? "Continue REFeree signup"
                 : `Continue as ${roleCard.title.replace("I am a ", "").replace("I am an ", "")}`}
             </button>
           </div>
@@ -1349,7 +1349,7 @@ export function AuthFlow() {
             {role === "ref" && wizardStep === 3 && (
               <div className="space-y-4">
                 <p className="text-sm leading-relaxed text-[var(--muted)]">
-                  Upload your referee certification, license, or training credential (NFHS card, state license, USSF, etc.).
+                  Upload your REFeree certification, license, or training credential (NFHS card, state license, USSF, etc.).
                 </p>
                 <SignupFileUpload
                   label="Certification / license document"
@@ -1411,8 +1411,8 @@ export function AuthFlow() {
                 <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
                   After you create your account you’ll land on <strong>Payments</strong> to save a card or
-                  bank with Stripe. When you approve a ref, GotREFS charges that method (ref pay + GotREFS fee +
-                  refundable deposit). Funds are held until the game ends, then paid to the ref by ACH.
+                  bank with Stripe. When you approve a REF, GotREFS charges that method (REF pay + GotREFS fee +
+                  refundable deposit). Funds are held until the game ends, then paid to the REF by ACH.
                 </p>
               </div>
             )}
@@ -1487,7 +1487,7 @@ export function AuthFlow() {
                       rel="noreferrer"
                       className="font-bold text-[var(--navy)] underline"
                     >
-                      {role === "organizer" ? "Event Organizer Terms & Conditions" : "Referee & Official Terms & Conditions"}
+                      {role === "organizer" ? "Event Organizer Terms & Conditions" : "REFeree & Official Terms & Conditions"}
                     </a>
                     ,{" "}
                     <a href="/policies/privacy-policy" target="_blank" rel="noreferrer" className="font-bold text-[var(--navy)] underline">

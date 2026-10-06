@@ -18,25 +18,25 @@ export const EVENT_BOOSTS: readonly BoostDefinition[] = [
     id: "new_listing",
     percent: 20,
     title: "New event promotion",
-    subtitle: "Offer 20% more pay to your first 10 refs booked",
+    subtitle: "Offer 20% more pay to your first 10 REFS booked",
   },
   {
     id: "last_minute",
     percent: 11,
     title: "Last-minute boost",
-    subtitle: "Extra pay for refs who accept 14 days or less before the game",
+    subtitle: "Extra pay for REFS who accept 14 days or less before the game",
   },
   {
     id: "multi_game",
     percent: 10,
     title: "Multi-game bonus",
-    subtitle: "For refs working 3 or more of your games",
+    subtitle: "For REFS working 3 or more of your games",
   },
   {
     id: "season",
     percent: 15,
     title: "Season commitment",
-    subtitle: "For refs who commit to your full season",
+    subtitle: "For REFS who commit to your full season",
   },
 ] as const;
 

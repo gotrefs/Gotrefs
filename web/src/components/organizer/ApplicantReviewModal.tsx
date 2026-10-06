@@ -126,7 +126,7 @@ export function ApplicantReviewModal({
           typeof result === "string"
             ? result
             : action === "accept"
-              ? "Could not approve this ref. Try again."
+              ? "Could not approve this REF. Try again."
               : "Could not deny this request. Try again."
         );
         setConfirmDeny(false);
@@ -161,7 +161,7 @@ export function ApplicantReviewModal({
     return null;
   }
 
-  const name = applicant ? `Ref ${applicant.gotrefsId}` : "";
+  const name = applicant ? `REF ${applicant.gotrefsId}` : "";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-4 sm:items-center">
@@ -202,7 +202,7 @@ export function ApplicantReviewModal({
               <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Confirm</p>
               <h2 className="mt-2 text-xl font-bold text-neutral-900">Are you sure?</h2>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-neutral-600">
-                Deny <span className="font-semibold text-neutral-900">Ref {applicant.gotrefsId}</span> for{" "}
+                Deny <span className="font-semibold text-neutral-900">REF {applicant.gotrefsId}</span> for{" "}
                 <span className="font-semibold text-neutral-900">{applicant.eventTitle}</span>? They will be
                 notified and won’t stay on this request.
               </p>
@@ -234,14 +234,14 @@ export function ApplicantReviewModal({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">
-                    Ref requested for your event
+                    REF requested for your event
                     {total > 1 ? ` · ${counterLabel}` : ""}
                   </p>
                   <h2 className="mt-1 text-xl font-bold text-neutral-900">{applicant.eventTitle}</h2>
                   <p className="mt-1 text-sm text-neutral-500">
                     {[applicant.eventPlace, applicant.eventWhen].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-neutral-800">Ref {applicant.gotrefsId}</p>
+                  <p className="mt-2 text-sm font-semibold text-neutral-800">REF {applicant.gotrefsId}</p>
                 </div>
                 <button
                   type="button"
@@ -299,7 +299,7 @@ export function ApplicantReviewModal({
                     {applicant.eventPayLabel
                       ? `Event pay ${applicant.eventPayLabel}`
                       : applicant.refRateLabel
-                        ? `Ref rate ${applicant.refRateLabel}`
+                        ? `REF rate ${applicant.refRateLabel}`
                         : "Pay TBD"}
                   </p>
                 </div>
@@ -329,7 +329,7 @@ export function ApplicantReviewModal({
 
               <label className="mt-5 block rounded-2xl border border-neutral-200 bg-white px-4 py-3">
                 <span className="text-xs font-black uppercase tracking-wide text-neutral-500">
-                  Number of games (you set this — ref cannot change it)
+                  Number of games (you set this — REF cannot change it)
                 </span>
                 <input
                   type="number"
@@ -343,7 +343,7 @@ export function ApplicantReviewModal({
                 />
                   <span className="mt-1 block text-xs text-neutral-500">
                   Approving charges your saved payment method now (games × rate + GotREFS fee + refundable
-                  1-game deposit per ref). Funds are held until the game ends.
+                  1-game deposit per REF). Funds are held until the game ends.
                 </span>
               </label>
 

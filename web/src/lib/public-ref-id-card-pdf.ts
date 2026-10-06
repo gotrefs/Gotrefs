@@ -138,7 +138,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
   let y = 92;
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("Referee ID:", 132, y);
+  doc.text("REFeree ID:", 132, y);
   doc.setFont("helvetica", "normal");
   doc.text(id, 205, y);
   y += 20;
@@ -183,7 +183,7 @@ export async function buildPublicRefIdCardPdf(card: PublicRefIdCard): Promise<Ar
 
   doc.setFillColor(...WHITE);
   doc.rect(8, boxTop, leftW, boxH, "F");
-  drawBoxHeader(8, boxTop, "Games certified to ref", leftW);
+  drawBoxHeader(8, boxTop, "Games certified to REF", leftW);
   doc.setTextColor(...INK);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);

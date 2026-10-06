@@ -82,7 +82,7 @@ export async function PATCH(
   }
 
   if (action === "accept" && !isRef) {
-    return NextResponse.json({ error: "Only the referee can accept" }, { status: 403 });
+    return NextResponse.json({ error: "Only the REFeree can accept" }, { status: 403 });
   }
 
   if (action === "accept" && isRef) {
@@ -156,7 +156,7 @@ export async function PATCH(
   }
 
   if (action === "decline" && !isRef) {
-    return NextResponse.json({ error: "Only the referee can decline" }, { status: 403 });
+    return NextResponse.json({ error: "Only the REFeree can decline" }, { status: 403 });
   }
 
   if (action === "cancel" && !isOrg) {

@@ -119,7 +119,7 @@ export function OrganizerConfirmPayPanel({
       }
       setMsg(
         data.breakdown
-          ? `Paid ${formatCents(data.breakdown.totalCents)}. Check your inbox for your receipt. Refs are paid by ACH after the event. Unused deposit is returned to your card after the event ends.`
+          ? `Paid ${formatCents(data.breakdown.totalCents)}. Check your inbox for your receipt. REFS are paid by ACH after the event. Unused deposit is returned to your card after the event ends.`
           : "Payment confirmed. Check your inbox for your receipt."
       );
       await load(eventId);
@@ -177,10 +177,10 @@ export function OrganizerConfirmPayPanel({
   return (
     <section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm sm:p-8">
       <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Confirm payment</p>
-      <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Unpaid accepted refs</h2>
+      <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Unpaid accepted REFS</h2>
       <p className="mt-2 text-sm text-neutral-600">
-        Normally you’re charged when you approve a ref. Use this only if a charge was skipped. Total includes
-        referee pay, the GotREFS fee, and a refundable deposit.
+        Normally you’re charged when you approve a REF. Use this only if a charge was skipped. Total includes
+        REFeree pay, the GotREFS fee, and a refundable deposit.
       </p>
 
       {events.length > 0 ? (
@@ -210,21 +210,21 @@ export function OrganizerConfirmPayPanel({
           {breakdown.offers.map((line) => (
             <div key={line.offerId} className="flex justify-between gap-3 text-neutral-700">
               <span>
-                Ref · {line.gamesCount} game{line.gamesCount === 1 ? "" : "s"} ×{" "}
+                REF · {line.gamesCount} game{line.gamesCount === 1 ? "" : "s"} ×{" "}
                 {formatCents(line.rateCents)}
               </span>
               <span className="font-semibold">{formatCents(line.refSubtotalCents)}</span>
             </div>
           ))}
           <div className="flex justify-between gap-3 border-t border-neutral-100 pt-2 text-neutral-700">
-            <span>Referee pay</span>
+            <span>REFeree pay</span>
             <span className="font-semibold">{formatCents(breakdown.refSubtotalCents)}</span>
           </div>
           <div className="flex justify-between gap-3 text-neutral-700">
             <span className="inline-flex items-center">
               GotREFS fee
               <InfoTip label="About the GotREFS fee">
-                This is the GotREFS processing fee for running payments, holding funds, and paying refs after
+                This is the GotREFS processing fee for running payments, holding funds, and paying REFS after
                 the event.
               </InfoTip>
             </span>
@@ -233,12 +233,12 @@ export function OrganizerConfirmPayPanel({
           <div className="flex justify-between gap-3 text-neutral-700">
             <span className="inline-flex max-w-[70%] items-center">
               <span>
-                Refundable deposit (1 game × {breakdown.refCount} ref
+                Refundable deposit (1 game × {breakdown.refCount} REF
                 {breakdown.refCount === 1 ? "" : "s"}
                 {breakdown.depositAlreadyHeldCents > 0 ? ", top-up" : ""})
               </span>
               <InfoTip label="About the refundable deposit">
-                This deposit covers refs if they work extra games. If they don’t, it’s returned to you right
+                This deposit covers REFS if they work extra games. If they don’t, it’s returned to you right
                 after the event.
               </InfoTip>
             </span>
