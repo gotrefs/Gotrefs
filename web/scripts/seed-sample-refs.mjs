@@ -295,7 +295,6 @@ const LEVEL_PHRASES = {
   "High School": ["JV and varsity", "freshman through varsity", "high school and summer league", "middle school and high school games"],
   Club: ["club and travel tournaments", "travel teams", "club leagues", "weekend club showcases"],
   "Adult League": ["adult rec leagues", "men's and women's leagues", "adult and corporate leagues", "weeknight adult leagues"],
-  Collegiate: ["small-college and junior college games", "college club and intramural games", "college scrimmages and high school varsity"],
 };
 
 const BACKGROUNDS = [
@@ -339,9 +338,10 @@ function yearsPhrase(years, voice) {
   return bioPick(options);
 }
 
-/** A career this short doesn't reach the college level; keep the card consistent. */
+/** Keep the level consistent with the years of experience. */
 function realisticLevel(level, years) {
-  if (level === "Collegiate" && years < 4) return years < 2 ? "Youth / Rec" : "High School";
+  // No sample ref is listed at the college level: those show as Club instead.
+  if (level === "Collegiate") return years < 2 ? "Youth / Rec" : years < 4 ? "High School" : "Club";
   return level;
 }
 
