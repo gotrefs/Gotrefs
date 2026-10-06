@@ -8,11 +8,11 @@ export function FindRefsNowSection() {
       data-snap-section
       className="viewport-screen flex flex-col border-t border-[var(--border)] bg-white px-4"
     >
-      <div className="mx-auto flex h-full w-full max-w-6xl flex-col items-center">
-        <div className="shrink-0 text-center">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col items-center gap-5 lg:flex-row lg:gap-12">
+        <div className="shrink-0 text-center lg:flex-1 lg:text-left">
           <p className="marketing-eyebrow text-[var(--red)]">For Organizers</p>
           <h2 className="marketing-headline text-[#1b2132]">Find Refs Near You</h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600 md:text-base">
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600 md:text-base lg:mx-0">
             Browse officials by sport, rate and distance on the map. No account needed to look.
           </p>
           <Link
@@ -26,22 +26,16 @@ export function FindRefsNowSection() {
         <Link
           href="/find-refs"
           aria-label="Open Find Refs"
-          className="group mt-6 flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] transition hover:shadow-[0_24px_70px_rgba(15,23,42,0.26)] sm:mt-8"
+          className="group flex min-h-0 w-full flex-1 items-center justify-center lg:h-full lg:w-auto lg:flex-none"
         >
-          <div className="flex shrink-0 items-center gap-1.5 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5" aria-hidden>
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-            <span className="ml-3 truncate rounded-md bg-white px-3 py-0.5 text-xs text-neutral-500">gotrefs.org/find-refs</span>
-          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/marketing/find-refs-screenshot.jpg"
-            alt="The GoTRefs Find Refs page: filters, referee listings and a map"
-            width={1400}
-            height={788}
+            src="/marketing/we-gotrefs-poster.jpg"
+            alt="We GotREFS poster: the referee marketplace for every sport"
+            width={1107}
+            height={1421}
             loading="lazy"
-            className="min-h-0 w-full flex-1 object-cover object-left-top transition duration-300 group-hover:scale-[1.01]"
+            className="h-auto max-h-full w-auto max-w-full rounded-2xl object-contain lg:h-full shadow-[0_20px_60px_rgba(15,23,42,0.22)] transition duration-300 group-hover:scale-[1.01]"
           />
         </Link>
       </div>
