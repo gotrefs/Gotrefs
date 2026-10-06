@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicRefListing } from "@/lib/marketplace/public-refs";
+import { StripePromptModal } from "@/components/payments/StripePromptModal";
 import { PLATFORM_FEE_PERCENT_LABEL, PLATFORM_FEE_RATE } from "@/lib/platform-fee";
 import { sportEmoji } from "@/lib/sport-emoji";
 
@@ -85,6 +86,8 @@ export function RequestRefForm({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [openingCard, setOpeningCard] = useState(false);
+  const [cardPrompt, setCardPrompt] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
   const [sendAfterCard, setSendAfterCard] = useState(false);
 
   // Bring back what the organizer picked before they created an account.
@@ -153,21 +156,35 @@ export function RequestRefForm({
     );
   }
 
-  /** Booking is when a card is needed: open Stripe's card form, then come back here. */
+  /** Booking is when a card is needed: show the Stripe pop-up (the request waits for the card). */
+  function askForCard() {
+    saveDraft(r.gotrefsId, draft);
+    setCardError(null);
+    setCardPrompt(true);
+  }
+
+  /** From the pop-up: open Stripe's card form, then come back here and send the request. */
   async function openCardForm() {
     saveDraft(r.gotrefsId, draft);
+    setCardError(null);
     setOpeningCard(true);
-    const res = await fetch("/api/stripe/organizer-payment-method", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "onboard", returnTo: returnPath }),
-    });
-    const json = (await res.json()) as { url?: string; error?: string };
-    if (!res.ok || !json.url) {
+    try {
+      const res = await fetch("/api/stripe/organizer-payment-method", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "onboard", returnTo: returnPath }),
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        setOpeningCard(false);
+        setCardError(json.error || "Could not open Stripe.");
+        return;
+      }
+      window.location.assign(json.url);
+    } catch {
       setOpeningCard(false);
-      throw new Error(json.error || "Could not open the secure card form. Try again.");
+      setCardError("Could not reach Stripe.");
     }
-    window.location.assign(json.url);
   }
 
   async function sendRequest(options: { afterCard?: boolean } = {}) {
@@ -183,7 +200,7 @@ export function RequestRefForm({
         const pmRes = await fetch("/api/stripe/organizer-payment-method");
         const pm = (await pmRes.json()) as { ready?: boolean };
         if (pmRes.ok && !pm.ready) {
-          await openCardForm();
+          askForCard();
           return;
         }
       }
@@ -225,7 +242,7 @@ export function RequestRefForm({
         if (options.afterCard) {
           throw new Error("We couldn't confirm your card yet. Tap Request to try again.");
         }
-        await openCardForm();
+        askForCard();
         return;
       }
       if (!offerRes.ok) throw new Error(offerJson.error || "Could not send the request.");
@@ -320,6 +337,24 @@ export function RequestRefForm({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+      {cardPrompt && (
+        <StripePromptModal
+          eyebrow="Secure payments"
+          title={`Add a card to pay ${firstName}`}
+          actionLabel="Continue to Stripe"
+          busy={openingCard}
+          error={cardError}
+          onAction={() => void openCardForm()}
+          onDismiss={() => {
+            setCardPrompt(false);
+            setError("No card was added, so the request wasn't sent. Tap Request when you're ready.");
+          }}
+        >
+          Fill this out on Stripe so your Ref can be paid. You&apos;re only charged when {firstName} accepts,
+          and your request is sent as soon as the card is saved. Stripe protects your card details. GotREFS
+          never stores your full card number.
+        </StripePromptModal>
+      )}
       <Link href="/find-refs" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900">
         ← Back to refs
       </Link>
@@ -525,7 +560,7 @@ export function RequestRefForm({
                 disabled={sending || openingCard}
                 className="mt-4 w-full rounded-xl bg-[var(--red)] py-3.5 text-base font-semibold text-white hover:bg-[var(--red-dark)] disabled:opacity-60"
               >
-                {openingCard ? "Opening secure card form…" : sending ? "Sending…" : "Request"}
+                {sending ? "Sending…" : "Request"}
               </button>
             )}
             <p className="mt-3 text-center text-sm text-neutral-600">You won&apos;t be charged yet</p>

@@ -4,6 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/client";
 
+/** Note shown on Stripe's card page when an organizer adds a card while booking. */
+export const ORGANIZER_CARD_FORM_MESSAGE =
+  "Fill this out to pay your Ref. You're only charged when a Ref accepts your request.";
+
 export type OrganizerPaymentMethodRow = {
   member_id: string;
   stripe_customer_id: string | null;
@@ -238,7 +242,7 @@ export async function createOrganizerCheckoutSetupSession(
     name: args.name,
   });
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
+  const params: Stripe.Checkout.SessionCreateParams = {
     mode: "setup",
     customer: customerId,
     currency: "usd",
@@ -248,7 +252,19 @@ export async function createOrganizerCheckoutSetupSession(
     setup_intent_data: {
       metadata: { member_id: args.memberId, purpose: "organizer_default_pm" },
     },
-  });
+  };
+  let session: Stripe.Checkout.Session;
+  try {
+    // Shown next to the button on Stripe's page, so it says why the card is being asked for.
+    session = await stripe.checkout.sessions.create({
+      ...params,
+      custom_text: { submit: { message: ORGANIZER_CARD_FORM_MESSAGE } },
+    });
+  } catch (err) {
+    // The note is optional. If Stripe won't take it, the card form still has to open.
+    console.warn("[organizer-pm] checkout note rejected:", err instanceof Error ? err.message : err);
+    session = await stripe.checkout.sessions.create(params);
+  }
   return { customerId, session };
 }
 
