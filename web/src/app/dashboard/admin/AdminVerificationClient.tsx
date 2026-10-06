@@ -313,7 +313,7 @@ export default function AdminVerificationClient() {
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--red)]">Admin only</p>
-        <h1 className="mt-1 font-display text-3xl font-black text-[var(--navy)]">Referee verification review</h1>
+        <h2 className="mt-1 font-display text-3xl font-black text-[var(--navy)]">Referee verification review</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
           Every referee account appears here — submitted packages, incomplete signups, approved, and rejected.
           Resubmissions land under <strong>Pending</strong> (and <strong>Resubmitted</strong>) — not Rejected.

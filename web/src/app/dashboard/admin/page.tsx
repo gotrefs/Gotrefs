@@ -4,6 +4,10 @@ import { isGotrefsAdminUser } from "@/lib/auth/admin-access";
 import { resolveMemberRole, dashboardPathForRole } from "@/lib/member-role";
 import { createClient } from "@/lib/supabase/server";
 
+const AdminSignupsPanel = dynamic(() => import("./AdminSignupsPanel"), {
+  loading: () => <p className="mb-10 text-sm text-[var(--muted)]">Loading signups…</p>,
+});
+
 const AdminVerificationClient = dynamic(() => import("./AdminVerificationClient"), {
   loading: () => (
     <p className="text-sm text-[var(--muted)]">Loading verification review tools…</p>
@@ -25,5 +29,10 @@ export default async function AdminDashboardPage() {
     redirect(dashboardPathForRole(role));
   }
 
-  return <AdminVerificationClient />;
+  return (
+    <>
+      <AdminSignupsPanel />
+      <AdminVerificationClient />
+    </>
+  );
 }
