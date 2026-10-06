@@ -16,6 +16,34 @@ const inputClass =
 type Done = { gotrefsId: string | null; needsEmailConfirmation: boolean; photoSaved: boolean };
 
 /**
+ * Shrink the chosen photo to a small JPEG so it can travel with the signup request
+ * and be saved on the server (which works before the email is confirmed).
+ * Returns null if this browser can't read the image; the caller then falls back.
+ */
+async function shrinkPhoto(file: File): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    for (const [maxSide, quality] of [[900, 0.85], [700, 0.75], [500, 0.7]] as const) {
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      // ~1 MB of base64: far under the server's limit.
+      if (dataUrl.startsWith("data:image/jpeg") && dataUrl.length < 1_400_000) return dataUrl;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Referee signup in one screen: name, photo, sport (+ email and password to log in).
  * No government ID or certification here. The ref gets an ID card right away; it only
  * says "Verified" once GoTRefs has verified them.
@@ -31,6 +59,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
+  const [resend, setResend] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Preview the chosen photo; release the object URL when it changes.
@@ -99,6 +128,20 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
     }
   }
 
+  async function resendEmail() {
+    setResend("sending");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), pendingRedirect: "/dashboard/referee" }),
+      });
+      setResend(res.ok ? "sent" : "failed");
+    } catch {
+      setResend("failed");
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const problem = validate();
@@ -109,6 +152,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
     setError(null);
     setSaving(true);
     try {
+      const profilePhotoDataUrl = photo ? await shrinkPhoto(photo) : null;
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,6 +166,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
           verificationSkipped: true,
           termsAccepted: true,
           acceptedTermsSlug: "referee-official-terms",
+          ...(profilePhotoDataUrl ? { profilePhotoDataUrl } : {}),
         }),
       });
       const json = (await res.json()) as {
@@ -129,6 +174,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
         needsEmailConfirmation?: boolean;
         userId?: string | null;
         gotrefsId?: string | null;
+        photoSaved?: boolean;
       };
       if (!res.ok) {
         setError(json.error || "Could not create your account. Try again.");
@@ -136,8 +182,9 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
         return;
       }
 
-      let photoSaved = false;
-      if (!json.needsEmailConfirmation && json.userId && photo) {
+      // Normally the server has already saved the photo. These are fallbacks.
+      let photoSaved = json.photoSaved === true;
+      if (!photoSaved && !json.needsEmailConfirmation && json.userId && photo) {
         try {
           await uploadRefProfilePhoto(json.userId, photo);
           photoSaved = true;
@@ -165,7 +212,9 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
         <h2 className="text-2xl font-semibold text-neutral-900">Your ref card is ready, {firstName.trim()}!</h2>
         <p className="mt-1 text-sm text-neutral-600">
           {done.needsEmailConfirmation
-            ? `We sent a link to ${email.trim().toLowerCase()}. Open it on this device to activate your card.`
+            ? `We sent a link to ${email.trim().toLowerCase()}. Open it ${
+                done.photoSaved ? "on your phone or computer" : "on this device"
+              } to activate your card and its QR code.`
             : "Show the QR code at any game so organizers can pull up your ID."}
         </p>
         <div className="mx-auto mt-5 w-full max-w-[360px] text-left">
@@ -179,6 +228,27 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
             className="w-full shadow-xl"
           />
         </div>
+        {done.needsEmailConfirmation && (
+          <div className="mt-6 space-y-3">
+            <button
+              type="button"
+              onClick={resendEmail}
+              disabled={resend === "sending" || resend === "sent"}
+              className="w-full rounded-xl border border-neutral-300 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 disabled:opacity-60"
+            >
+              {resend === "sending" ? "Sending…" : resend === "sent" ? "Email sent again" : "Didn't get it? Send again"}
+            </button>
+            {resend === "failed" && (
+              <p className="text-sm text-red-600">Couldn&apos;t send the email. Try again in a minute.</p>
+            )}
+            <p className="text-sm text-neutral-600">
+              Already clicked the link?{" "}
+              <Link href="/auth/login" className="font-semibold text-neutral-900 underline">
+                Log in
+              </Link>
+            </p>
+          </div>
+        )}
         {!done.needsEmailConfirmation && (
           <a
             href="/dashboard/referee"
