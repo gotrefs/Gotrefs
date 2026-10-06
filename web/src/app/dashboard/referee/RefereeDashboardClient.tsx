@@ -1233,6 +1233,11 @@ export default function RefereeDashboardClient() {
   // Eligibility alone unlocks booking once admin has approved (do not also require hero state).
   const canApplyToGames = canAcceptOffers && !verificationNeedsFix && !verificationRejected;
   const pendingOffers = offers.filter((offer) => offer.status === "pending");
+  // The "connect Stripe to get paid" prompt waits until there is a job to be paid for.
+  const hasAcceptedJob =
+    bookings.length > 0 ||
+    offers.some((offer) => offer.status === "accepted") ||
+    applications.some((app) => app.status === "accepted");
   const missingActions: {
     label: string;
     description: string;
@@ -1284,7 +1289,7 @@ export default function RefereeDashboardClient() {
 
   return (
     <div className="flex flex-col gap-10">
-      <RefPayoutRequiredModal />
+      <RefPayoutRequiredModal hasAcceptedJob={hasAcceptedJob} />
       {applicationDecisionNotice && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div

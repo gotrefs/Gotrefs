@@ -5,7 +5,37 @@ import {
   type SignupDashboardPath,
 } from "@/lib/auth/email-confirmation";
 import { BRAND_NAME } from "@/lib/brand";
+import { emailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/resend";
+
+/**
+ * The confirmation email itself. A complete HTML document plus a full plain-text
+ * version (not just a bare link): mail filters treat link-only messages as suspect.
+ */
+export function buildSignupConfirmationEmail(confirmUrl: string) {
+  return {
+    subject: `Confirm your ${BRAND_NAME} email`,
+    html: emailLayout({
+      title: "Confirm your email",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Thanks for joining ${BRAND_NAME}. Confirm your email to open your account. The link works on your phone or your computer.</p>
+        <p style="margin:0;font-size:13px;color:#7B8FA0;">If the button doesn’t work, copy this link into your browser:<br/><span style="word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(confirmUrl)}</span></p>
+        <p style="margin:12px 0 0;font-size:13px;color:#7B8FA0;">If you didn’t sign up for ${BRAND_NAME}, you can ignore this email.</p>`,
+      ctaLabel: "Confirm email",
+      ctaUrl: confirmUrl,
+      ctaLarge: true,
+    }),
+    text: [
+      `Thanks for joining ${BRAND_NAME}.`,
+      "",
+      "Confirm your email to open your account:",
+      confirmUrl,
+      "",
+      "The link works on your phone or your computer.",
+      `If you didn't sign up for ${BRAND_NAME}, you can ignore this email.`,
+    ].join("\n"),
+  };
+}
 
 /** Cross-device confirmation link (token_hash). PKCE `code=` links break when opened on another device. */
 export function buildSignupConfirmationCallbackUrl(
@@ -54,18 +84,7 @@ export async function sendCrossDeviceSignupConfirmationEmail(options: {
   }
 
   const confirmUrl = buildSignupConfirmationCallbackUrl(options.siteUrl, tokenHash, nextPath);
-  const sent = await sendEmail({
-    to: email,
-    subject: `Confirm your ${BRAND_NAME} email`,
-    html: `
-      <h2>Confirm your email</h2>
-      <p>Thanks for joining ${BRAND_NAME}. Tap the button below to confirm your email — this works on your phone or computer.</p>
-      <p><a href="${confirmUrl}" style="display:inline-block;padding:12px 20px;background:#221e3f;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Confirm email &amp; continue</a></p>
-      <p style="color:#666;font-size:14px;">If the button does not work, copy and paste this link into your browser:<br/>${confirmUrl}</p>
-      <p style="color:#666;font-size:14px;">After you confirm, return to the browser where you signed up — it will open your dashboard automatically. You can also open the link on this device.</p>
-    `,
-    text: `Confirm your ${BRAND_NAME} email: ${confirmUrl}`,
-  });
+  const sent = await sendEmail({ to: email, ...buildSignupConfirmationEmail(confirmUrl) });
 
   if (!sent) {
     return {

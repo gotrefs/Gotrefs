@@ -107,7 +107,8 @@ export function OrganizerQuickSignupForm({ next }: { next: string | null }) {
         <h1 className="mt-3 text-2xl font-semibold text-neutral-900">Check your email</h1>
         <p className="mt-2 text-neutral-600">
           We sent a link to <span className="font-semibold text-neutral-900">{confirmEmail}</span>. Open it to
-          finish creating your account{next ? " and pick up right where you left off" : ""}.
+          finish creating your account{next ? " and pick up right where you left off" : ""}. Can&apos;t find
+          it? Check your junk or spam folder.
         </p>
         <button type="button" onClick={() => void resend()} className="mt-5 text-sm font-semibold text-neutral-900 underline">
           Resend the email

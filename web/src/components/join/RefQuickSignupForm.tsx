@@ -214,7 +214,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
           {done.needsEmailConfirmation
             ? `We sent a link to ${email.trim().toLowerCase()}. Open it ${
                 done.photoSaved ? "on your phone or computer" : "on this device"
-              } to activate your card and its QR code.`
+              } to activate your card and its QR code. Can't find it? Check your junk or spam folder.`
             : "Show the QR code at any game so organizers can pull up your ID."}
         </p>
         <div className="mx-auto mt-5 w-full max-w-[360px] text-left">
