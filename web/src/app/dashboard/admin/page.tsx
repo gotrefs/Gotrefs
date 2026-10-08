@@ -8,6 +8,10 @@ const AdminSignupsPanel = dynamic(() => import("./AdminSignupsPanel"), {
   loading: () => <p className="mb-10 text-sm text-[var(--muted)]">Loading signups…</p>,
 });
 
+const AdminUpcomingEventsPanel = dynamic(() => import("./AdminUpcomingEventsPanel"), {
+  loading: () => <p className="mb-10 text-sm text-[var(--muted)]">Loading upcoming events…</p>,
+});
+
 const AdminVerificationClient = dynamic(() => import("./AdminVerificationClient"), {
   loading: () => (
     <p className="text-sm text-[var(--muted)]">Loading verification review tools…</p>
@@ -32,6 +36,7 @@ export default async function AdminDashboardPage() {
   return (
     <>
       <AdminSignupsPanel />
+      <AdminUpcomingEventsPanel />
       <AdminVerificationClient />
     </>
   );
