@@ -126,9 +126,9 @@ export function OrganizerPaymentMethodPanel() {
             </button>
           </div>
           <p className="mt-3 text-sm text-neutral-500">
-            When you approve a REF (or they accept your invite), GotREFS charges this method: REFeree pay, the
-            GotREFS fee, and a refundable deposit (1 extra game per hired REF). Money is held until the game
-            ends, then paid to the REF by ACH. Unused deposit is returned after the event.
+            When you approve a REF (or they accept your invite), GotREFS charges this method for the booked
+            games or hours plus the 20% GotREFS fee. After the event you check the REF out and they sign off; then
+            they’re paid by ACH. Extra games or hours are charged to this method then, and unused ones are refunded.
           </p>
         </div>
       </section>

@@ -13,7 +13,7 @@ export type ConfirmPayBreakdown = {
   refCount: number;
   refSubtotalCents: number;
   platformFeeCents: number;
-  /** One extra game at each ref's rate for refs in this payment (top-up only). */
+  /** No longer charged (always 0). Kept so older screens and emails still read. */
   depositCents: number;
   depositAlreadyHeldCents: number;
   depositRequiredAfterCents: number;
@@ -26,8 +26,8 @@ export function depositForRefsCents(ratesCents: number[]) {
 }
 
 /**
- * Build confirm-pay totals: ref pay + 20% fee on ref pay only + deposit top-up
- * (1 extra game × each unpaid accepted ref being paid now).
+ * Build confirm-pay totals: REF pay for the booked games/hours + the 20% GotREFS fee on that pay.
+ * No deposit: extra work is charged after the event, once the REF signs off on the timesheet.
  */
 export function buildConfirmPayBreakdown(args: {
   offers: ConfirmPayOfferLine[];
@@ -37,11 +37,9 @@ export function buildConfirmPayBreakdown(args: {
   const offers = args.offers.filter((o) => o.refSubtotalCents > 0);
   const refSubtotalCents = offers.reduce((sum, o) => sum + o.refSubtotalCents, 0);
   const platformFeeCents = calcPlatformFeeCents(refSubtotalCents);
-  const ratesForDeposit = offers.map((o) => o.rateCents);
-  const depositForThisBatch = depositForRefsCents(ratesForDeposit);
-  const depositRequiredAfterCents = args.depositRequiredCents + depositForThisBatch;
-  const depositCents = Math.max(0, depositRequiredAfterCents - Math.max(0, args.depositCollectedCents));
-  const totalCents = refSubtotalCents + platformFeeCents + depositCents;
+  const depositRequiredAfterCents = Math.max(0, args.depositRequiredCents);
+  const depositCents = 0;
+  const totalCents = refSubtotalCents + platformFeeCents;
 
   return {
     offers,

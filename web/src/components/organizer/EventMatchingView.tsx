@@ -203,8 +203,8 @@ export function EventMatchingView({
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-neutral-900">Matching REFS</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Verified officials whose travel radius reaches this event. You’ll confirm pay after they
-              accept (REF pay + GotREFS fee + refundable 1-game deposit per REF).
+              Verified officials whose travel radius reaches this event. You’re charged when they
+              accept (booked games or hours + 20% GotREFS fee).
             </p>
           </div>
           {loadingMatches ? (

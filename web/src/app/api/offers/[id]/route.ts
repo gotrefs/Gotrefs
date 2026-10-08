@@ -4,6 +4,7 @@ import {
   notifyOfferAcceptedToRef,
   notifyOfferCanceledToRef,
   notifyOfferResponseToOrganizer,
+  notifyOrganizerCardDeclined,
 } from "@/lib/email/notifications";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { createClient } from "@/lib/supabase/server";
@@ -198,6 +199,31 @@ export async function PATCH(
     } catch (err) {
       await admin.from("assignment_offers").update({ status: "pending" }).eq("id", offer.id);
       await admin.from("bookings").delete().eq("offer_id", offer.id);
+      // The organizer's card didn't work: the booking isn't confirmed until they add another one.
+      const cardProblem =
+        !(err instanceof OrganizerChargeError) ||
+        ["missing_payment_method", "payment_incomplete", "stripe_error"].includes(err.code);
+      if (cardProblem && organizerMemberId) {
+        const orgId = organizerMemberId;
+        const siteUrl = emailSiteUrl(request.url);
+        notifyInBackground(() =>
+          notifyOrganizerCardDeclined({
+            admin,
+            organizerMemberId: orgId,
+            refMemberId: offer.ref_member_id,
+            eventId: offer.event_id,
+            siteUrl,
+          })
+        );
+        return NextResponse.json(
+          {
+            error:
+              "The organizer's card didn't go through, so this game isn't booked yet. We've asked them to add a new card. The invite stays under Invites so you can accept once they do.",
+            code: "organizer_card_declined",
+          },
+          { status: 402 }
+        );
+      }
       if (err instanceof OrganizerChargeError) {
         return NextResponse.json(
           { error: err.message, code: err.code },

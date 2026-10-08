@@ -1360,8 +1360,8 @@ export function OrganizerListingWizard({
             </p>
             <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay REFS with Stripe</h2>
             <p className="mt-2 text-center text-sm text-neutral-500">
-              Save a card or bank under Payments. When you approve a REF, GotREFS charges that method (REF
-              pay + GotREFS fee + refundable deposit). Unused deposit is returned after the event.
+              Save a card or bank under Payments. When a REF accepts, GotREFS charges that method for the
+              booked games or hours + the 20% GotREFS fee. Extra work is charged after the event; unused work is refunded.
             </p>
             <button
               type="button"

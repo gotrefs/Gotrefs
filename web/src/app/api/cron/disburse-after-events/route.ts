@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { disbursePaymentToRefs } from "@/lib/stripe/payouts";
+import { runSettlementSweep } from "@/lib/stripe/settle-booking";
 
 /**
- * After an event ends, transfer held organizer payments to refs via Connect.
+ * After an event ends, pay REFS. With timesheets: each REF is paid for the work they signed off on
+ * (48h auto-approve), and the organizer is charged/refunded the difference. Without the
+ * timesheets table (older database), falls back to paying the booked amount per payment.
  * Cron: Authorization Bearer CRON_SECRET (or x-vercel-cron).
  */
 export async function POST(request: NextRequest) {
@@ -25,6 +28,14 @@ export async function POST(request: NextRequest) {
     admin = createServiceClient();
   } catch {
     return NextResponse.json({ error: "Server configuration error." }, { status: 503 });
+  }
+
+  try {
+    const sweep = await runSettlementSweep(admin);
+    if (sweep) return NextResponse.json({ ok: true, mode: "timesheets", ...sweep });
+  } catch (err) {
+    console.error("[cron/disburse-after-events] settlement sweep failed:", err);
+    return NextResponse.json({ error: "Settlement sweep failed." }, { status: 500 });
   }
 
   const nowIso = new Date().toISOString();

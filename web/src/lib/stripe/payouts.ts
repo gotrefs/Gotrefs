@@ -26,7 +26,7 @@ type PaymentRow = {
   status: string;
 };
 
-async function getConnectForMember(admin: SupabaseClient, memberId: string) {
+export async function getConnectForMember(admin: SupabaseClient, memberId: string) {
   const { data } = await admin
     .from("stripe_connect_accounts")
     .select("*")
@@ -35,7 +35,7 @@ async function getConnectForMember(admin: SupabaseClient, memberId: string) {
   return (data as ConnectAccountRow | null) ?? null;
 }
 
-async function upsertPayoutPending(
+export async function upsertPayoutPending(
   admin: SupabaseClient,
   row: {
     payment_id: string;
@@ -95,22 +95,29 @@ async function upsertPayoutPending(
   return data;
 }
 
-async function executeTransfer(args: {
+export async function executeTransfer(args: {
   admin: SupabaseClient;
   payoutId: string;
   amountCents: number;
   destination: string;
   transferGroup?: string | null;
   metadata: Record<string, string>;
+  /** Pay out of this charge even before its funds settle into the GotREFS balance. */
+  sourceTransaction?: string | null;
+  idempotencyKey?: string;
 }) {
   const stripe = getStripe();
-  const transfer = await stripe.transfers.create({
-    amount: args.amountCents,
-    currency: "usd",
-    destination: args.destination,
-    transfer_group: args.transferGroup || undefined,
-    metadata: args.metadata,
-  });
+  const transfer = await stripe.transfers.create(
+    {
+      amount: args.amountCents,
+      currency: "usd",
+      destination: args.destination,
+      transfer_group: args.transferGroup || undefined,
+      metadata: args.metadata,
+      ...(args.sourceTransaction ? { source_transaction: args.sourceTransaction } : {}),
+    },
+    args.idempotencyKey ? { idempotencyKey: args.idempotencyKey } : undefined
+  );
 
   const { error } = await args.admin
     .from("payouts")

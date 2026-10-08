@@ -1411,8 +1411,9 @@ export function AuthFlow() {
                 <p className="text-sm font-black text-emerald-900">Payment setup</p>
                 <p className="mt-2 text-sm leading-6 text-emerald-900">
                   After you create your account you’ll land on <strong>Payments</strong> to save a card or
-                  bank with Stripe. When you approve a REF, GotREFS charges that method (REF pay + GotREFS fee +
-                  refundable deposit). Funds are held until the game ends, then paid to the REF by ACH.
+                  bank with Stripe. When a REF accepts, GotREFS charges that method for the booked games or hours
+                  plus the 20% GotREFS fee. Funds are held until the REF signs off on their hours after the event,
+                  then paid to the REF by ACH.
                 </p>
               </div>
             )}
