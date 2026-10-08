@@ -120,10 +120,13 @@ function RefResultCard({
                 {sportEmoji(r.primarySport)} {r.primarySport} Official
                 {r.certificationLevel ? ` · ${r.certificationLevel}` : ""}
               </h3>
-              <p className="mt-0.5 text-sm text-neutral-500">
-                {r.place ?? "Southern California"}
-                {distance != null ? ` · ${Math.round(distance)} mi away` : ""}
-              </p>
+              {/* No made-up location: REFS without a ZIP on file just don't show one. */}
+              {r.place || distance != null ? (
+                <p className="mt-0.5 text-sm text-neutral-500">
+                  {r.place ?? ""}
+                  {distance != null ? `${r.place ? " · " : ""}${Math.round(distance)} mi away` : ""}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {r.isSample ? (
