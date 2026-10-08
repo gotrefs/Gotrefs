@@ -120,10 +120,13 @@ function RefResultCard({
                 {sportEmoji(r.primarySport)} {r.primarySport} Official
                 {r.certificationLevel ? ` · ${r.certificationLevel}` : ""}
               </h3>
-              <p className="mt-0.5 text-sm text-neutral-500">
-                {r.place ?? "Southern California"}
-                {distance != null ? ` · ${Math.round(distance)} mi away` : ""}
-              </p>
+              {/* No made-up location: REFS without a ZIP on file just don't show one. */}
+              {r.place || distance != null ? (
+                <p className="mt-0.5 text-sm text-neutral-500">
+                  {r.place ?? ""}
+                  {distance != null ? `${r.place ? " · " : ""}${Math.round(distance)} mi away` : ""}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {r.isSample ? (
@@ -242,6 +245,8 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
     filtered.sort((a, b) => {
       // Real, bookable refs always come before sample profiles.
       if (a.r.isSample !== b.r.isSample) return a.r.isSample ? 1 : -1;
+      // Among real REFS, verified ones first.
+      if (a.r.verified !== b.r.verified) return a.r.verified ? -1 : 1;
       if (Boolean(a.r.photoUrl) !== Boolean(b.r.photoUrl)) return a.r.photoUrl ? -1 : 1;
       if (sort === "price-asc") return byPrice(a.r, b.r);
       if (sort === "price-desc") return byPrice(b.r, a.r);

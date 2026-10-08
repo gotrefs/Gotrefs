@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { maskEmail } from "@/lib/mask-email";
 import { isOrganizerMember } from "@/lib/organizer-access";
 import { pickProfilePhotoSource, resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { sportEmoji } from "@/lib/sport-emoji";
@@ -160,13 +159,11 @@ export async function GET() {
     const additionalSports = Array.isArray(rp?.additional_sports) ? rp.additional_sports : [];
 
     const { data: authUser } = await admin.auth.admin.getUserById(m.id);
-    const email = authUser?.user?.email ?? "";
     const gotrefsId =
       (typeof rp?.gotrefs_id === "string" && rp.gotrefs_id) ||
       (typeof authUser?.user?.user_metadata?.gotrefs_id === "string"
         ? authUser.user.user_metadata.gotrefs_id
         : `GR-${m.id.slice(0, 8).toUpperCase()}`);
-    const maskedEmail = email ? maskEmail(email) : "•••@•••.•••";
     const rating = ratingByRef.get(m.id);
     const photoSource = await pickProfilePhotoSource(
       admin,
@@ -198,7 +195,7 @@ export async function GET() {
       travelRadiusMiles:
         typeof rp?.travel_radius_miles === "number" ? rp.travel_radius_miles : null,
       availability: availByRef.get(m.id) ?? [],
-      maskedEmail,
+      // No email or phone, not even masked: organizers never see REF contact details.
       avatarUrl,
       ratingAverage: rating?.count ? Number((rating.total / rating.count).toFixed(1)) : null,
       ratingCount: rating?.count ?? 0,

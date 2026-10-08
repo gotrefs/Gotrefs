@@ -1,5 +1,6 @@
 import "server-only";
 import { approximateEventCoords } from "@/lib/maps/geo";
+import { refHasListingBasics } from "@/lib/marketplace/ref-listing";
 import { geocodeZipBatch } from "@/lib/marketplace/zip-geocode";
 import { resolveProfilePhotoUrl } from "@/lib/profile-photo";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -23,7 +24,11 @@ export type PublicRefListing = {
   coords: { lat: number; lng: number } | null;
   travelRadiusMiles: number | null;
   bio: string;
-  /** Passed GoTRefs verification and can be requested. Sample refs are never verified. */
+  /**
+   * Passed GotREFS verification. Unverified REFS are listed too (once they have a photo,
+   * name, sport and phone) and can be requested; they confirm only after approval.
+   * Sample REFS are never verified.
+   */
   verified: boolean;
   /** Sample (seed) profile: shown for layout, never bookable. */
   isSample: boolean;
@@ -54,6 +59,8 @@ type MemberRow = {
   home_zip: string | null;
   profile_picture_url?: string | null;
   is_seed?: boolean | null;
+  /** Read only to decide whether an unverified REF is listed. Never returned. */
+  phone?: string | null;
   ref_profiles: ProfileRow[] | ProfileRow | null;
 };
 
@@ -95,6 +102,8 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
   const baseProfile =
     "gotrefs_id, primary_sport, additional_sports, certification_level, rate_per_game, rate_type, rate_min, rate_max, rate_unit, bio";
   const attempts = [
+    `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, phone, ref_profiles ( ${baseProfile}, travel_radius_miles )`,
+    `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, phone, ref_profiles ( ${baseProfile} )`,
     `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, ref_profiles ( ${baseProfile}, travel_radius_miles )`,
     `id, display_name, first_name, last_name, home_zip, profile_picture_url, is_seed, ref_profiles ( ${baseProfile} )`,
     `id, display_name, first_name, last_name, home_zip, profile_picture_url, ref_profiles ( ${baseProfile} )`,
@@ -109,17 +118,40 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
   if (result.error) throw new Error(result.error.message);
   const members = (result.data ?? []) as MemberRow[];
 
-  // Real refs only appear once they can actually be booked.
+  // Real REFS appear once verified, or before that once they have a photo, name, sport and phone.
   const eligibleIds = new Set<string>();
+  const listedIds = new Set<string>();
   await Promise.all(
     members
       .filter((m) => !m.is_seed)
       .map(async (m) => {
         const { data: ok } = await admin.rpc("ref_is_offer_eligible", { ref_id: m.id });
-        if (ok) eligibleIds.add(m.id);
+        if (ok) {
+          eligibleIds.add(m.id);
+          return;
+        }
+        const rp = Array.isArray(m.ref_profiles) ? m.ref_profiles[0] : m.ref_profiles;
+        let phone = m.phone ?? null;
+        if (!phone) {
+          const { data } = await admin.auth.admin.getUserById(m.id);
+          const metaPhone = data?.user?.user_metadata?.phone;
+          phone = typeof metaPhone === "string" ? metaPhone : null;
+        }
+        if (
+          refHasListingBasics({
+            firstName: m.first_name,
+            lastName: m.last_name,
+            displayName: m.display_name,
+            photo: m.profile_picture_url,
+            sport: rp?.primary_sport,
+            phone,
+          })
+        ) {
+          listedIds.add(m.id);
+        }
       })
   );
-  const shown = members.filter((m) => m.is_seed || eligibleIds.has(m.id));
+  const shown = members.filter((m) => m.is_seed || eligibleIds.has(m.id) || listedIds.has(m.id));
   const realIds = shown.filter((m) => !m.is_seed).map((m) => m.id);
   const emptyId = "00000000-0000-0000-0000-000000000000";
 
@@ -195,7 +227,7 @@ export async function loadPublicRefListings(): Promise<PublicRefListing[]> {
         travelRadiusMiles:
           typeof rp.travel_radius_miles === "number" ? rp.travel_radius_miles : metaRadiusByRef.get(m.id) ?? null,
         bio: (rp.bio ?? "").trim(),
-        verified: !isSample,
+        verified: !isSample && eligibleIds.has(m.id),
         isSample,
         ratingAverage: rating?.count ? Number((rating.total / rating.count).toFixed(1)) : null,
         ratingCount: rating?.count ?? 0,

@@ -52,6 +52,8 @@ type RegisterBody = {
   recommendedAssignorName?: string;
   recommendedAssignorEmail?: string;
   recommendedAssignorPhone?: string;
+  /** REF's home ZIP code (5 digits): places them on the Find REFS map. */
+  homeZip?: string;
   /** Ref's face photo as a small `data:image/...;base64,` URL (the signup form shrinks it first). */
   profilePhotoDataUrl?: string;
 };
@@ -167,6 +169,13 @@ async function setupSignupProfiles(
   return { ok: true };
 }
 
+/** Save the REF's ZIP on their member row (non-fatal: they can add it later). */
+async function saveHomeZip(admin: SupabaseClient, userId: string, zip: string | null) {
+  if (!zip) return;
+  const { error } = await admin.from("members").update({ home_zip: zip }).eq("id", userId);
+  if (error) console.warn("[api/auth/register] home_zip:", error.message);
+}
+
 async function markMemberOnboarded(admin: SupabaseClient, userId: string) {
   await admin
     .from("members")
@@ -203,6 +212,7 @@ export async function POST(request: NextRequest) {
   const isAssignor = body.isAssignor === true && role === "ref";
   const organizationName = (body.organizationName ?? "").trim();
   const phone = (body.phone ?? "").trim();
+  const homeZip = /^\d{5}$/.test((body.homeZip ?? "").trim()) ? (body.homeZip ?? "").trim() : null;
   const primarySport = (body.primarySport ?? "").trim();
   const additionalSports = Array.isArray(body.additionalSports)
     ? body.additionalSports.filter((sport) => typeof sport === "string" && sport.trim()).map((sport) => sport.trim())
@@ -285,7 +295,8 @@ export async function POST(request: NextRequest) {
     last_name: lastName,
     full_name: `${firstName} ${lastName}`.trim(),
     organization_name: role === "organizer" ? organizationName : null,
-    phone: role === "organizer" ? phone || null : null,
+    // Kept for GotREFS (admin page) only; never shown to the other side of a booking.
+    phone: phone || null,
     role,
     primary_sport: role === "ref" ? primarySport || "Basketball" : null,
     additional_sports: role === "ref" ? additionalSports : [],
@@ -411,6 +422,7 @@ export async function POST(request: NextRequest) {
       // Saved now so the photo is on the card whichever device they confirm from.
       if (role === "ref") {
         photoSaved = await saveSignupProfilePhoto(admin, userId, body.profilePhotoDataUrl).catch(() => false);
+        await saveHomeZip(admin, userId, homeZip).catch(() => undefined);
       }
       // Prefer a token_hash email so confirm works on phone even if signup was on computer.
       await sendCrossDeviceSignupConfirmationEmail({
@@ -493,6 +505,7 @@ export async function POST(request: NextRequest) {
       await markMemberOnboarded(admin, userId);
       if (role === "ref") {
         photoSaved = await saveSignupProfilePhoto(admin, userId, body.profilePhotoDataUrl).catch(() => false);
+        await saveHomeZip(admin, userId, homeZip).catch(() => undefined);
       }
     } catch {
       // Non-fatal if profile or onboarding flag cannot be set.

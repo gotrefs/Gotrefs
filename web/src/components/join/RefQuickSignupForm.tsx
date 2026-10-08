@@ -54,6 +54,8 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
   const [sport, setSport] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [zip, setZip] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,8 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
     if (!firstName.trim() || !lastName.trim()) return "Enter your first and last name.";
     if (!photo) return "Add a photo of yourself for your REF card.";
     if (!sport) return "Pick the sport you REFeree.";
+    if (!/^\d{5}$/.test(zip.trim())) return "Enter your 5-digit ZIP code.";
+    if (phone.replace(/\D/g, "").length < 10) return "Enter a phone number with area code.";
     if (!EMAIL_RE.test(email.trim())) return "Enter a valid email address.";
     if (password.length < 8) return "Password must be at least 8 characters.";
     if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
@@ -163,6 +167,8 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
           email: email.trim().toLowerCase(),
           password,
           primarySport: sport,
+          phone: phone.trim(),
+          homeZip: zip.trim(),
           verificationSkipped: true,
           termsAccepted: true,
           acceptedTermsSlug: "referee-official-terms",
@@ -346,6 +352,38 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
             ))}
         </select>
       </fieldset>
+
+      <label className="mt-5 block text-sm font-semibold text-neutral-900">
+        ZIP code
+        <input
+          inputMode="numeric"
+          maxLength={5}
+          value={zip}
+          onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          className={inputClass}
+          autoComplete="postal-code"
+          placeholder="Where you REF"
+        />
+        <span className="mt-1 block text-xs font-normal text-neutral-500">
+          Puts you on the Find REFS map. Organizers only see your general area.
+        </span>
+      </label>
+
+      <label className="mt-5 block text-sm font-semibold text-neutral-900">
+        Phone number
+        <input
+          type="tel"
+          inputMode="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className={inputClass}
+          autoComplete="tel"
+          placeholder="(555) 555-5555"
+        />
+        <span className="mt-1 block text-xs font-normal text-neutral-500">
+          Only GotREFS sees this. Organizers never get your phone or email.
+        </span>
+      </label>
 
       <label className="mt-5 block text-sm font-semibold text-neutral-900">
         Email

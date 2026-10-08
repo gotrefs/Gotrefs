@@ -64,7 +64,6 @@ type DirectoryRef = {
   homeZip: string | null;
   travelRadiusMiles?: number | null;
   availability: { start_at: string; end_at: string }[];
-  maskedEmail: string;
   avatarUrl?: string | null;
   ratingAverage: number | null;
   ratingCount: number;
