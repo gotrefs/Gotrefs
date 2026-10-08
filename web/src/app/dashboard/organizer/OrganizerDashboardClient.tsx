@@ -550,7 +550,7 @@ export default function OrganizerDashboardClient() {
       }
       setMsg(
         action === "accept"
-          ? "REF approved and charged (REF pay + fee + deposit). Funds are held until the game ends, then paid to the REF."
+          ? "REF approved and charged (REF pay + 20% fee). Funds are held until the REF signs off on their hours, then paid to the REF."
           : action === "withdraw"
             ? "Request removed. The REF was notified and can request again if the game is still open."
             : "Request denied. The REF was emailed and won’t see this game anymore."
@@ -1284,7 +1284,7 @@ export default function OrganizerDashboardClient() {
       };
     const nextRefSubtotalCents = current.refSubtotalCents + refSubtotalCents;
     const nextPlatformFeeCents = calcPlatformFeeCents(nextRefSubtotalCents);
-    const nextDepositCents = current.depositCents + rateCents;
+    const nextDepositCents = 0;
     acc[offer.event_id] = {
       refSubtotalCents: nextRefSubtotalCents,
       platformFeeCents: nextPlatformFeeCents,

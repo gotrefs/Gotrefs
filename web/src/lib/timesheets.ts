@@ -19,7 +19,18 @@ export type Timesheet = {
   submitted_at: string | null;
   ref_decided_at: string | null;
   dispute_note: string | null;
+  /** Set once the REF has been paid and the organizer charged/refunded the difference. */
+  auto_approved?: boolean;
+  settled_at?: string | null;
+  ref_pay_cents?: number | null;
+  organizer_adjust_cents?: number | null;
+  adjust_status?: "none" | "charged" | "refunded" | "charge_failed" | "refund_failed" | null;
+  adjust_payment_id?: string | null;
+  settle_error?: string | null;
 };
+
+/** How long a REF has to sign off (or an organizer to clock out) before GotREFS approves it as-is. */
+export const AUTO_APPROVE_MS = 48 * 60 * 60 * 1000;
 
 /** Check-in opens this long before the event starts… */
 export const CHECK_IN_OPENS_MS = 6 * 60 * 60 * 1000;
@@ -78,4 +89,21 @@ export function timesheetMoney(sheet: Pick<Timesheet, "rate" | "booked_units" | 
 export function unitLabel(unit: PayUnit, n: number) {
   if (unit === "hour") return `${n} hour${n === 1 ? "" : "s"}`;
   return `${n} game${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Money after sign-off, in cents. The organizer already paid booked × rate + 20%.
+ * The REF gets worked × rate; the organizer is charged (positive) or refunded (negative)
+ * the difference plus the 20% on that difference.
+ */
+export function settlementCents(args: { rateCents: number; bookedUnits: number; workedUnits: number }) {
+  const rate = Math.max(0, Math.round(args.rateCents));
+  const booked = Math.max(0, Number(args.bookedUnits) || 0);
+  const worked = Math.max(0, Number(args.workedUnits) || 0);
+  const refPayCents = Math.round(rate * worked);
+  const bookedPayCents = Math.round(rate * booked);
+  const diff = refPayCents - bookedPayCents;
+  const fee = Math.round(Math.abs(diff) * PLATFORM_FEE_RATE);
+  const adjustCents = diff === 0 ? 0 : diff > 0 ? diff + fee : diff - fee;
+  return { refPayCents, bookedPayCents, diffCents: diff, adjustCents };
 }

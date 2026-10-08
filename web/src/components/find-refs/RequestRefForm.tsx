@@ -117,11 +117,10 @@ export function RequestRefForm({
   const payValid = draft.pay !== "" && Number.isFinite(payNum) && payNum > 0;
   const payTooLow = payValid && r.rateMin != null && payNum < r.rateMin;
   // Mirrors what the organizer is charged when the ref accepts:
-  // pay × units + service fee on that pay + a refundable deposit of one unit.
+  // pay × units + the service fee on that pay. Extra work is charged after the event.
   const subtotal = payValid ? payNum * draft.amount : null;
   const fee = subtotal != null ? Math.round(subtotal * PLATFORM_FEE_RATE * 100) / 100 : null;
-  const deposit = payValid ? payNum : null;
-  const total = subtotal != null && fee != null && deposit != null ? subtotal + fee + deposit : null;
+  const total = subtotal != null && fee != null ? subtotal + fee : null;
   const amountOptions = useMemo(() => (perGame ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 8]), [perGame]);
   const amountText = (n: number) =>
     perGame ? `${n} game${n === 1 ? "" : "s"}` : `${n} hour${n === 1 ? "" : "s"}`;
@@ -567,7 +566,7 @@ export function RequestRefForm({
             )}
             <p className="mt-3 text-center text-sm text-neutral-600">You won&apos;t be charged yet</p>
 
-            {total != null && subtotal != null && fee != null && deposit != null && (
+            {total != null && subtotal != null && fee != null && (
               <dl className="mt-4 space-y-2 text-[15px] text-neutral-700">
                 <div className="flex justify-between">
                   <dt>
@@ -579,14 +578,13 @@ export function RequestRefForm({
                   <dt>GotREFS service fee ({PLATFORM_FEE_PERCENT_LABEL})</dt>
                   <dd>${fee.toFixed(2)}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt>Refundable deposit</dt>
-                  <dd>${deposit.toFixed(2)}</dd>
-                </div>
                 <div className="flex justify-between border-t border-neutral-200 pt-3 font-semibold text-neutral-900">
                   <dt>Total when {firstName} accepts</dt>
                   <dd>${total.toFixed(2)}</dd>
                 </div>
+                <p className="text-xs text-neutral-500">
+                  If {firstName} works more or less than this, the difference is charged or refunded after the event.
+                </p>
               </dl>
             )}
 

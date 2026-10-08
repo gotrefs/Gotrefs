@@ -119,7 +119,7 @@ export function OrganizerConfirmPayPanel({
       }
       setMsg(
         data.breakdown
-          ? `Paid ${formatCents(data.breakdown.totalCents)}. Check your inbox for your receipt. REFS are paid by ACH after the event. Unused deposit is returned to your card after the event ends.`
+          ? `Paid ${formatCents(data.breakdown.totalCents)}. Check your inbox for your receipt. REFS are paid by ACH once they sign off on their hours after the event.`
           : "Payment confirmed. Check your inbox for your receipt."
       );
       await load(eventId);
@@ -180,7 +180,7 @@ export function OrganizerConfirmPayPanel({
       <h2 className="mt-2 text-2xl font-semibold text-neutral-900">Unpaid accepted REFS</h2>
       <p className="mt-2 text-sm text-neutral-600">
         Normally you’re charged when you approve a REF. Use this only if a charge was skipped. Total includes
-        REFeree pay, the GotREFS fee, and a refundable deposit.
+        REFeree pay and the 20% GotREFS fee.
       </p>
 
       {events.length > 0 ? (
@@ -230,6 +230,7 @@ export function OrganizerConfirmPayPanel({
             </span>
             <span className="font-semibold">{formatCents(breakdown.platformFeeCents)}</span>
           </div>
+          {breakdown.depositCents > 0 ? (
           <div className="flex justify-between gap-3 text-neutral-700">
             <span className="inline-flex max-w-[70%] items-center">
               <span>
@@ -244,6 +245,7 @@ export function OrganizerConfirmPayPanel({
             </span>
             <span className="font-semibold">{formatCents(breakdown.depositCents)}</span>
           </div>
+          ) : null}
           <div className="flex justify-between gap-3 border-t border-neutral-200 pt-2 text-base font-bold text-neutral-900">
             <span>Total due now</span>
             <span>{formatCents(breakdown.totalCents)}</span>

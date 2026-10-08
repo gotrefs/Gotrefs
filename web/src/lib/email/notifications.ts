@@ -605,7 +605,7 @@ export async function notifyOrganizerPaymentReceipt(opts: {
       ? `<p>We also held a <strong>refundable deposit of ${escapeHtml(
           formatUsdCents(opts.depositCents)
         )}</strong> (one game rate × each REF). If those REFS don’t work extra games, that deposit is returned to your original payment method after the event ends — automatically, or sooner from your Payments tab.</p>`
-      : `<p>Any unused refundable deposit already held for this event is returned after the event ends.</p>`;
+      : `<p>This covers the games or hours you booked. If the REF works more, the extra (plus the GotREFS fee) is charged after they sign off on their hours; if they work less, the difference is refunded.</p>`;
 
   return sendEmail({
     to: org.email,
@@ -632,7 +632,7 @@ export async function notifyOrganizerPaymentReceipt(opts: {
           <li>Total charged: <strong>${escapeHtml(formatUsdCents(opts.totalCents))}</strong></li>
         </ul>
         ${depositLine}
-        <p>REFS are paid by ACH after the event ends — not at the moment you confirm pay. You can download a full receipt anytime under Payments → Tax / receipts.</p>
+        <p>REFS are paid by ACH after the event, once they sign off on their hours — not at the moment you pay. You can download a full receipt anytime under Payments → Tax / receipts.</p>
         <p style="font-size:13px;color:#7B8FA0;">Receipt ID: ${escapeHtml(opts.paymentId)}</p>
       `,
       ctaLabel: "Open Payments",
@@ -747,3 +747,120 @@ export async function notifyTimesheetSignoff(opts: {
   });
 }
 
+
+/** A REF tried to accept but the organizer's card was declined: ask for a new card. */
+export async function notifyOrganizerCardDeclined(opts: {
+  admin: SupabaseClient;
+  organizerMemberId: string;
+  refMemberId: string;
+  eventId: string;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const [org, event, refName] = await Promise.all([
+    emailForMemberId(opts.admin, opts.organizerMemberId),
+    eventSummary(opts.admin, opts.eventId),
+    refShortName(opts.admin, opts.refMemberId),
+  ]);
+  if (!org) return false;
+  const eventTitle = event?.title || "your event";
+  const url = dashboardUrl(siteUrl, "/dashboard/organizer?tab=payments");
+  return sendEmail({
+    to: org.email,
+    subject: `${BRAND_NAME}: Your card was declined — ${eventTitle}`,
+    html: emailLayout({
+      title: "Add a new card to book your REF",
+      bodyHtml: `<p>Hi ${escapeHtml(org.displayName)},</p>
+        <p><strong>${escapeHtml(refName)}</strong> tried to accept <strong>${escapeHtml(eventTitle)}</strong>, but your card on file was declined, so the booking isn't confirmed yet.</p>
+        <p>Add another card under Payments. Once it's saved, ${escapeHtml(refName)} can accept again.</p>`,
+      ctaLabel: "Add a new card",
+      ctaUrl: url,
+      ctaLarge: true,
+    }),
+    text: `${refName} tried to accept ${eventTitle}, but your card was declined. Add another card: ${url}`,
+  });
+}
+
+/** After the event: the extra games/hours couldn't be charged. The REF is paid anyway. */
+export async function notifyOrganizerExtraChargeFailed(opts: {
+  admin: SupabaseClient;
+  organizerMemberId: string;
+  eventId: string;
+  amountCents: number;
+  summary: string;
+  siteUrl?: string;
+}) {
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const [org, event] = await Promise.all([
+    emailForMemberId(opts.admin, opts.organizerMemberId),
+    eventSummary(opts.admin, opts.eventId),
+  ]);
+  if (!org) return false;
+  const eventTitle = event?.title || "your event";
+  const url = dashboardUrl(siteUrl, "/dashboard/organizer?tab=payments");
+  const amount = formatUsdCents(opts.amountCents);
+  return sendEmail({
+    to: org.email,
+    subject: `${BRAND_NAME}: Payment needed for extra REF work — ${eventTitle}`,
+    html: emailLayout({
+      title: "Update your card",
+      bodyHtml: `<p>Hi ${escapeHtml(org.displayName)},</p>
+        <p>For <strong>${escapeHtml(eventTitle)}</strong>: ${escapeHtml(opts.summary)}.</p>
+        <p>We tried to charge <strong>${escapeHtml(amount)}</strong> for the extra work (including the GotREFS fee), but your card was declined. Please add another card under Payments so we can complete this charge.</p>`,
+      ctaLabel: "Add a new card",
+      ctaUrl: url,
+      ctaLarge: true,
+    }),
+    text: `For ${eventTitle}: ${opts.summary}. We couldn't charge ${amount} for the extra work. Add another card: ${url}`,
+  });
+}
+
+/** After the event: what the organizer was charged or refunded for one REF's actual work. */
+export async function notifyOrganizerTimesheetSettled(opts: {
+  admin: SupabaseClient;
+  organizerMemberId: string;
+  eventId: string;
+  summary: string;
+  /** Positive: charged. Negative: refunded. */
+  adjustCents: number;
+  siteUrl?: string;
+}) {
+  if (opts.adjustCents === 0) return false;
+  const siteUrl = opts.siteUrl || emailSiteUrl();
+  const [org, event] = await Promise.all([
+    emailForMemberId(opts.admin, opts.organizerMemberId),
+    eventSummary(opts.admin, opts.eventId),
+  ]);
+  if (!org) return false;
+  const eventTitle = event?.title || "your event";
+  const amount = formatUsdCents(Math.abs(opts.adjustCents));
+  const charged = opts.adjustCents > 0;
+  const line = charged
+    ? `We charged <strong>${escapeHtml(amount)}</strong> to your card for the extra work (including the GotREFS fee).`
+    : `We refunded <strong>${escapeHtml(amount)}</strong> to your original payment method for the work that wasn't needed (including the GotREFS fee).`;
+  return sendEmail({
+    to: org.email,
+    subject: `${BRAND_NAME}: ${charged ? "Extra REF work charged" : "Refund"} — ${eventTitle}`,
+    html: emailLayout({
+      title: charged ? "Extra REF work" : "Refund for unused REF work",
+      bodyHtml: `<p>Hi ${escapeHtml(org.displayName)},</p>
+        <p>For <strong>${escapeHtml(eventTitle)}</strong>: ${escapeHtml(opts.summary)}.</p>
+        <p>${line}</p>`,
+      ctaLabel: "Open Payments",
+      ctaUrl: dashboardUrl(siteUrl, "/dashboard/organizer?tab=payments"),
+    }),
+    text: `For ${eventTitle}: ${opts.summary}. ${charged ? "Charged" : "Refunded"} ${amount}.`,
+  });
+}
+
+async function refShortName(admin: SupabaseClient, memberId: string) {
+  const { data } = await admin
+    .from("members")
+    .select("first_name, last_name, display_name")
+    .eq("id", memberId)
+    .maybeSingle();
+  const first = (data?.first_name ?? "").trim();
+  const last = (data?.last_name ?? "").trim();
+  if (first) return last ? `${first} ${last[0]}.` : first;
+  return (data?.display_name ?? "").trim() || "Your REF";
+}

@@ -60,7 +60,12 @@ export function RefTimesheetCard({
       ) : null}
 
       {sheet.status === "approved" ? (
-        <p className="mt-2 font-medium text-emerald-700">✓ Approved</p>
+        <p className="mt-2 font-medium text-emerald-700">
+          ✓ Approved{sheet.auto_approved ? " automatically after 48 hours" : ""}
+          {sheet.settled_at && sheet.ref_pay_cents != null
+            ? ` · Your pay: $${(sheet.ref_pay_cents / 100).toFixed(2)}`
+            : ""}
+        </p>
       ) : null}
       {sheet.status === "disputed" ? (
         <p className="mt-2 text-red-700">

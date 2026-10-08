@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { emailSiteUrl } from "@/lib/email/resend";
 import { notifyInBackground, notifyTimesheetSignoff } from "@/lib/email/notifications";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +12,7 @@ import {
   type Timesheet,
 } from "@/lib/timesheets";
 import { loadBookingsForTimesheet } from "@/lib/timesheets-server";
+import { settleBooking } from "@/lib/stripe/settle-booking";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
 
   const now = new Date().toISOString();
   const sheet = booking.timesheet;
+  // Both sides have confirmed: pay the REF and settle the difference right after responding.
+  const settleSoon = () =>
+    after(async () => {
+      try {
+        const result = await settleBooking(admin, bookingId);
+        console.log("[timesheets] settle", bookingId, JSON.stringify(result));
+      } catch (error) {
+        console.error("[timesheets] settle failed", bookingId, error);
+      }
+    });
+
   const save = async (patch: Partial<Timesheet>) => {
     const { data, error } = await admin
       .from("booking_timesheets")
@@ -132,6 +144,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
         dispute_note: null,
       });
 
+      if (status === "approved") settleSoon();
       if (status === "awaiting_ref") {
         const m = timesheetMoney(updated);
         const summary = `${unitLabel(unit, m.worked)} worked (booked ${unitLabel(unit, m.booked)})`;
@@ -160,6 +173,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ bo
               dispute_note: (body.note ?? "").trim().slice(0, 500) || null,
             }
       );
+      if (updated.status === "approved") settleSoon();
       return NextResponse.json({ timesheet: updated });
     }
 
