@@ -285,7 +285,8 @@ export async function POST(request: NextRequest) {
     last_name: lastName,
     full_name: `${firstName} ${lastName}`.trim(),
     organization_name: role === "organizer" ? organizationName : null,
-    phone: role === "organizer" ? phone || null : null,
+    // Kept for GotREFS (admin page) only; never shown to the other side of a booking.
+    phone: phone || null,
     role,
     primary_sport: role === "ref" ? primarySport || "Basketball" : null,
     additional_sports: role === "ref" ? additionalSports : [],

@@ -374,7 +374,9 @@ export function RequestRefForm({
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
                 <span className="font-semibold text-neutral-900">{r.name}</span>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">✓ Verified</span>
+                {r.verified ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">✓ Verified</span>
+                ) : null}
               </p>
               <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-3xl">
                 {sportEmoji(r.primarySport)} {r.primarySport} Official

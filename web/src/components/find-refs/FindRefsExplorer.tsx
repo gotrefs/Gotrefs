@@ -242,6 +242,8 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
     filtered.sort((a, b) => {
       // Real, bookable refs always come before sample profiles.
       if (a.r.isSample !== b.r.isSample) return a.r.isSample ? 1 : -1;
+      // Among real REFS, verified ones first.
+      if (a.r.verified !== b.r.verified) return a.r.verified ? -1 : 1;
       if (Boolean(a.r.photoUrl) !== Boolean(b.r.photoUrl)) return a.r.photoUrl ? -1 : 1;
       if (sort === "price-asc") return byPrice(a.r, b.r);
       if (sort === "price-desc") return byPrice(b.r, a.r);

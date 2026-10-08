@@ -1,3 +1,4 @@
+import { refHasListingBasics } from "@/lib/marketplace/ref-listing";
 import { NextResponse } from "next/server";
 import { boostedOfferPay, computeOfferBoost } from "@/lib/boosts-server";
 import { emailSiteUrl } from "@/lib/email/resend";
@@ -81,12 +82,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not check your payment method. Try again." }, { status: 503 });
   }
 
-  const { data: refMember } = await admin
-    .from("members")
-    .select("is_seed")
-    .eq("id", body.refMemberId)
-    .maybeSingle();
-  if ((refMember as { is_seed?: boolean } | null)?.is_seed) {
+  // "*" so a column this database doesn't have yet can't fail the lookup.
+  const { data: refMemberRow } = await admin.from("members").select("*").eq("id", body.refMemberId).maybeSingle();
+  const refMember = refMemberRow as {
+    is_seed?: boolean | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    display_name?: string | null;
+    profile_picture_url?: string | null;
+    phone?: string | null;
+  } | null;
+  if (refMember?.is_seed) {
     return NextResponse.json({ error: "Sample profiles can't be requested." }, { status: 400 });
   }
 
@@ -114,7 +120,27 @@ export async function POST(request: Request) {
     profile,
   });
 
-  if (!eligible) {
+  // Unverified REFS listed on Find REFS can be requested too. They can only accept once
+  // GotREFS approves them (checked when they accept), and the card is only charged then.
+  let listed = false;
+  if (!eligible && refMember) {
+    let phone = refMember.phone ?? null;
+    if (!phone) {
+      const { data: refAuth } = await admin.auth.admin.getUserById(body.refMemberId);
+      const metaPhone = refAuth?.user?.user_metadata?.phone;
+      phone = typeof metaPhone === "string" ? metaPhone : null;
+    }
+    listed = refHasListingBasics({
+      firstName: refMember.first_name,
+      lastName: refMember.last_name,
+      displayName: refMember.display_name,
+      photo: refMember.profile_picture_url,
+      sport: profile?.primary_sport,
+      phone,
+    });
+  }
+
+  if (!eligible && !listed) {
     return NextResponse.json(
       {
         error:
