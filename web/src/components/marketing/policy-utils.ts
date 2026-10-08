@@ -11,7 +11,7 @@ export function policyShortLabel(policy: PolicyDocument) {
     case "event-organizer-terms":
       return "Event Organizer Terms";
     case "referee-official-terms":
-      return "Referee & Official Terms";
+      return "REFeree & Official Terms";
     case "background-check-verification":
       return "Background Check & Verification";
     case "community-standards":

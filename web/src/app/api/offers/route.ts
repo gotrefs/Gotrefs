@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     if (!paymentProfile?.stripe_customer_id || !paymentProfile.default_payment_method_id) {
       return NextResponse.json(
         {
-          error: "Add a card to send this request. You're only charged when the ref accepts.",
+          error: "Add a card to send this request. You're only charged when the REF accepts.",
           code: "missing_payment_method",
         },
         { status: 402 }
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This referee has not completed their profile and verification package yet.",
+          "This REFeree has not completed their profile and verification package yet.",
       },
       { status: 400 }
     );
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This referee's minimum hourly rate is above your event pay. Adjust your event pay or choose another official.",
+          "This REFeree's minimum hourly rate is above your event pay. Adjust your event pay or choose another official.",
       },
       { status: 400 }
     );

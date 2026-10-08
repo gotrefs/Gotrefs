@@ -200,7 +200,7 @@ export function OrganizerEventComposer({
                 required
                 hint={
                   zipTrim && !zipIsValid
-                    ? "Use a 5-digit ZIP so refs can match by area."
+                    ? "Use a 5-digit ZIP so REFS can match by area."
                     : zipTrim && zipIsValid
                       ? "Looks good"
                       : undefined
@@ -305,7 +305,7 @@ export function OrganizerEventComposer({
             </button>
             {notesOpen ? (
               <div className="mt-2">
-                <FieldShell label="Notes for refs" htmlFor="composer-notes">
+                <FieldShell label="Notes for REFS" htmlFor="composer-notes">
                   <textarea
                     id="composer-notes"
                     rows={3}

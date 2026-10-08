@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       error:
-        "Event Checkout is no longer used. Add a card or bank under Payments. Offers are charged automatically when a referee accepts (or when you hire an applicant).",
+        "Event Checkout is no longer used. Add a card or bank under Payments. Offers are charged automatically when a REFeree accepts (or when you hire an applicant).",
     },
     { status: 410 }
   );

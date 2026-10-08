@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
   const lnErr = validateName(lastName, "Last name");
   if (lnErr) return NextResponse.json({ error: lnErr }, { status: 400 });
   if (!(PRIMARY_SPORTS as readonly string[]).includes(primarySport)) {
-    return NextResponse.json({ error: "Pick the sport you referee." }, { status: 400 });
+    return NextResponse.json({ error: "Pick the sport you REFeree." }, { status: 400 });
   }
   if (body.termsAccepted !== true) {
-    return NextResponse.json({ error: "Accept the referee terms to continue." }, { status: 400 });
+    return NextResponse.json({ error: "Accept the REFeree terms to continue." }, { status: 400 });
   }
 
   try {

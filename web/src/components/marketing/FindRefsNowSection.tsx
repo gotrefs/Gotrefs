@@ -11,7 +11,7 @@ export function FindRefsNowSection() {
       <div className="mx-auto flex h-full w-full max-w-6xl flex-col items-center gap-5 lg:flex-row lg:gap-12">
         <div className="shrink-0 text-center lg:flex-1 lg:text-left">
           <p className="marketing-eyebrow text-[var(--red)]">For Organizers</p>
-          <h2 className="marketing-headline text-[#1b2132]">Find Refs Near You</h2>
+          <h2 className="marketing-headline text-[#1b2132]">Find REFS Near You</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-neutral-600 md:text-base lg:mx-0">
             Browse officials by sport, rate and distance on the map. No account needed to look.
           </p>
@@ -19,19 +19,19 @@ export function FindRefsNowSection() {
             href="/find-refs"
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--red)] px-8 py-3.5 text-base font-bold text-white shadow-lg transition hover:bg-[var(--red-dark)] sm:mt-6 sm:px-10 sm:py-4 sm:text-lg"
           >
-            Find Refs Now <span aria-hidden>→</span>
+            Find REFS Now <span aria-hidden>→</span>
           </Link>
         </div>
 
         <Link
           href="/find-refs"
-          aria-label="Open Find Refs"
+          aria-label="Open Find REFS"
           className="group flex min-h-0 w-full flex-1 items-center justify-center lg:h-full lg:w-auto lg:flex-none"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/marketing/we-gotrefs-poster.jpg"
-            alt="We GotREFS poster: the referee marketplace for every sport"
+            alt="We GotREFS poster: the REFeree marketplace for every sport"
             width={1107}
             height={1421}
             loading="lazy"

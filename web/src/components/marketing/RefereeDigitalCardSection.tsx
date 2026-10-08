@@ -383,7 +383,7 @@ export function RefereeDigitalCardSection() {
             Verified officials
           </p>
           <h2 className="mt-1 max-w-4xl text-xl font-black leading-tight tracking-tight text-[#1b2132] sm:text-2xl md:text-[1.75rem]">
-            Your digital ref card when you&apos;re verified
+            Your digital REF card when you&apos;re verified
           </h2>
           <p className="mx-auto mt-1 hidden max-w-xl text-[13px] leading-snug text-[var(--muted)] sm:block">
             Organizers see at a glance that you&apos;re identity-verified, certified, and ready to work your games.
@@ -405,7 +405,7 @@ export function RefereeDigitalCardSection() {
         <div className="flex shrink-0 flex-col items-center gap-1.5 sm:gap-2">
           <VerificationPartnerBadge />
           <Link href="/join" className="btn-demo-hero inline-flex w-full sm:w-auto">
-            Get verified as a ref
+            Get verified as a REF
           </Link>
         </div>
       </div>

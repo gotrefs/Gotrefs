@@ -40,7 +40,7 @@ export async function activateQueuedSignupRequests(opts: {
       .from("event_signup_requests")
       .update({
         status: "pending",
-        message: "Ref applied — verification approved; request released to organizer",
+        message: "REF applied — verification approved; request released to organizer",
       })
       .eq("id", row.id);
 

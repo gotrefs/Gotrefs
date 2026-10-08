@@ -13,7 +13,7 @@ const meta = siteData.meta as { defaultTitle: string };
 
 export const metadata: Metadata = {
   title: meta.defaultTitle,
-  description: "Connect verified referees with event organizers.",
+  description: "Connect verified REFerees with event organizers.",
 };
 
 export default function RootLayout({

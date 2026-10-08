@@ -17,12 +17,12 @@ export const FAQ_SECTIONS: FaqSection[] = [
     items: [
       {
         q: "What is GotREFS?",
-        a: "GotREFS is a nationwide referee marketplace that connects certified, verified officials with sports organizers, leagues, tournaments, schools, and athletic directors. Organizers can quickly find qualified officials, while referees can discover games, manage availability, and receive assignments from one platform.",
+        a: "GotREFS is a nationwide REFeree marketplace that connects certified, verified officials with sports organizers, leagues, tournaments, schools, and athletic directors. Organizers can quickly find qualified officials, while REFerees can discover games, manage availability, and receive assignments from one platform.",
       },
       {
         q: "Who uses GotREFS?",
         bullets: [
-          "Referees and umpires",
+          "REFerees and umpires",
           "Assignors",
           "Tournament directors",
           "League administrators",
@@ -42,7 +42,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         q: "What makes GotREFS different?",
         bullets: [
-          "Nationwide referee marketplace",
+          "Nationwide REFeree marketplace",
           "Verified and background-checked officials",
           "Officials are rated by event organizers from previous events",
           "Multi-sport platform",
@@ -55,11 +55,11 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "What is the mission of GotREFS?",
-        a: "To make it easier for sports organizers to find qualified officials and easier for referees to find games — creating a trusted marketplace that helps grow officiating across every sport and every community.",
+        a: "To make it easier for sports organizers to find qualified officials and easier for REFerees to find games — creating a trusted marketplace that helps grow officiating across every sport and every community.",
       },
       {
-        q: "Is GotREFS free for referees?",
-        a: "Yes. Referees can create an account and participate in the marketplace at no cost.",
+        q: "Is GotREFS free for REFerees?",
+        a: "Yes. REFerees can create an account and participate in the marketplace at no cost.",
       },
       {
         q: "Is GotREFS free for event organizers?",
@@ -76,7 +76,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
     ],
   },
   {
-    title: "For Referees",
+    title: "For REFerees",
     items: [
       {
         q: "How do I join GotREFS?",
@@ -84,7 +84,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "Is there a cost to join?",
-        a: "Creating a referee account is free.",
+        a: "Creating a REFeree account is free.",
       },
       {
         q: "How do I get verified?",
@@ -125,8 +125,8 @@ export const FAQ_SECTIONS: FaqSection[] = [
         ],
       },
       {
-        q: "Can I view referee certifications before hiring?",
-        a: "Yes. Organizers can review referee qualifications, certifications, verification status, ratings, and eligibility before making offers.",
+        q: "Can I view REFeree certifications before hiring?",
+        a: "Yes. Organizers can review REFeree qualifications, certifications, verification status, ratings, and eligibility before making offers.",
       },
       {
         q: "How quickly can I staff an event?",
@@ -172,7 +172,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "Does GotREFS provide real-time event management?",
-        a: "Yes. Organizers can track staffing needs, referee requests, offers, and confirmations through a centralized dashboard.",
+        a: "Yes. Organizers can track staffing needs, REFeree requests, offers, and confirmations through a centralized dashboard.",
       },
       {
         q: "Is customer support available?",
@@ -206,7 +206,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       },
       {
         q: "Where are the privacy policy and terms?",
-        a: "The Privacy Policy is available at /policies/privacy-policy. Event Organizer Terms are available at /policies/event-organizer-terms, and Referee & Official Terms are available at /policies/referee-official-terms. Users must accept the applicable terms during signup.",
+        a: "The Privacy Policy is available at /policies/privacy-policy. Event Organizer Terms are available at /policies/event-organizer-terms, and REFeree & Official Terms are available at /policies/referee-official-terms. Users must accept the applicable terms during signup.",
       },
     ],
   },

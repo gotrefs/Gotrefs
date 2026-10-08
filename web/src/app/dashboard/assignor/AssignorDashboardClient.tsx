@@ -95,11 +95,11 @@ export default function AssignorDashboardClient() {
       });
       const json = (await res.json()) as { error?: string; entry?: AssignorRosterEntry };
       if (!res.ok) {
-        setMsg(json.error || "Could not save ref.");
+        setMsg(json.error || "Could not save REF.");
         return;
       }
       if (json.entry) setEntries((current) => [json.entry!, ...current]);
-      setMsg("Ref saved to your assignor roster.");
+      setMsg("REF saved to your assignor roster.");
     } catch {
       setMsg("Could not reach the server.");
     } finally {
@@ -113,7 +113,7 @@ export default function AssignorDashboardClient() {
     const res = await fetch(`/api/assignor/roster?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     if (!res.ok) {
       setEntries(previous);
-      setMsg("Could not remove that ref.");
+      setMsg("Could not remove that REF.");
       return;
     }
     setMsg("Removed from roster.");
@@ -135,7 +135,7 @@ export default function AssignorDashboardClient() {
         return;
       }
       setEntries((current) => [...(json.entries ?? []), ...current]);
-      setMsg(`Imported ${json.imported ?? 0} ref${json.imported === 1 ? "" : "s"} into your roster.`);
+      setMsg(`Imported ${json.imported ?? 0} REF${json.imported === 1 ? "" : "S"} into your roster.`);
     } catch {
       setMsg("Could not reach the server.");
     } finally {
@@ -149,11 +149,11 @@ export default function AssignorDashboardClient() {
         <section className="rounded-[2rem] bg-[var(--navy)] p-6 text-white shadow-xl sm:p-8">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--red)]">Assignor workspace</p>
           <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">
-            Add your refs once. Staff games faster later.
+            Add your REFS once. Staff games faster later.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80">
-            Choose the cleanest path for today: manually add a ref, or upload a roster file and let GotREFS store each
-            ref in Supabase.
+            Choose the cleanest path for today: manually add a REF, or upload a roster file and let GotREFS store each
+            REF in Supabase.
           </p>
         </section>
 
@@ -172,9 +172,9 @@ export default function AssignorDashboardClient() {
             }`}
           >
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Option A</p>
-            <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Manually input ref info</h2>
+            <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Manually input REF info</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              Best for adding one ref or a small crew with details you already know.
+              Best for adding one REF or a small crew with details you already know.
             </p>
           </button>
 
@@ -186,7 +186,7 @@ export default function AssignorDashboardClient() {
             }`}
           >
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--red)]">Option B</p>
-            <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Upload a ref list</h2>
+            <h2 className="mt-2 text-2xl font-black text-[var(--navy)]">Upload a REF list</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
               Upload a CSV or text file with names, emails, sports, certifications, rates, and notes.
             </p>
@@ -209,7 +209,7 @@ export default function AssignorDashboardClient() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="font-display text-2xl font-black text-[var(--navy)]">Upload roster file</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                Recommended columns: name, email, sport, certification, rate, notes. A plain list also works, one ref
+                Recommended columns: name, email, sport, certification, rate, notes. A plain list also works, one REF
                 per line.
               </p>
               <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center transition hover:border-[var(--navy)] hover:bg-white">
@@ -232,8 +232,8 @@ export default function AssignorDashboardClient() {
               <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                 <p className="font-black">Next automation step</p>
                 <p className="mt-1">
-                  For messy PDFs or spreadsheets, send the file to an LLM parser, normalize the refs into this same
-                  roster format, create draft claim profiles, then email each ref: “Your GotREFS profile was created by
+                  For messy PDFs or spreadsheets, send the file to an LLM parser, normalize the REFS into this same
+                  roster format, create draft claim profiles, then email each REF: “Your GotREFS profile was created by
                   [assignor name]. Please fill in the missing information to receive future game notifications.”
                 </p>
               </div>
@@ -244,7 +244,7 @@ export default function AssignorDashboardClient() {
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="font-display text-xl font-black text-[var(--navy)]">Current roster</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            {loading ? "Loading roster..." : `${entries.length} ref${entries.length === 1 ? "" : "s"} stored.`}
+            {loading ? "Loading roster..." : `${entries.length} REF${entries.length === 1 ? "" : "S"} stored.`}
           </p>
         </section>
       </div>

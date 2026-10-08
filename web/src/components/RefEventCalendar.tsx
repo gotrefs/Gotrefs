@@ -93,6 +93,7 @@ export function RefEventCalendar({
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [askedId, setAskedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -470,9 +471,13 @@ export function RefEventCalendar({
                   disabled={
                     submitting ||
                     eventWorkStatus(selected.id) !== "open" ||
-                    !canApplyToEvents
+                    (!canApplyToEvents && (applicationPending || !onRequireProfile))
                   }
-                  onClick={() => void requestSignup(selected)}
+                  onClick={() => {
+                    // Blocked: the first tap says what's missing, the next opens that step.
+                    if (!canApplyToEvents && askedId !== selected.id) setAskedId(selected.id);
+                    else void requestSignup(selected);
+                  }}
                   className={`w-full rounded-full px-4 py-3 text-sm font-black text-white transition-all duration-200 disabled:opacity-80 ${
                     eventWorkStatus(selected.id) === "invited" ||
                     eventWorkStatus(selected.id) === "confirmed"
@@ -487,7 +492,9 @@ export function RefEventCalendar({
                       : !canApplyToEvents
                         ? applicationPending
                           ? "Awaiting GotREFS approval"
-                          : applyBlockedLabel
+                          : onRequireProfile && askedId !== selected.id
+                            ? "Apply"
+                            : applyBlockedLabel
                         : submitting
                           ? "Submitting…"
                           : "Apply"}

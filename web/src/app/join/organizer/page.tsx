@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: `Create your organizer account | ${BRAND_NAME}`,
-  description: "Sign up in under a minute. No card needed until you book a ref.",
+  description: "Sign up in under a minute. No card needed until you book a REF.",
 };
 export const dynamic = "force-dynamic";
 

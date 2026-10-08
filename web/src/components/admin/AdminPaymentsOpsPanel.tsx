@@ -79,13 +79,13 @@ export function AdminPaymentsOpsPanel() {
   ) {
     if (action === "disburse") {
       const ok = window.confirm(
-        `Disburse ${formatCents(row.amountSubtotalCents)} to refs for “${row.eventTitle}” now?\n\nThis creates Stripe Connect transfers immediately.`
+        `Disburse ${formatCents(row.amountSubtotalCents)} to REFS for “${row.eventTitle}” now?\n\nThis creates Stripe Connect transfers immediately.`
       );
       if (!ok) return;
     } else {
       const transferWarn =
         row.transferredCount > 0
-          ? `\n\nWARNING: ${row.transferredCount} transfer(s) already sent to refs. You must reverse those in Stripe separately.`
+          ? `\n\nWARNING: ${row.transferredCount} transfer(s) already sent to REFS. You must reverse those in Stripe separately.`
           : "";
       const ok = window.confirm(
         `Refund full organizer charge ${formatCents(row.amountTotalCents)} for “${row.eventTitle}”?${transferWarn}\n\nThis resets offer payment status so the organizer can be charged again.`
@@ -155,10 +155,10 @@ export function AdminPaymentsOpsPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em] text-neutral-500">Payments</p>
-          <h2 className="mt-1 text-2xl font-black text-[var(--navy)]">Pay refs & refund charges</h2>
+          <h2 className="mt-1 text-2xl font-black text-[var(--navy)]">Pay REFS & refund charges</h2>
           <p className="mt-2 max-w-2xl text-sm text-neutral-600">
             {note ||
-              "Disburse sends money to refs via Connect. Full refund returns the organizer Stripe charge when something goes wrong."}
+              "Disburse sends money to REFS via Connect. Full refund returns the organizer Stripe charge when something goes wrong."}
           </p>
           {!loading ? (
             <p className="mt-2 text-sm font-semibold text-neutral-800">
@@ -215,7 +215,7 @@ export function AdminPaymentsOpsPanel() {
                   <td className="px-2 py-3">
                     <p className="font-semibold">{formatCents(r.amountTotalCents)}</p>
                     <p className="text-xs text-neutral-500">
-                      refs {formatCents(r.amountSubtotalCents)} · fee {formatCents(r.platformFeeCents)}
+                      REFS {formatCents(r.amountSubtotalCents)} · fee {formatCents(r.platformFeeCents)}
                     </p>
                   </td>
                   <td className="px-2 py-3 text-xs text-neutral-600">

@@ -148,7 +148,7 @@ export function VendorPaymentsPanel() {
       </p>
       <h2 className="mt-1 font-display text-2xl font-black text-[var(--navy)]">Pay a vendor</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
-        Pay non-ref vendors through Stripe Checkout (card or ACH debit). Funds transfer to their
+        Pay non-REF vendors through Stripe Checkout (card or ACH debit). Funds transfer to their
         Connect account for ACH direct deposit and roll into the same 1099 ledger when linked.
       </p>
 

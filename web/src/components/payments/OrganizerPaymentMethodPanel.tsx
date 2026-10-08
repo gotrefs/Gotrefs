@@ -38,7 +38,7 @@ export function OrganizerPaymentMethodPanel() {
           body: JSON.stringify({ action: "confirm_checkout_session", sessionId }),
         });
         if (confirmRes.ok) {
-          setMsg("Payment method saved. You’re ready to hire refs.");
+          setMsg("Payment method saved. You’re ready to hire REFS.");
         }
         window.history.replaceState({}, "", "/dashboard/organizer?tab=payments");
       }
@@ -106,7 +106,7 @@ export function OrganizerPaymentMethodPanel() {
             </p>
             <StripeMark />
           </div>
-          <h2 className="mt-3 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
+          <h2 className="mt-3 text-2xl font-semibold text-neutral-900">Pay REFS with Stripe</h2>
         </div>
         <div className="px-6 py-5">
           {msg ? <p className="mb-3 text-sm font-semibold text-emerald-700">{msg}</p> : null}
@@ -126,9 +126,9 @@ export function OrganizerPaymentMethodPanel() {
             </button>
           </div>
           <p className="mt-3 text-sm text-neutral-500">
-            When you approve a ref (or they accept your invite), GotREFS charges this method: referee pay, the
-            GotREFS fee, and a refundable deposit (1 extra game per hired ref). Money is held until the game
-            ends, then paid to the ref by ACH. Unused deposit is returned after the event.
+            When you approve a REF (or they accept your invite), GotREFS charges this method: REFeree pay, the
+            GotREFS fee, and a refundable deposit (1 extra game per hired REF). Money is held until the game
+            ends, then paid to the REF by ACH. Unused deposit is returned after the event.
           </p>
         </div>
       </section>
@@ -145,7 +145,7 @@ export function OrganizerPaymentMethodPanel() {
           <StripeMark />
         </div>
         <h2 className="mt-3 text-2xl font-semibold text-neutral-900">
-          Save a card on file to pay out refs
+          Save a card on file to pay out REFS
         </h2>
         <p className="mt-2 text-sm leading-6 text-neutral-600">
           Stripe protects your card details. Finish setup on Stripe’s site, then you’re ready to hire.

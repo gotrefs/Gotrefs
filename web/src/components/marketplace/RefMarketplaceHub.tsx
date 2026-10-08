@@ -11,7 +11,7 @@ import {
   type RefWorkOffer,
 } from "@/components/marketplace/RefMyWorkPanel";
 
-type HubTab = "find-games" | "my-work" | "payments";
+type HubTab = "find-games" | "my-work" | "payments" | "card";
 type FindView = "list" | "map" | "calendar";
 
 export function RefMarketplaceHub({
@@ -25,6 +25,7 @@ export function RefMarketplaceHub({
   applications,
   bookings,
   payoutPanel,
+  cardPanel,
 }: {
   canApplyToEvents: boolean;
   applyBlockedLabel?: string;
@@ -36,6 +37,8 @@ export function RefMarketplaceHub({
   applications: RefWorkApplication[];
   bookings: RefWorkBooking[];
   payoutPanel?: ReactNode;
+  /** The Ref's own card, shown under the "My Player Card" tab. */
+  cardPanel?: ReactNode;
 }) {
   const searchParams = useSearchParams();
   const initialTab =
@@ -45,7 +48,9 @@ export function RefMarketplaceHub({
       ? "payments"
       : searchParams.get("tab") === "my-work"
         ? "my-work"
-        : "find-games";
+        : searchParams.get("tab") === "card" && cardPanel
+          ? "card"
+          : "find-games";
   const [tab, setTab] = useState<HubTab>(initialTab);
   const [findView, setFindView] = useState<FindView>("map");
 
@@ -55,6 +60,8 @@ export function RefMarketplaceHub({
       setTab("payments");
     } else if (panel === "offers" || panel === "trips" || searchParams.get("tab") === "my-work") {
       setTab("my-work");
+    } else if (searchParams.get("tab") === "card") {
+      setTab("card");
     }
   }, [searchParams]);
 
@@ -64,6 +71,7 @@ export function RefMarketplaceHub({
     { id: "find-games", label: "Explore" },
     { id: "my-work", label: "Trips", badge: pendingInviteCount },
     { id: "payments", label: "Payments" },
+    ...(cardPanel ? [{ id: "card" as const, label: "My Player Card" }] : []),
   ];
 
   return (
@@ -159,6 +167,16 @@ export function RefMarketplaceHub({
       {tab === "payments" && (
         <div id="ref-payout-panel" data-ref-payments>
           {payoutPanel}
+        </div>
+      )}
+
+      {tab === "card" && cardPanel && (
+        <div data-ref-player-card className="mx-auto w-full max-w-md">
+          <h2 className="text-2xl font-semibold text-neutral-900">My Player Card</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Show the QR code at a game so the organizer can pull up your ID. Tap your photo to change it.
+          </p>
+          <div className="mt-5">{cardPanel}</div>
         </div>
       )}
     </div>

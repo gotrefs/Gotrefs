@@ -125,7 +125,7 @@ export function OrganizerQuickSignupForm({ next }: { next: string | null }) {
       className="mx-auto max-w-md rounded-3xl bg-white p-7 shadow-[0_10px_40px_rgba(0,0,0,0.08)] sm:p-8"
     >
       <h1 className="text-2xl font-semibold text-neutral-900">Create your account</h1>
-      <p className="mt-1 text-sm text-neutral-600">Free to join. No card needed until you book a ref.</p>
+      <p className="mt-1 text-sm text-neutral-600">Free to join. No card needed until you book a REF.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <label className="block text-sm font-semibold text-neutral-900">
@@ -181,9 +181,9 @@ export function OrganizerQuickSignupForm({ next }: { next: string | null }) {
         </Link>
       </p>
       <p className="mt-2 text-center text-sm text-neutral-600">
-        Are you a referee?{" "}
+        Are you a REFeree?{" "}
         <Link href="/join" className="font-semibold text-neutral-900 underline">
-          Join as a ref
+          Join as a REF
         </Link>
       </p>
     </form>

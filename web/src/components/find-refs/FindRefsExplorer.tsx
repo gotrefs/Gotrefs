@@ -153,7 +153,7 @@ function RefResultCard({
                 ★ {r.ratingAverage} ({r.ratingCount})
               </span>
             )}
-            {r.gamesCompleted > 0 && <span>{r.gamesCompleted} games on GoTRefs</span>}
+            {r.gamesCompleted > 0 && <span>{r.gamesCompleted} games on GotREFS</span>}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -364,13 +364,13 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
           ))}
         </select>
         <div className="mt-2">
-          <Checkbox label="Only refs who travel to me" checked={travelsToMe} onChange={setTravelsToMe} />
+          <Checkbox label="Only REFS who travel to me" checked={travelsToMe} onChange={setTravelsToMe} />
         </div>
         {!place && <p className="mt-1 text-xs text-neutral-500">Enter a location above to filter by distance.</p>}
       </FilterSection>
 
       <FilterSection title="Status">
-        <Checkbox label="Verified refs only" checked={verifiedOnly} onChange={setVerifiedOnly} />
+        <Checkbox label="Verified REFS only" checked={verifiedOnly} onChange={setVerifiedOnly} />
       </FilterSection>
 
       {activeFilterCount > 0 && (
@@ -397,9 +397,9 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
                   setKeyword(e.target.value);
                   setVisible(PAGE_SIZE);
                 }}
-                placeholder="Search by sport, name or GoTRefs ID"
+                placeholder="Search by sport, name or GotREFS ID"
                 className="w-full bg-transparent text-sm outline-none"
-                aria-label="Search refs"
+                aria-label="Search REFS"
               />
             </label>
             <span className="h-px w-full bg-neutral-200 sm:h-6 sm:w-px" aria-hidden />
@@ -437,7 +437,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3 sm:px-6">
             <p className="text-sm text-neutral-600">
               <span className="font-semibold text-neutral-900">{results.length}</span>{" "}
-              {results.length === 1 ? "ref" : "refs"}
+              {results.length === 1 ? "REF" : "REFS"}
               {place ? ` near ${place.label.split(",")[0]}` : ""}
             </p>
             <label className="flex items-center gap-2 text-sm text-neutral-600">
@@ -460,14 +460,14 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
             className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-[var(--navy)] px-4 py-3 text-sm text-white hover:opacity-95 sm:px-6"
           >
             <span>
-              <span className="font-semibold">Are you a referee?</span> Join free and find games near you.
+              <span className="font-semibold">Are you a REFeree?</span> Join free and find games near you.
             </span>
             <span className="shrink-0 font-semibold underline">Join →</span>
           </Link>
 
           {results.length === 0 ? (
             <div className="px-6 py-16 text-center">
-              <p className="text-lg font-semibold text-neutral-900">No refs match these filters</p>
+              <p className="text-lg font-semibold text-neutral-900">No REFS match these filters</p>
               <p className="mt-1 text-sm text-neutral-500">Try a wider distance or fewer filters.</p>
               <button type="button" onClick={clearAll} className="mt-4 text-sm font-semibold text-[var(--navy)] underline">
                 Clear all filters
@@ -485,7 +485,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
                     onClick={() => setVisible((v) => v + PAGE_SIZE)}
                     className="rounded-full border border-neutral-900 px-6 py-2.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
                   >
-                    Show more refs
+                    Show more REFS
                   </button>
                 </div>
               )}
@@ -535,7 +535,7 @@ export function FindRefsExplorer({ refs }: { refs: PublicRefListing[] }) {
                 onClick={() => setFiltersOpen(false)}
                 className="w-full rounded-full bg-neutral-900 py-3 text-sm font-semibold text-white"
               >
-                Show {results.length} refs
+                Show {results.length} REFS
               </button>
             </div>
           </div>

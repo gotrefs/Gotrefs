@@ -91,7 +91,10 @@ async function selectTolerant<T>(
   return [];
 }
 
-/** Every real account (refs and organizers), newest first. Sample refs are left out. */
+/**
+ * Every real account (refs and organizers), newest first. Sample refs are left out, and so is
+ * anyone deleted in Supabase (from Authentication → Users, or from the members table).
+ */
 export async function loadAllSignups(admin: SupabaseClient): Promise<AdminSignupEntry[]> {
   const [users, members, profiles] = await Promise.all([
     listAllAuthUsers(admin),
@@ -111,9 +114,15 @@ export async function loadAllSignups(admin: SupabaseClient): Promise<AdminSignup
   const memberById = new Map(members.map((row) => [row.id, row]));
   const profileById = new Map(profiles.map((row) => [row.member_id, row]));
 
+  // Signup always creates a members row, so a login with none left means the person was
+  // deleted from the members table in Supabase: leave them off. (Skipped if members could
+  // not be read at all, so a failed query never empties the list.)
+  const membersReadable = members.length > 0;
+
   const entries: AdminSignupEntry[] = [];
   for (const user of users) {
     const member = memberById.get(user.id);
+    if (membersReadable && !member) continue;
     const email = text(user.email) || text(member?.email);
     if (member?.is_seed === true || SAMPLE_EMAIL.test(email)) continue;
 

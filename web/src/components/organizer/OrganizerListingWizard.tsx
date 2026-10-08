@@ -144,7 +144,7 @@ const VENUE_TYPES = [
 ] as const;
 
 const ACCESS_TYPES = [
-  { id: "entire", title: "An entire venue", subtitle: "Refs work the whole facility for your event.", emoji: "🏠" },
+  { id: "entire", title: "An entire venue", subtitle: "REFS work the whole facility for your event.", emoji: "🏠" },
   { id: "shared", title: "A shared facility", subtitle: "Your game shares the venue with other activities.", emoji: "🚪" },
   { id: "outdoor", title: "An outdoor field or court", subtitle: "Open-air space — fields, courts, tracks, parks.", emoji: "🌿" },
 ] as const;
@@ -450,7 +450,7 @@ export function OrganizerListingWizard({
       return;
     }
     if (screen === "accessType" && !draft.accessType) {
-      setError("Choose how refs will use the venue.");
+      setError("Choose how REFS will use the venue.");
       return;
     }
     if (screen === "addressSearch" && !draft.lat) {
@@ -502,7 +502,7 @@ export function OrganizerListingWizard({
     }
     if (screen === "bio") {
       if (!draft.bio.trim()) {
-        setError("Tell refs a bit about your organization.");
+        setError("Tell REFS a bit about your organization.");
         return;
       }
       const saved = await onSaveProfile(draft);
@@ -510,7 +510,7 @@ export function OrganizerListingWizard({
     }
     if (screen === "prices") {
       if (!draft.ratePerOfficial.trim() || !(Number(draft.ratePerOfficial) > 0)) {
-        setError("Set an hourly pay for the referee.");
+        setError("Set an hourly pay for the REFeree.");
         return;
       }
       const saved = await onSaveProfile({
@@ -523,7 +523,7 @@ export function OrganizerListingWizard({
     }
     if (screen === "contact") {
       if (!draft.contactName.trim()) {
-        setError("Add a contact name so refs know who they're working with.");
+        setError("Add a contact name so REFS know who they're working with.");
         return;
       }
       if (!draft.contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail.trim())) {
@@ -531,7 +531,7 @@ export function OrganizerListingWizard({
         return;
       }
       if (!draft.contactPhone.trim()) {
-        setError("Add a phone number in case a ref needs to reach you.");
+        setError("Add a phone number in case a REF needs to reach you.");
         return;
       }
     }
@@ -628,7 +628,7 @@ export function OrganizerListingWizard({
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
                   In this step, we&apos;ll ask what kind of venue you have, where the game is, and how many
-                  refs you need.
+                  REFS you need.
                 </p>
               </div>
               <SportListingPreview sport={draft.sport || "Basketball"} />
@@ -666,7 +666,7 @@ export function OrganizerListingWizard({
           {screen === "accessType" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                What type of place will refs work at?
+                What type of place will REFS work at?
               </h1>
               <div className="mt-8 space-y-3">
                 {ACCESS_TYPES.map((option) => {
@@ -767,7 +767,7 @@ export function OrganizerListingWizard({
                 Is the pin in the right spot?
               </h1>
               <p className="mt-2 text-neutral-600">
-                Your address is only shared with refs after they&apos;ve been booked.
+                Your address is only shared with REFS after they&apos;ve been booked.
               </p>
               <div className="mt-6">
                 <VenuePinMap
@@ -785,7 +785,7 @@ export function OrganizerListingWizard({
                 Your exact address stays private
               </h1>
               <p className="mt-2 max-w-2xl text-neutral-600">
-                We only share your address after refs book through GotREFS. Until then, they&apos;ll see an
+                We only share your address after REFS book through GotREFS. Until then, they&apos;ll see an
                 approximate location within about <strong>7 miles</strong> on the map — so they can&apos;t go
                 around the platform to find you at a specific park or gym.
               </p>
@@ -798,7 +798,7 @@ export function OrganizerListingWizard({
                 />
               </div>
               <p className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-sm text-neutral-600">
-                Precise pin and street address unlock for the hired refs once their booking is confirmed.
+                Precise pin and street address unlock for the hired REFS once their booking is confirmed.
               </p>
             </div>
           )}
@@ -811,7 +811,7 @@ export function OrganizerListingWizard({
               <p className="mt-2 text-neutral-500">You&apos;ll add more details later, like pay and timing.</p>
               <div className="mt-8">
                 <StepperRow
-                  label="Refs needed"
+                  label="REFS needed"
                   value={draft.officialsNeeded}
                   min={1}
                   onChange={(officialsNeeded) => patch({ officialsNeeded })}
@@ -828,7 +828,7 @@ export function OrganizerListingWizard({
               <p className="mt-2 text-neutral-500">
                 {quickRepost
                   ? `Same venue (${draft.city || "your city"}) · ${draft.sport || "sport"} · pay stays the same. Only set the new time.`
-                  : "Refs see the date and time so they can match their availability."}
+                  : "REFS see the date and time so they can match their availability."}
               </p>
               <div className="mt-8 space-y-4">
                 <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
@@ -872,7 +872,7 @@ export function OrganizerListingWizard({
                   Make your event stand out
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
-                  Tell refs the game level, sport, and anything they should know before they accept —
+                  Tell REFS the game level, sport, and anything they should know before they accept —
                   so the right officials show up prepared.
                 </p>
               </div>
@@ -885,7 +885,7 @@ export function OrganizerListingWizard({
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
                 What level are these games?
               </h1>
-              <p className="mt-2 text-neutral-500">Helps the right refs find you — and know what to expect.</p>
+              <p className="mt-2 text-neutral-500">Helps the right REFS find you — and know what to expect.</p>
               <div className="mt-8 space-y-3">
                 {GAME_LEVELS.map((level) => {
                   const selected = draft.gameLevel === level.id;
@@ -922,7 +922,7 @@ export function OrganizerListingWizard({
           {screen === "sport" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">What sport is this for?</h1>
-              <p className="mt-2 text-neutral-500">Pick a primary sport so the right refs find you.</p>
+              <p className="mt-2 text-neutral-500">Pick a primary sport so the right REFS find you.</p>
               <div className="mt-8">
                 <SportsFields
                   primarySport={draft.sport}
@@ -937,7 +937,7 @@ export function OrganizerListingWizard({
           {screen === "refInstructions" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                Anything refs should know before they arrive?
+                Anything REFS should know before they arrive?
               </h1>
               <p className="mt-2 text-neutral-500">
                 Parking, check-in spot, locker rooms, dress code, gate codes — optional but helpful.
@@ -968,12 +968,12 @@ export function OrganizerListingWizard({
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
                 Create your organization description
               </h1>
-              <p className="mt-2 text-neutral-500">Share what refs should know about your league or school.</p>
+              <p className="mt-2 text-neutral-500">Share what REFS should know about your league or school.</p>
               <textarea
                 className="mt-8 min-h-40 w-full rounded-2xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900"
                 value={draft.bio}
                 onChange={(e) => patch({ bio: e.target.value })}
-                placeholder="Tell refs about your events, expectations, and vibe…"
+                placeholder="Tell REFS about your events, expectations, and vibe…"
                 maxLength={800}
               />
               <p className="mt-2 text-right text-xs text-neutral-500">{draft.bio.length}/800</p>
@@ -988,7 +988,7 @@ export function OrganizerListingWizard({
                   Finish up and publish
                 </h1>
                 <p className="mt-4 max-w-md text-lg text-neutral-600">
-                  Finally, you&apos;ll set your hourly pay for the referee and confirm a few final details to publish
+                  Finally, you&apos;ll set your hourly pay for the REFeree and confirm a few final details to publish
                   your listing.
                 </p>
               </div>
@@ -1002,7 +1002,7 @@ export function OrganizerListingWizard({
                 Now, set your prices
               </h1>
               <p className="mt-2 text-neutral-500">
-                Set the hourly pay for the referee. These suggestions are based on similar games in your area.
+                Set the hourly pay for the REFeree. These suggestions are based on similar games in your area.
               </p>
               <div className="mt-8 space-y-3">
                 <label className="block rounded-2xl border border-neutral-300 px-5 py-4">
@@ -1045,7 +1045,7 @@ export function OrganizerListingWizard({
           {screen === "contact" && (
             <div className="mx-auto max-w-xl">
               <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-                How can refs and GotREFS reach you?
+                How can REFS and GotREFS reach you?
               </h1>
               <p className="mt-2 text-neutral-500">
                 We use this to confirm your booking and keep you updated about your event.
@@ -1101,7 +1101,7 @@ export function OrganizerListingWizard({
               </p>
 
               <p className="mt-8 font-semibold text-neutral-900">What&apos;s your organization&apos;s address?</p>
-              <p className="mt-1 text-sm text-neutral-500">Refs won&apos;t see this information.</p>
+              <p className="mt-1 text-sm text-neutral-500">REFS won&apos;t see this information.</p>
               <div className="mt-4 overflow-hidden rounded-2xl border border-neutral-400">
                 <AddressField label="Country / region" value={country} onChange={() => undefined} as="select" />
                 <AddressField
@@ -1325,7 +1325,7 @@ export function OrganizerListingWizard({
           <div className="absolute right-4 top-4 z-10 w-[min(92%,340px)] rounded-3xl bg-white p-6 shadow-xl">
             <p className="text-xl font-semibold text-neutral-900">Compare similar listings</p>
             <p className="mt-1 text-sm text-neutral-500">
-              {draft.sport || "Sports"} games · {draft.officialsNeeded} ref{draft.officialsNeeded === 1 ? "" : "s"}
+              {draft.sport || "Sports"} games · {draft.officialsNeeded} REF{draft.officialsNeeded === 1 ? "" : "S"}
             </p>
             <p className="mt-4 font-semibold text-neutral-900">Booked games</p>
             <p className="mt-1 text-sm text-neutral-600">
@@ -1358,9 +1358,9 @@ export function OrganizerListingWizard({
             <p className="mt-6 text-5xl" aria-hidden>
               💳
             </p>
-            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay refs with Stripe</h2>
+            <h2 className="mt-6 text-2xl font-semibold text-neutral-900">Pay REFS with Stripe</h2>
             <p className="mt-2 text-center text-sm text-neutral-500">
-              Save a card or bank under Payments. When you approve a ref, GotREFS charges that method (ref
+              Save a card or bank under Payments. When you approve a REF, GotREFS charges that method (REF
               pay + GotREFS fee + refundable deposit). Unused deposit is returned after the event.
             </p>
             <button

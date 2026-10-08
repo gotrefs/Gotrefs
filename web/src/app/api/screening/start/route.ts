@@ -24,7 +24,7 @@ export async function POST() {
     .single();
 
   if (!member || member.role !== "ref") {
-    return NextResponse.json({ error: "Only referees can start screening" }, { status: 403 });
+    return NextResponse.json({ error: "Only REFerees can start screening" }, { status: 403 });
   }
 
   const email = user.email || "";

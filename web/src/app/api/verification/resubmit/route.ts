@@ -15,7 +15,7 @@ export async function POST() {
 
   const { data: member } = await supabase.from("members").select("role").eq("id", user.id).single();
   if (member?.role !== "ref") {
-    return NextResponse.json({ error: "Only referees can resubmit verification." }, { status: 403 });
+    return NextResponse.json({ error: "Only REFerees can resubmit verification." }, { status: 403 });
   }
 
   let admin;

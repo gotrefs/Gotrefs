@@ -215,7 +215,7 @@ export function RefFinderMap({
       )}
       <div ref={mapElRef} className="h-full w-full" />
       <p className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-neutral-700 shadow">
-        Pins show each ref&apos;s general area
+        Pins show each REF&apos;s general area
       </p>
     </div>
   );

@@ -580,6 +580,7 @@ export function FindGamesExplorer({
                 applyBlockedLabel={
                   applicationPending ? "Awaiting GotREFS approval" : applyBlockedLabel
                 }
+                blockedActionable={!applicationPending && Boolean(onRequireProfile)}
                 onRequest={(event) => void applyToEvent(event)}
               />
             )}
@@ -602,6 +603,7 @@ export function FindGamesExplorer({
               ? applyBlockedLabel
               : applyBlockedLabel
         }
+        blockedActionable={!applicationPending && Boolean(onRequireProfile)}
         onClose={() => setDetailsEvent(null)}
         onApply={(event) => void applyToEvent(event)}
         onUnrequest={(event) => void unrequestEvent(event)}

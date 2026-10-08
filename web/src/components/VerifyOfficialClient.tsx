@@ -74,7 +74,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
             <p className="mt-3 text-2xl font-black tracking-tight text-white">{card.displayName}</p>
           ) : null}
           <p className="mt-1 text-sm text-white/65">
-            Referee ID <span className="font-semibold text-white">{card.gotrefsId}</span>
+            REFeree ID <span className="font-semibold text-white">{card.gotrefsId}</span>
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
         </section>
 
         <p className="text-center text-xs text-white/50">
-          No GotREFS login required — this page is for organizers scanning a referee QR.
+          No GotREFS login required — this page is for organizers scanning a REFeree QR.
         </p>
       </div>
     </main>

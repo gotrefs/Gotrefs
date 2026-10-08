@@ -10,13 +10,13 @@ export function MarketingHeader() {
         <BrandLogo href="/" src="/gotrefs-logo-blue-background.png" imageClassName="h-12 w-auto sm:h-16" priority />
         <nav className="hidden items-center gap-6 text-sm font-semibold text-white/90 md:flex">
           <Link href="/find-refs" className="hover:text-white">
-            Find Refs
+            Find REFS
           </Link>
           <MarketingNavLink href="#features" className="hover:text-white">
             How it works
           </MarketingNavLink>
           <MarketingNavLink href="#ref-verification" className="hover:text-white">
-            For Referees
+            For REFerees
           </MarketingNavLink>
           <MarketingNavLink href="#for-organizers" className="hover:text-white">
             For Organizers
@@ -33,7 +33,7 @@ export function MarketingHeader() {
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <Link href="/find-refs" className="text-sm font-semibold text-white/90 hover:text-white md:hidden">
-            Find Refs
+            Find REFS
           </Link>
           <Link href="/auth/login" className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline">
             Log in

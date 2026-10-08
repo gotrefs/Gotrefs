@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
   const isAssignor = await requireAssignor(user.id, supabase);
   if (!isAssignor) {
-    return NextResponse.json({ error: "Enable assignor mode before importing refs." }, { status: 403 });
+    return NextResponse.json({ error: "Enable assignor mode before importing REFS." }, { status: 403 });
   }
 
   const formData = await request.formData();
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   const text = await file.text();
   const parsed = parseRosterText(text).slice(0, 500);
   if (parsed.length === 0) {
-    return NextResponse.json({ error: "No refs were found in that file." }, { status: 400 });
+    return NextResponse.json({ error: "No REFS were found in that file." }, { status: 400 });
   }
 
   const now = new Date().toISOString();

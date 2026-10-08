@@ -20,7 +20,7 @@ export default async function RefereeDashboardPage() {
     <Suspense
       fallback={
         <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
-          <p className="text-sm font-semibold text-neutral-800">Loading your referee dashboard…</p>
+          <p className="text-sm font-semibold text-neutral-800">Loading your REFeree dashboard…</p>
         </div>
       }
     >

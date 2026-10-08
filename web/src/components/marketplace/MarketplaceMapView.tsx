@@ -31,6 +31,7 @@ export function MarketplaceMapView({
   requestingId,
   canApply = true,
   applyBlockedLabel = "Verification required",
+  blockedActionable = false,
   onSelect,
   onRequest,
   className,
@@ -42,6 +43,7 @@ export function MarketplaceMapView({
   requestingId?: string | null;
   canApply?: boolean;
   applyBlockedLabel?: string;
+  blockedActionable?: boolean;
   onSelect?: (id: string | null) => void;
   onRequest?: (event: OpenEventRecord) => void;
   className?: string;
@@ -80,6 +82,7 @@ export function MarketplaceMapView({
         requesting={Boolean(selectedPin && requestingId === selectedPin.id)}
         canApply={canApply}
         applyBlockedLabel={applyBlockedLabel}
+        blockedActionable={blockedActionable}
         onClose={() => onSelect?.(null)}
         onApply={(event) => onRequest?.(event)}
       />

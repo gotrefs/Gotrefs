@@ -314,14 +314,14 @@ export function RequestRefForm({
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-neutral-900">Request sent to {r.name}</h1>
         <p className="mt-2 text-neutral-600">
-          We&apos;ll email you when they accept. You only pay once a ref confirms.
+          We&apos;ll email you when they accept. You only pay once a REF confirms.
         </p>
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
           <Link href="/dashboard/organizer" className="rounded-full bg-neutral-900 px-6 py-3 text-sm font-semibold text-white">
             Go to my dashboard
           </Link>
           <Link href="/find-refs" className="rounded-full border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900">
-            Request another ref
+            Request another REF
           </Link>
         </div>
       </div>
@@ -350,13 +350,13 @@ export function RequestRefForm({
             setError("No card was added, so the request wasn't sent. Tap Request when you're ready.");
           }}
         >
-          Fill this out on Stripe so your Ref can be paid. You&apos;re only charged when {firstName} accepts,
+          Fill this out on Stripe so your REF can be paid. You&apos;re only charged when {firstName} accepts,
           and your request is sent as soon as the card is saved. Stripe protects your card details. GotREFS
           never stores your full card number.
         </StripePromptModal>
       )}
       <Link href="/find-refs" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900">
-        ← Back to refs
+        ← Back to REFS
       </Link>
 
       <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-14">
@@ -396,7 +396,7 @@ export function RequestRefForm({
             )}
             {r.gamesCompleted > 0 && (
               <div>
-                <dt className="text-neutral-500">Games on GoTRefs</dt>
+                <dt className="text-neutral-500">Games on GotREFS</dt>
                 <dd className="mt-0.5 font-semibold text-neutral-900">{r.gamesCompleted}</dd>
               </div>
             )}
@@ -407,7 +407,7 @@ export function RequestRefForm({
               </div>
             )}
             <div>
-              <dt className="text-neutral-500">GoTRefs ID</dt>
+              <dt className="text-neutral-500">GotREFS ID</dt>
               <dd className="mt-0.5 font-semibold text-neutral-900">
                 <Link href={`/verify/${encodeURIComponent(r.gotrefsId)}`} className="underline">
                   {r.gotrefsId}
@@ -551,7 +551,7 @@ export function RequestRefForm({
 
             {viewerRole === "ref" ? (
               <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                You&apos;re signed in with a referee account. Log in as an event organizer to request refs.
+                You&apos;re signed in with a REFeree account. Log in as an event organizer to request REFS.
               </p>
             ) : (
               <button
@@ -574,7 +574,7 @@ export function RequestRefForm({
                   <dd>${subtotal.toFixed(2)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>GoTRefs service fee ({PLATFORM_FEE_PERCENT_LABEL})</dt>
+                  <dt>GotREFS service fee ({PLATFORM_FEE_PERCENT_LABEL})</dt>
                   <dd>${fee.toFixed(2)}</dd>
                 </div>
                 <div className="flex justify-between">

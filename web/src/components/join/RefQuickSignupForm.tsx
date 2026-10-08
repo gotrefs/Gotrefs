@@ -83,8 +83,8 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
 
   function validate(): string | null {
     if (!firstName.trim() || !lastName.trim()) return "Enter your first and last name.";
-    if (!photo) return "Add a photo of yourself for your ref card.";
-    if (!sport) return "Pick the sport you referee.";
+    if (!photo) return "Add a photo of yourself for your REF card.";
+    if (!sport) return "Pick the sport you REFeree.";
     if (!EMAIL_RE.test(email.trim())) return "Enter a valid email address.";
     if (password.length < 8) return "Password must be at least 8 characters.";
     if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
@@ -209,7 +209,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
   if (done) {
     return (
       <div className="rounded-3xl bg-white p-7 text-center shadow-[0_10px_40px_rgba(0,0,0,0.08)] sm:p-8">
-        <h2 className="text-2xl font-semibold text-neutral-900">Your ref card is ready, {firstName.trim()}!</h2>
+        <h2 className="text-2xl font-semibold text-neutral-900">Your REF card is ready, {firstName.trim()}!</h2>
         <p className="mt-1 text-sm text-neutral-600">
           {done.needsEmailConfirmation
             ? `We sent a link to ${email.trim().toLowerCase()}. Open it ${
@@ -259,7 +259,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
         )}
         <p className="mt-4 text-xs leading-5 text-neutral-500">
           Your card says &ldquo;Official ID card&rdquo; for now. It changes to &ldquo;Verified official&rdquo; once
-          GoTRefs verifies you.
+          GotREFS verifies you.
         </p>
       </div>
     );
@@ -267,7 +267,7 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
 
   return (
     <form onSubmit={submit} noValidate className="rounded-3xl bg-white p-7 shadow-[0_10px_40px_rgba(0,0,0,0.08)] sm:p-8">
-      <h2 className="text-2xl font-semibold text-neutral-900">Get your ref card</h2>
+      <h2 className="text-2xl font-semibold text-neutral-900">Get your REF card</h2>
       <p className="mt-1 text-sm text-neutral-600">Free. Takes about a minute. No ID needed to sign up.</p>
 
       <div className="mt-6 flex items-center gap-4">
@@ -371,12 +371,12 @@ export function RefQuickSignupForm({ sports }: { sports: string[] }) {
         disabled={saving}
         className="mt-6 w-full rounded-xl bg-[var(--red)] py-3.5 text-base font-semibold text-white hover:bg-[var(--red-dark)] disabled:opacity-60"
       >
-        {saving ? "Creating your card…" : "Get my ref card"}
+        {saving ? "Creating your card…" : "Get my REF card"}
       </button>
       <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
         By signing up you agree to the{" "}
         <Link href="/policies/referee-official-terms" target="_blank" className="underline">
-          Referee Terms
+          REFeree Terms
         </Link>
         , Privacy Policy and Community Standards.
       </p>

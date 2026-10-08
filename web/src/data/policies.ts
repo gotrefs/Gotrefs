@@ -26,7 +26,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
         title: "Introduction",
         body: [
           'At GotREFS, the safety, integrity, and professionalism of youth and amateur sports are fundamental to our mission. This Background Check & Verification Policy ("Policy") establishes the standards and procedures for verifying the qualifications of officials who use the GotREFS platform.',
-          'This Policy applies to all referees, umpires, officials, judges, scorekeepers, and other sports professionals ("Officials") who create an account on GotREFS.org.',
+          'This Policy applies to all REFerees, umpires, officials, judges, scorekeepers, and other sports professionals ("Officials") who create an account on GotREFS.org.',
           "By using the platform, Officials acknowledge and agree to comply with this Policy.",
         ],
       },
@@ -737,7 +737,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
   },
   {
     slug: "referee-official-terms",
-    title: "GotREFS Referee & Official Terms & Conditions",
+    title: "GotREFS REFeree & Official Terms & Conditions",
     effectiveDate: "Effective Date: To be updated",
     summary: "Terms governing official eligibility, assignments, conduct, compensation, cancellations, safety, and platform use.",
     contactEmail: "support@GotREFS.org",
@@ -745,7 +745,7 @@ export const POLICY_DOCUMENTS: PolicyDocument[] = [
       {
         title: "Introduction",
         body: [
-          "These Terms & Conditions govern use of GotREFS.org by referees, umpires, officials, judges, scorekeepers, and other sports officials who use the platform to locate, accept, and manage officiating assignments. By creating an account or using GotREFS.org, Officials agree to these Terms.",
+          "These Terms & Conditions govern use of GotREFS.org by REFerees, umpires, officials, judges, scorekeepers, and other sports officials who use the platform to locate, accept, and manage officiating assignments. By creating an account or using GotREFS.org, Officials agree to these Terms.",
         ],
       },
       {

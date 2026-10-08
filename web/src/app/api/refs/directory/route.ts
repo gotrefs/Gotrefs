@@ -35,7 +35,7 @@ export async function GET() {
     return NextResponse.json({
       canContact: false,
       refs: [],
-      message: "Only registered event organizers can browse ref availability and contact refs.",
+      message: "Only registered event organizers can browse REF availability and contact REFS.",
     });
   }
 

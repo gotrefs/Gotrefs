@@ -361,7 +361,7 @@ export function RefereeIdCard({
                   </p>
                 ) : null}
                 <p style={{ color: C.ink }}>
-                  <span className="font-bold">Referee ID: </span>
+                  <span className="font-bold">REFeree ID: </span>
                   <span className="font-semibold tracking-wide">{id || "—"}</span>
                 </p>
               </button>
@@ -471,7 +471,7 @@ export function RefereeIdCard({
           {/* Games + Location */}
           <div className="mt-3.5 grid h-[7.5rem] grid-cols-2 gap-2">
             <InfoBox
-              title={isVerifiedCard ? "Games certified to ref" : "Sports"}
+              title={isVerifiedCard ? "Games certified to REF" : "Sports"}
               onClick={() => onEditField?.("sports")}
               className="h-full"
               bodyClassName="max-h-[5.25rem]"

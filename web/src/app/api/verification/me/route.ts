@@ -47,7 +47,7 @@ export async function GET() {
     ]);
 
   if (member?.role !== "ref") {
-    return NextResponse.json({ error: "Referee account required." }, { status: 403 });
+    return NextResponse.json({ error: "REFeree account required." }, { status: 403 });
   }
 
   let status = submission?.status || "draft";

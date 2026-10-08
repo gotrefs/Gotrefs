@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type PageProps = { params: Promise<{ gotrefsId: string }> };
 
-export const metadata: Metadata = { title: `Request a referee | ${BRAND_NAME}` };
+export const metadata: Metadata = { title: `Request a REFeree | ${BRAND_NAME}` };
 export const dynamic = "force-dynamic";
 
 async function viewerRole(): Promise<"organizer" | "ref" | null> {
@@ -31,7 +31,7 @@ function Notice({ title, body }: { title: string; body: string }) {
       <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
       <p className="mt-2 text-neutral-600">{body}</p>
       <Link href="/find-refs" className="mt-6 inline-block rounded-full bg-neutral-900 px-6 py-3 text-sm font-semibold text-white">
-        Browse refs
+        Browse REFS
       </Link>
     </div>
   );
@@ -55,11 +55,11 @@ export default async function RequestRefPage({ params }: PageProps) {
       <MarketingHeader />
       <main className="min-h-dvh bg-white">
         {!listing ? (
-          <Notice title="Ref not found" body="This referee isn't available right now. Browse other refs near you." />
+          <Notice title="REF not found" body="This REFeree isn't available right now. Browse other REFS near you." />
         ) : listing.isSample ? (
           <Notice
             title="This is a sample profile"
-            body="Sample profiles show what GoTRefs listings look like and can't be requested. Browse verified refs instead."
+            body="Sample profiles show what GotREFS listings look like and can't be requested. Browse verified REFS instead."
           />
         ) : (
           <RequestRefForm listing={listing} viewerRole={role} />

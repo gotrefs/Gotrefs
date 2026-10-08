@@ -139,7 +139,7 @@ export async function GET() {
 
   return NextResponse.json({
     payments: payload,
-    note: "Disburse sends Connect transfers to refs now (skips event-end wait). Full refund returns the organizer charge and resets offer payment status when no transfers exist.",
+    note: "Disburse sends Connect transfers to REFS now (skips event-end wait). Full refund returns the organizer charge and resets offer payment status when no transfers exist.",
   });
 }
 

@@ -232,7 +232,7 @@ export default function RefereeDashboardClient() {
       String(meta.full_name ?? "").trim() ||
         `${String(meta.first_name ?? "").trim()} ${String(meta.last_name ?? "").trim()}`.trim() ||
         user.email?.split("@")[0] ||
-        "Referee"
+        "REFeree"
     );
 
     const { data: memberRow } = await supabase
@@ -1036,7 +1036,7 @@ export default function RefereeDashboardClient() {
         return;
       }
       setIsAssignor(Boolean(json.isAssignor));
-      setMsg(enabled ? "Assignor mode enabled. Add refs you work with below." : "Assignor mode turned off.");
+      setMsg(enabled ? "Assignor mode enabled. Add REFS you work with below." : "Assignor mode turned off.");
       if (enabled) {
         const rosterRes = await fetch("/api/assignor/roster");
         const rosterJson = (await rosterRes.json()) as { entries?: AssignorRosterEntry[] };
@@ -1080,11 +1080,11 @@ export default function RefereeDashboardClient() {
       });
       const json = (await res.json()) as { error?: string; entry?: AssignorRosterEntry };
       if (!res.ok) {
-        setMsg(json.error || "Could not add ref.");
+        setMsg(json.error || "Could not add REF.");
         return;
       }
       if (json.entry) setRosterEntries((prev) => [json.entry!, ...prev]);
-      setMsg("Ref saved to your assignor roster.");
+      setMsg("REF saved to your assignor roster.");
     } catch {
       setMsg("Could not reach the server.");
     } finally {
@@ -1281,11 +1281,39 @@ export default function RefereeDashboardClient() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
-        <p className="text-sm font-semibold text-neutral-800">Loading your referee dashboard…</p>
+        <p className="text-sm font-semibold text-neutral-800">Loading your REFeree dashboard…</p>
         <p className="mt-2 text-xs text-neutral-500">This usually takes a second after Stripe Connect.</p>
       </div>
     );
   }
+
+  // Everything the Ref's own card shows. Used by the approved banner and the My Player Card tab.
+  const refCardProps = {
+    fullName: displayName,
+    gotrefsId: cardMeta.gotrefsId,
+    primarySport: sport,
+    additionalSports: additionalSports,
+    certificationLevel: cert,
+    additionalCertificationLevels: additionalCerts,
+    certifiedBy: cardMeta.certifiedBy || cert || undefined,
+    rate: rateLabel(),
+    avatarUrl: avatarUrl ?? undefined,
+    avatarLabel: avatarLabel,
+    baseCity: cardMeta.baseCity,
+    workRegions: cardMeta.workRegions,
+    travelRadius: cardMeta.travelRadius,
+    availabilitySummary: availabilitySummary,
+    govIdUploaded: Boolean(govIdPath),
+    certUploaded: Boolean(certDocPath),
+    backgroundStatus: screening?.status,
+    verificationStatus: verificationStatus,
+    verificationSkipped: cardMeta.verificationSkipped,
+    profileComplete: profileComplete,
+    verified: isVerified,
+    validThrough: showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null,
+    onEditField: (field: EditableRefCardField) => openProfileWizard(field),
+    onUploadPhoto: (file: File) => void uploadProfilePhoto(file),
+  };
 
   return (
     <div className="flex flex-col gap-10">
@@ -1467,15 +1495,22 @@ export default function RefereeDashboardClient() {
                 return;
               }
               setMsg(applyBlockedLabel);
+              // Open the step the button named (e.g. "Upload your government ID"), not just the first gap.
+              const gateField: EditableRefCardField | null =
+                applyGateStep === "government_id" || applyGateStep === "submit"
+                  ? "verification"
+                  : applyGateStep === "certification"
+                    ? "certification"
+                    : null;
               const next = missingActions[0];
-              if (next) openProfileWizard(next.field);
-              else openProfileWizard("certification");
+              openProfileWizard(gateField ?? next?.field ?? "certification");
             }}
             onReload={load}
             offers={offers}
             applications={applications}
             bookings={bookings}
             payoutPanel={<RefPayoutPanel />}
+            cardPanel={<RefereeIdCard {...refCardProps} />}
           />
         </section>
       )}
@@ -1596,35 +1631,7 @@ export default function RefereeDashboardClient() {
             ) : null}
           </div>
           <div>
-            <RefereeIdCard
-              cardRef={idCardRef}
-              fullName={displayName}
-              gotrefsId={cardMeta.gotrefsId}
-              primarySport={sport}
-              additionalSports={additionalSports}
-              certificationLevel={cert}
-              additionalCertificationLevels={additionalCerts}
-              certifiedBy={cardMeta.certifiedBy || cert || undefined}
-              rate={rateLabel()}
-              avatarUrl={avatarUrl ?? undefined}
-              avatarLabel={avatarLabel}
-              baseCity={cardMeta.baseCity}
-              workRegions={cardMeta.workRegions}
-              travelRadius={cardMeta.travelRadius}
-              availabilitySummary={availabilitySummary}
-              govIdUploaded={Boolean(govIdPath)}
-              certUploaded={Boolean(certDocPath)}
-              backgroundStatus={screening?.status}
-              verificationStatus={verificationStatus}
-              verificationSkipped={cardMeta.verificationSkipped}
-              profileComplete={profileComplete}
-              verified={isVerified}
-              validThrough={
-                showApprovedHero ? formatCardValidThrough(verificationReviewedAt) : null
-              }
-              onEditField={(field) => openProfileWizard(field)}
-              onUploadPhoto={(file) => void uploadProfilePhoto(file)}
-            />
+            <RefereeIdCard cardRef={idCardRef} {...refCardProps} />
           </div>
         </div>
       ) : null}

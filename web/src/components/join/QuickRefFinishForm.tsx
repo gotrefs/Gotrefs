@@ -32,8 +32,8 @@ export function QuickRefFinishForm({
     e.preventDefault();
     setError(null);
     if (!firstName.trim() || !lastName.trim()) return setError("Add your first and last name.");
-    if (!sport) return setError("Pick the sport you referee.");
-    if (!terms) return setError("Accept the referee terms to continue.");
+    if (!sport) return setError("Pick the sport you REFeree.");
+    if (!terms) return setError("Accept the REFeree terms to continue.");
     setSaving(true);
     try {
       const res = await fetch("/api/auth/quick-ref-signup", {
@@ -71,7 +71,7 @@ export function QuickRefFinishForm({
       </div>
 
       <fieldset className="mt-6">
-        <legend className="text-sm font-semibold text-neutral-900">What sport do you referee?</legend>
+        <legend className="text-sm font-semibold text-neutral-900">What sport do you REFeree?</legend>
         <div className="mt-2 flex flex-wrap gap-2">
           {popular.map((s) => (
             <button
@@ -111,7 +111,7 @@ export function QuickRefFinishForm({
         <span>
           I agree to the{" "}
           <Link href="/policies/referee-official-terms" target="_blank" className="font-semibold underline">
-            Referee Terms
+            REFeree Terms
           </Link>
           , Privacy Policy and Community Standards.
         </span>

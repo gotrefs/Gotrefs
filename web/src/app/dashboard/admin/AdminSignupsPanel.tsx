@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AdminSignupEntry } from "@/lib/admin/signups";
+import AdminSignupUploadsModal from "./AdminSignupUploadsModal";
 
 type RoleFilter = "all" | "ref" | "organizer";
 const PREVIEW_ROWS = 15;
 
 const ROLE_LABEL: Record<AdminSignupEntry["role"], string> = {
-  ref: "Referee",
+  ref: "REFeree",
   organizer: "Organizer",
   unknown: "Not set",
 };
@@ -24,7 +25,7 @@ function csvCell(value: string) {
 }
 
 function toCsv(rows: AdminSignupEntry[]) {
-  const header = ["First name", "Last name", "Email", "Phone", "Type", "Sport", "Organization", "GoTRefs ID", "Signed up", "Email confirmed"];
+  const header = ["First name", "Last name", "Email", "Phone", "Type", "Sport", "Organization", "GotREFS ID", "Signed up", "Email confirmed"];
   const lines = rows.map((row) =>
     [
       row.firstName || row.name,
@@ -52,6 +53,7 @@ export default function AdminSignupsPanel() {
   const [role, setRole] = useState<RoleFilter>("all");
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [viewing, setViewing] = useState<AdminSignupEntry | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -83,6 +85,13 @@ export default function AdminSignupsPanel() {
     setLoading(true);
     setReloadKey((key) => key + 1);
   }
+
+  // Coming back to this tab (say, after deleting someone in Supabase) reloads the list.
+  useEffect(() => {
+    const onFocus = () => setReloadKey((key) => key + 1);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   const counts = useMemo(
     () => ({
@@ -149,7 +158,7 @@ export default function AdminSignupsPanel() {
           {(
             [
               ["all", "All", counts.all],
-              ["ref", "Referees", counts.ref],
+              ["ref", "REFerees", counts.ref],
               ["organizer", "Organizers", counts.organizer],
             ] as const
           ).map(([value, label, count]) => (
@@ -207,12 +216,19 @@ export default function AdminSignupsPanel() {
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setViewing(s)}
+                  className="mt-2 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--navy)] hover:border-[var(--navy)]"
+                >
+                  Uploaded info
+                </button>
               </li>
             ))}
           </ul>
 
           <div className="hidden overflow-x-auto border-t border-[var(--border)] sm:block">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th scope="col" className="px-5 py-2.5">Name</th>
@@ -221,6 +237,9 @@ export default function AdminSignupsPanel() {
                   <th scope="col" className="px-3 py-2.5">Type</th>
                   <th scope="col" className="px-3 py-2.5">Sport / organization</th>
                   <th scope="col" className="px-3 py-2.5">Signed up</th>
+                  <th scope="col" className="px-3 py-2.5">
+                    <span className="sr-only">Uploaded info</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -239,6 +258,15 @@ export default function AdminSignupsPanel() {
                     <td className="px-3 py-2.5 text-slate-700">{ROLE_LABEL[s.role]}</td>
                     <td className="px-3 py-2.5 text-slate-700">{s.sport || s.organization || "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">{formatDate(s.signedUpAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setViewing(s)}
+                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--navy)] hover:border-[var(--navy)]"
+                      >
+                        Uploaded info
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -258,6 +286,14 @@ export default function AdminSignupsPanel() {
           ) : null}
         </>
       )}
+      {viewing ? (
+        <AdminSignupUploadsModal
+          key={viewing.id}
+          memberId={viewing.id}
+          fallbackName={viewing.name}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
     </section>
   );
 }

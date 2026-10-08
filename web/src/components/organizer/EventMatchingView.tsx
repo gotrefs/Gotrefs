@@ -144,7 +144,7 @@ export function EventMatchingView({
   );
 
   const payLabel = formatPayOffer(event.pay_offer);
-  const statusLabel = `${hiredCount}/${event.officials_needed} Refs Hired`;
+  const statusLabel = `${hiredCount}/${event.officials_needed} REFS Hired`;
 
   async function requestRef(refId: string) {
     setBusyId(refId);
@@ -201,10 +201,10 @@ export function EventMatchingView({
       <div className="mx-auto grid min-h-0 w-full max-w-[90rem] flex-1 grid-cols-1 lg:grid-cols-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
         <aside className="min-h-0 overflow-y-auto border-r border-neutral-200 p-4 sm:p-5">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-neutral-900">Matching refs</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">Matching REFS</h2>
             <p className="mt-1 text-sm text-neutral-500">
               Verified officials whose travel radius reaches this event. You’ll confirm pay after they
-              accept (ref pay + GotREFS fee + refundable 1-game deposit per ref).
+              accept (REF pay + GotREFS fee + refundable 1-game deposit per REF).
             </p>
           </div>
           {loadingMatches ? (
@@ -215,7 +215,7 @@ export function EventMatchingView({
             </div>
           ) : matches.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500">
-              No matching refs found for this sport and location yet. Check back as more verified officials add availability nearby.
+              No matching REFS found for this sport and location yet. Check back as more verified officials add availability nearby.
             </div>
           ) : (
             <div className="space-y-3">

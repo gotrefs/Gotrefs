@@ -142,7 +142,7 @@ export function EventStaffingPanel({
               {event.sport} · {new Date(event.starts_at).toLocaleString()} · ZIP {event.zip_code}
             </p>
             <p className="mt-2 text-sm font-bold text-[var(--navy)]">
-              {hiredCount}/{event.officials_needed} refs confirmed
+              {hiredCount}/{event.officials_needed} REFS confirmed
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -151,7 +151,7 @@ export function EventStaffingPanel({
               onClick={() => setTab("suggested")}
               className="rounded-full bg-[var(--red)] px-4 py-2 text-sm font-bold text-white"
             >
-              Find matching refs
+              Find matching REFS
             </button>
             <button
               type="button"
@@ -180,7 +180,7 @@ export function EventStaffingPanel({
               tab === "suggested" ? "bg-[var(--navy)] text-white" : "border border-[var(--border)]"
             }`}
           >
-            Suggested refs ({suggestedRefs.length})
+            Suggested REFS ({suggestedRefs.length})
           </button>
         </div>
 
@@ -188,7 +188,7 @@ export function EventStaffingPanel({
           {tab === "applicants" &&
             (eventApplicants.length === 0 ? (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-                No refs have applied yet. Open Suggested refs to invite someone who matches this game, or wait for requests from Find Games.
+                No REFS have applied yet. Open Suggested REFS to invite someone who matches this game, or wait for requests from Find Games.
               </p>
             ) : (
               eventApplicants.map((applicant) => (
@@ -204,7 +204,7 @@ export function EventStaffingPanel({
                     />
                   </div>
                   {applicant.refRateLabel && (
-                    <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Ref rate: {applicant.refRateLabel}</p>
+                    <p className="mt-1 text-xs font-semibold text-[var(--muted)]">REF rate: {applicant.refRateLabel}</p>
                   )}
                   <button
                     type="button"
@@ -221,7 +221,7 @@ export function EventStaffingPanel({
           {tab === "suggested" &&
             (suggestedRefs.length === 0 ? (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-slate-50 p-5 text-sm text-[var(--muted)]">
-                No refs match availability, sport, ZIP, and pay for this game yet. Wait for refs to apply from Find Games, or widen pay/ZIP on the listing.
+                No REFS match availability, sport, ZIP, and pay for this game yet. Wait for REFS to apply from Find Games, or widen pay/ZIP on the listing.
               </p>
             ) : (
               suggestedRefs.map((ref) => (
@@ -246,7 +246,7 @@ export function EventStaffingPanel({
                     onClick={() => void inviteRef(ref.id)}
                     className="mt-3 rounded-full bg-[var(--red)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
-                    {busyId === ref.id ? "Sending…" : "Request this ref"}
+                    {busyId === ref.id ? "Sending…" : "Request this REF"}
                   </button>
                 </article>
               ))

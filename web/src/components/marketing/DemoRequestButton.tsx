@@ -113,7 +113,7 @@ export function DemoRequestButton({ className = "" }: DemoRequestButtonProps) {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="min-h-24 rounded-xl border border-[var(--border)] px-3 py-2 font-normal"
-                  placeholder="Tell us about your league, tournament, school, or referee needs."
+                  placeholder="Tell us about your league, tournament, school, or REFeree needs."
                 />
               </label>
 

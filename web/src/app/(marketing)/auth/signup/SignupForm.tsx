@@ -219,7 +219,7 @@ export function SignupForm() {
             Create your profile
           </p>
           <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight text-[var(--blue-text)] sm:text-4xl">
-            Build your ref ID as you sign up.
+            Build your REF ID as you sign up.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
             Start browsing games right away in pending verification. Finish your ID, certification, and background
@@ -246,7 +246,7 @@ export function SignupForm() {
             <div>
               <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a...</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Choose your role. Selecting referee starts your live digital ID card.
+                Choose your role. Selecting REFeree starts your live digital ID card.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <button
@@ -259,7 +259,7 @@ export function SignupForm() {
                   }}
                   className="rounded-2xl border border-[var(--red)] bg-[var(--red)] px-5 py-4 text-left font-bold text-white shadow-sm"
                 >
-                  I am a Referee
+                  I am a REFeree
                 </button>
                 <button
                   type="button"
@@ -301,9 +301,9 @@ export function SignupForm() {
           {roleConfirmed && <form ref={formRef} onSubmit={onSubmit} className="mt-6 flex flex-col gap-5 sm:mt-8">
             {isRef && step === 0 && (
               <div>
-                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a referee</h2>
+                <h2 className="text-xl font-black text-[var(--navy)] sm:text-2xl">Step 1: I am a REFeree</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Fill in the fields below and watch your GotREFS Referee card update above.
+                  Fill in the fields below and watch your GotREFS REFeree card update above.
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
@@ -668,7 +668,7 @@ export function SignupForm() {
                 </label>
                 <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--grey-light)]/40 p-4 text-sm text-[var(--muted)]">
                   Certification document upload happens inside the dashboard after account creation, so files are
-                  securely tied to the signed-in ref.
+                  securely tied to the signed-in REF.
                 </div>
               </div>
             )}
@@ -689,7 +689,7 @@ export function SignupForm() {
                   ))}
                 </div>
                 <p className="mt-5 rounded-2xl border border-[var(--blue)]/20 bg-[var(--blue)]/5 p-4 text-sm text-[var(--slate)]">
-                  After signup, refs can browse games immediately in pending status. They will finish uploads and
+                  After signup, REFS can browse games immediately in pending status. They will finish uploads and
                   background screening before accepting paid assignments.
                 </p>
               </div>
@@ -783,7 +783,7 @@ export function SignupForm() {
                 disabled={loading}
                 className="btn-primary w-full py-3 disabled:opacity-50"
               >
-                {loading ? "Creating..." : isRef ? "Create pending ref profile" : "Sign up"}
+                {loading ? "Creating..." : isRef ? "Create pending REF profile" : "Sign up"}
               </button>
             )}
           </form>}
@@ -793,7 +793,7 @@ export function SignupForm() {
               <RefereeIdCard
                 fullName={fullName}
                 gotrefsId={email ? gotrefsId : undefined}
-                cardTitle="GotREFS Referee"
+                cardTitle="GotREFS REFeree"
                 primarySport={primarySport}
                 additionalSports={additionalSports}
                 certificationLevel={certificationLevel}

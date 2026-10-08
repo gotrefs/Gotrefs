@@ -26,7 +26,7 @@ export function VerifiedRefCardSection() {
       className="viewport-screen flex flex-col justify-center border-t border-[var(--border)] bg-slate-50 px-4"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col justify-center">
-        <p className="marketing-eyebrow text-[var(--red)]">For Referees</p>
+        <p className="marketing-eyebrow text-[var(--red)]">For REFerees</p>
         <h2 className="marketing-headline text-[#1b2132]">Your Whistle. Your Backyard.</h2>
         <p className="marketing-body">
           Stop chasing gigs across state lines. With <BrandName />, local event organizers come directly to you. Sleep
@@ -55,7 +55,7 @@ export function VerifiedRefCardSection() {
         </div>
 
         <Link href="/join" className="btn-demo-hero mt-5 inline-flex w-full sm:mt-6 sm:w-auto">
-          Join as a referee
+          Join as a REFeree
         </Link>
       </div>
     </section>
