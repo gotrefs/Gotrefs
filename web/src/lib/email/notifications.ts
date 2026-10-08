@@ -719,3 +719,31 @@ export async function notifyPayoutMethodNeeded(opts: {
     }),
   });
 }
+
+/** Ask the REF to sign off on games or hours that differ from the booking. */
+export async function notifyTimesheetSignoff(opts: {
+  admin: SupabaseClient;
+  refMemberId: string;
+  eventTitle: string;
+  summary: string;
+  siteUrl: string;
+}) {
+  const recipient = await emailForMemberId(opts.admin, opts.refMemberId);
+  if (!recipient?.email) return false;
+  const url = `${opts.siteUrl.replace(/\/$/, "")}/dashboard/referee?tab=my-work`;
+  return sendEmail({
+    to: recipient.email,
+    subject: `Sign off on your work for ${opts.eventTitle}`,
+    html: emailLayout({
+      title: "Please sign off on your work",
+      bodyHtml: `<p>The organizer of <strong>${escapeHtml(opts.eventTitle)}</strong> submitted your timesheet:</p>
+        <p><strong>${escapeHtml(opts.summary)}</strong></p>
+        <p>Approve it if it's right, or dispute it and ${BRAND_NAME} will step in.</p>`,
+      ctaLabel: "Review and sign off",
+      ctaUrl: url,
+      ctaLarge: true,
+    }),
+    text: `The organizer of ${opts.eventTitle} submitted your timesheet: ${opts.summary}. Approve or dispute it here: ${url}`,
+  });
+}
+

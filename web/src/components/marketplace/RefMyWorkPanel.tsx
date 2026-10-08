@@ -7,6 +7,8 @@ import {
   acceptPhotosForSport,
 } from "@/components/marketplace/AirbnbAcceptProfile";
 import { notesForRefDisplay } from "@/lib/marketplace/notes-for-ref";
+import type { Timesheet } from "@/lib/timesheets";
+import { RefTimesheetCard } from "@/components/timesheets/RefTimesheetCard";
 
 export type RefWorkOffer = {
   id: string;
@@ -97,6 +99,8 @@ export type RefWorkBooking = {
         notes?: string | null;
       }[]
     | null;
+  /** Filled in after the organizer checks this REF in at the event. */
+  timesheet?: Timesheet | null;
 };
 
 type WorkSubTab = "invites" | "applied" | "confirmed";
@@ -122,7 +126,10 @@ export function RefMyWorkPanel({
   bookings: RefWorkBooking[];
   onReload: () => Promise<void> | void;
 }) {
-  const [subTab, setSubTab] = useState<WorkSubTab>("invites");
+  // Open straight to Upcoming when a timesheet is waiting on this REF's sign-off.
+  const [subTab, setSubTab] = useState<WorkSubTab>(() =>
+    bookings.some((b) => b.timesheet?.status === "awaiting_ref") ? "confirmed" : "invites"
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -330,6 +337,9 @@ export function RefMyWorkPanel({
                       <p className="font-semibold text-neutral-900">Organizer info</p>
                       <p className="mt-0.5 whitespace-pre-wrap">{organizerInfo}</p>
                     </div>
+                  ) : null}
+                  {booking.timesheet ? (
+                    <RefTimesheetCard sheet={booking.timesheet} onChanged={onReload} />
                   ) : null}
                 </article>
               );

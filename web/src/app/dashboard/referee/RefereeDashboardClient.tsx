@@ -9,6 +9,7 @@ import { RefPayoutRequiredModal } from "@/components/payments/RefPayoutRequiredM
 import { RefVerificationResubmitFlow } from "@/components/RefVerificationResubmitFlow";
 import { RefMarketplaceHub } from "@/components/marketplace/RefMarketplaceHub";
 import type { RefWorkApplication, RefWorkBooking } from "@/components/marketplace/RefMyWorkPanel";
+import type { Timesheet } from "@/lib/timesheets";
 import { PendingOfferQueueModal } from "@/components/referee/PendingOfferQueueModal";
 import { RefereeIdCard, type EditableRefCardField } from "@/components/RefereeIdCard";
 import { RefGearCouponNotice } from "@/components/partners/RefGearCouponNotice";
@@ -429,7 +430,17 @@ export default function RefereeDashboardClient() {
         .order("created_at", { ascending: false });
       bks = fallback.data as typeof bks;
     }
-    setBookings((bks as unknown as RefWorkBooking[]) || []);
+    const bookingRows = ((bks as unknown as RefWorkBooking[]) || []).slice();
+    if (bookingRows.length > 0) {
+      // Timesheets are optional: if the table isn't there yet, bookings still show.
+      const { data: sheets } = await supabase
+        .from("booking_timesheets")
+        .select("*")
+        .eq("ref_member_id", user.id);
+      const byBooking = new Map((sheets ?? []).map((s) => [s.booking_id as string, s as Timesheet]));
+      for (const b of bookingRows) b.timesheet = byBooking.get(b.id) ?? null;
+    }
+    setBookings(bookingRows);
 
     const { data: av } = await supabase
       .from("ref_availability")

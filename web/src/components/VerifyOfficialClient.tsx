@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { RefereeIdCard } from "@/components/RefereeIdCard";
+import { ScanCheckInPanel } from "@/components/timesheets/ScanCheckInPanel";
 import type { PublicRefIdCard } from "@/lib/public-ref-id-card";
 import { refVerificationApproved } from "@/lib/ref-eligibility";
 import { BRAND_NAME } from "@/lib/brand";
@@ -77,6 +78,8 @@ export function VerifyOfficialClient({ card }: { card: PublicRefIdCard }) {
             REFeree ID <span className="font-semibold text-white">{card.gotrefsId}</span>
           </p>
         </div>
+
+        <ScanCheckInPanel gotrefsId={card.gotrefsId} />
 
         <div className="w-full">
           <div id="id-card" className="mx-auto w-full max-w-[400px]">
